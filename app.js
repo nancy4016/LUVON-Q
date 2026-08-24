@@ -239,6 +239,17 @@ function updateAuthUI(isAuthenticated) {
     if (tenantCard) tenantCard.classList.add('hidden');
   }
 }
+function toggleMobileMenu() {
+  const sidebar = document.getElementById('sidebarNav');
+  const backdrop = document.getElementById('sidebarBackdrop');
+
+  if (sidebar) {
+    sidebar.classList.toggle('-translate-x-full');
+  }
+  if (backdrop) {
+    backdrop.classList.toggle('hidden');
+  }
+}
 
 // Check session status on page load
 document.addEventListener('DOMContentLoaded', () => {
