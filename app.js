@@ -176,6 +176,56 @@ function toggleSignOut() {
   localStorage.removeItem('luvon_user_email');
   updateAuthUI(false);
 }
+// Current Auth State Tracker
+let authMode = 'signin';
+
+function switchAuthTab(mode) {
+  authMode = mode;
+  const tabSignIn = document.getElementById('tabSignIn');
+  const tabSignUp = document.getElementById('tabSignUp');
+  const nameField = document.getElementById('nameFieldGroup');
+  const signInOptions = document.getElementById('signInOptions');
+  const title = document.getElementById('authModalTitle');
+  const submitBtn = document.getElementById('authSubmitBtn');
+
+  if (mode === 'signup') {
+    // UI changes for Sign Up
+    tabSignUp.className = "flex-1 py-2 text-center text-brand-600 border-b-2 border-brand-600 transition-all font-semibold";
+    tabSignIn.className = "flex-1 py-2 text-center text-slate-400 hover:text-slate-600 border-b-2 border-transparent transition-all";
+    if (nameField) nameField.classList.remove('hidden');
+    if (signInOptions) signInOptions.classList.add('hidden');
+    if (title) title.textContent = "Create an Account";
+    if (submitBtn) submitBtn.textContent = "Register & Connect Portal";
+  } else {
+    // UI changes for Sign In
+    tabSignIn.className = "flex-1 py-2 text-center text-brand-600 border-b-2 border-brand-600 transition-all font-semibold";
+    tabSignUp.className = "flex-1 py-2 text-center text-slate-400 hover:text-slate-600 border-b-2 border-transparent transition-all";
+    if (nameField) nameField.classList.add('hidden');
+    if (signInOptions) signInOptions.classList.remove('hidden');
+    if (title) title.textContent = "Sign in to Orélune OS";
+    if (submitBtn) submitBtn.textContent = "Authenticate Session";
+  }
+}
+
+function handleCustomerAuth(event) {
+  event.preventDefault();
+  const emailInput = document.getElementById('email');
+  const nameInput = document.getElementById('fullName');
+  const email = emailInput ? emailInput.value : '';
+  const fullName = nameInput && nameInput.value ? nameInput.value : 'Nairobi Kicks Studio';
+
+  // Save session & tenant details locally
+  localStorage.setItem('luvon_authenticated', 'true');
+  localStorage.setItem('luvon_user_email', email);
+  localStorage.setItem('luvon_tenant_name', fullName);
+
+  // Update tenant display name on sidebar
+  const tenantNameEl = document.getElementById('tenantName');
+  if (tenantNameEl) tenantNameEl.textContent = fullName;
+
+  updateAuthUI(true);
+  closeSignInModal();
+}
 
 function updateAuthUI(isAuthenticated) {
   const signInBtn = document.getElementById('portalSignInBtn');
