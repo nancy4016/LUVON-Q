@@ -126,3 +126,72 @@ document.addEventListener("DOMContentLoaded", () => {
     updateCarousel(nextIndex);
   });
 });
+// Highlight active page link dynamically
+document.addEventListener('DOMContentLoaded', () => {
+  const currentPath = window.location.pathname.split('/').pop() || 'index.html';
+  const navLinks = document.querySelectorAll('.nav-link');
+
+  navLinks.forEach(link => {
+    const linkPath = link.getAttribute('href');
+    
+    // Remove active styles from all links
+    link.classList.remove('bg-brand-100', 'text-brand-900', 'font-semibold', 'active');
+    link.classList.add('text-slate-600');
+
+    // Add active styling only to matching route
+    if (linkPath === currentPath) {
+      link.classList.add('bg-brand-100', 'text-brand-900', 'font-semibold', 'active');
+      link.classList.remove('text-slate-600');
+    }
+  });
+});
+// ==========================================
+// Customer Portal Sign-In & Authentication Handlers
+// ==========================================
+function openSignInModal() {
+  const modal = document.getElementById('authModal');
+  if (modal) modal.classList.remove('hidden');
+}
+
+function closeSignInModal() {
+  const modal = document.getElementById('authModal');
+  if (modal) modal.classList.add('hidden');
+}
+
+function handleCustomerLogin(event) {
+  event.preventDefault();
+  const emailInput = document.getElementById('email');
+  const email = emailInput ? emailInput.value : '';
+
+  // Save session locally
+  localStorage.setItem('luvon_authenticated', 'true');
+  localStorage.setItem('luvon_user_email', email);
+
+  updateAuthUI(true);
+  closeSignInModal();
+}
+
+function toggleSignOut() {
+  localStorage.removeItem('luvon_authenticated');
+  localStorage.removeItem('luvon_user_email');
+  updateAuthUI(false);
+}
+
+function updateAuthUI(isAuthenticated) {
+  const signInBtn = document.getElementById('portalSignInBtn');
+  const tenantCard = document.getElementById('activeTenantCard');
+
+  if (isAuthenticated) {
+    if (signInBtn) signInBtn.classList.add('hidden');
+    if (tenantCard) tenantCard.classList.remove('hidden');
+  } else {
+    if (signInBtn) signInBtn.classList.remove('hidden');
+    if (tenantCard) tenantCard.classList.add('hidden');
+  }
+}
+
+// Check session status on page load
+document.addEventListener('DOMContentLoaded', () => {
+  const isLoggedIn = localStorage.getItem('luvon_authenticated') === 'true';
+  updateAuthUI(isLoggedIn);
+});
