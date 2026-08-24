@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full bg-[#fbf9f5]">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>LUVON Q ORÉLUNE | Catalog & Stock Manager</title>
+  
+  <!-- Tailwind CSS via CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  
+  <!-- Tailwind JavaScript Theme Configuration -->
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              50: '#fcfaf6',
+              100: '#f5eee1',
+              200: '#e7e2d8',
+              500: '#a38446',
+              600: '#8c7038',
+              700: '#735b2c',
+              900: '#1c1917',
+            }
+          },
+          fontFamily: {
+            sans: ['Inter', 'sans-serif'],
+            serif: ['Playfair Display', 'serif']
+          }
+        }
+      }
+    }
+  </script>
+
+  <!-- Google Fonts & Lucide Icons -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Playfair+Display:ital,wght@0,600;0,700;1,400&display=swap" rel="stylesheet">
+  <script src="https://unpkg.com/lucide@latest"></script>
+  
+  <!-- External Custom Stylesheet -->
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body class="h-full font-sans text-brand-900 antialiased flex flex-col md:flex-row">
+
+  <!-- Sidebar Navigation -->
+  <!-- Sidebar Navigation -->
+  <aside class="w-full md:w-64 bg-white border-r border-brand-200 flex-shrink-0 flex flex-col justify-between p-6">
+    <div class="space-y-8">
+      
+      <!-- Brand Logo (Image Only - Text Removed) -->
+      <div class="flex items-center justify-start">
+        <img src="Luvon q logo.png" alt="Luvon Q Logo" class="h-20 w-auto object-contain" />
+      </div>
+
+      <!-- Navigation Links -->
+      <nav class="space-y-1">
+        <a href="index.html" class="nav-link active flex items-center gap-3 px-3 py-2.5 rounded-lg font-medium text-sm">
+          <i data-lucide="layout-dashboard" class="w-4 h-4"></i> Overview
+        </a>
+        <a href="catalog.html" class="nav-link flex items-center gap-3 px-3 py-2.5 rounded-lg text-slate-600 hover:bg-brand-50 hover:text-brand-700 transition-all font-medium text-sm">
+          <i data-lucide="shopping-bag" class="w-4 h-4"></i> Catalog & Stock
+        </a>
+        <a href="inbox.html" class="nav-link flex items-center gap-3 px-3 py-2.5 rounded-lg text-slate-600 hover:bg-brand-50 hover:text-brand-700 transition-all font-medium text-sm">
+          <i data-lucide="message-square" class="w-4 h-4"></i> Omnichannel Inbox
+        </a>
+        <a href="voice.html" class="nav-link flex items-center gap-3 px-3 py-2.5 rounded-lg text-slate-600 hover:bg-brand-50 hover:text-brand-700 transition-all font-medium text-sm">
+          <i data-lucide="mic" class="w-4 h-4"></i> Voice & Persona
+        </a>
+        <a href="payments.html" class="nav-link flex items-center gap-3 px-3 py-2.5 rounded-lg text-slate-600 hover:bg-brand-50 hover:text-brand-700 transition-all font-medium text-sm">
+          <i data-lucide="credit-card" class="w-4 h-4"></i> Daraja M-Pesa
+        </a>
+      </nav>
+    </div>
+
+    <!-- Active Tenant Card -->
+    <div class="pt-6 border-t border-brand-200">
+      <div class="p-3 bg-brand-50 rounded-xl border border-brand-200 flex items-center gap-3">
+        <div class="w-8 h-8 rounded-lg bg-brand-600 text-white flex items-center justify-center font-bold text-xs">
+          NK
+        </div>
+        <div class="overflow-hidden">
+          <p class="text-xs font-semibold text-brand-900 truncate">Nairobi Kicks Studio</p>
+          <span class="inline-block px-1.5 py-0.5 text-[10px] font-semibold text-emerald-700 bg-emerald-100 rounded">Pro Tier</span>
+        </div>
+      </div>
+    </div>
+  </aside>
+
+  <!-- Main Content Area -->
+  <main class="flex-1 overflow-y-auto p-6 md:p-10 space-y-8">
+    
+    <!-- Header Bar -->
+    <header class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-brand-200 pb-6">
+      <div>
+        <h2 class="text-2xl font-serif font-bold text-brand-900">Live Inventory & Catalog Manager</h2>
+        <p class="text-xs text-slate-500 mt-1">Manage stock availability and products synced to conversational AI agents[cite: 1]</p>
+      </div>
+      <button id="open-modal-btn" class="px-5 py-2.5 bg-brand-600 hover:bg-brand-700 text-white rounded-xl text-xs font-semibold shadow transition-all flex items-center gap-2">
+        <i data-lucide="plus" class="w-4 h-4"></i> Add New Product
+      </button>
+    </header>
+
+    <!-- Filters & Action Bar -->
+    <div class="flex flex-col sm:flex-row items-center justify-between gap-4">
+      <div class="relative w-full sm:w-80">
+        <i data-lucide="search" class="w-4 h-4 absolute left-3.5 top-3 text-slate-400"></i>
+        <input type="text" id="catalog-search" placeholder="Search catalog items..." class="w-full pl-10 pr-4 py-2.5 text-xs bg-white border border-brand-200 rounded-xl focus:outline-none focus:border-brand-600 shadow-sm" />
+      </div>
+
+      <div class="flex items-center gap-3 w-full sm:w-auto">
+        <select id="category-filter" class="w-full sm:w-auto px-4 py-2.5 text-xs bg-white border border-brand-200 rounded-xl focus:outline-none focus:border-brand-600 font-medium text-brand-900 shadow-sm">
+          <option value="ALL">All Categories</option>
+          <option value="Sneakers">Sneakers</option>
+          <option value="Apparel">Apparel</option>
+          <option value="Wellness">Wellness</option>
+        </select>
+      </div>
+    </div>
+
+    <!-- Product Grid / Table -->
+    <div class="bg-white rounded-xl border border-brand-200 shadow-sm overflow-hidden">
+      <div class="overflow-x-auto">
+        <table class="w-full text-left text-xs text-slate-600">
+          <thead class="bg-brand-50 border-b border-brand-200 font-semibold text-brand-900 uppercase tracking-wider">
+            <tr>
+              <th class="p-4">Item</th>
+              <th class="p-4">Category</th>
+              <th class="p-4">Price (KSh)</th>
+              <th class="p-4">Stock Count</th>
+              <th class="p-4">AI Recommendation</th>
+              <th class="p-4 text-right">Actions</th>
+            </tr>
+          </thead>
+          <tbody id="catalog-table-body" class="divide-y divide-brand-200/60">
+            <!-- Dynamically rendered via catalog.js -->
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+  </main>
+
+  <!-- Add Product Modal Overlay -->
+  <div id="product-modal" class="fixed inset-0 z-50 hidden bg-brand-900/60 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl border border-brand-200 max-w-lg w-full p-6 shadow-2xl space-y-5">
+      <div class="flex items-center justify-between border-b border-brand-200 pb-4">
+        <h3 class="font-serif font-bold text-lg text-brand-900">Add New Catalog Item</h3>
+        <button id="close-modal-btn" class="text-slate-400 hover:text-brand-900 transition-colors">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+
+      <form id="product-form" class="space-y-4">
+        <div>
+          <label class="block text-xs font-semibold text-brand-900 mb-1">Item Name</label>
+          <input type="text" id="prod-name" required placeholder="e.g. Air Jordan 1 High OG" class="w-full px-4 py-2.5 text-xs bg-brand-50 border border-brand-200 rounded-xl focus:outline-none focus:border-brand-600 font-medium" />
+        </div>
+
+        <div class="grid grid-cols-2 gap-4">
+          <div>
+            <label class="block text-xs font-semibold text-brand-900 mb-1">Price (KSh)</label>
+            <input type="number" id="prod-price" required placeholder="5500" class="w-full px-4 py-2.5 text-xs bg-brand-50 border border-brand-200 rounded-xl focus:outline-none focus:border-brand-600 font-medium" />
+          </div>
+
+          <div>
+            <label class="block text-xs font-semibold text-brand-900 mb-1">In Stock Quantity</label>
+            <input type="number" id="prod-stock" required placeholder="5" class="w-full px-4 py-2.5 text-xs bg-brand-50 border border-brand-200 rounded-xl focus:outline-none focus:border-brand-600 font-medium" />
+          </div>
+        </div>
+
+        <div>
+          <label class="block text-xs font-semibold text-brand-900 mb-1">Category</label>
+          <select id="prod-category" class="w-full px-4 py-2.5 text-xs bg-brand-50 border border-brand-200 rounded-xl focus:outline-none focus:border-brand-600 font-medium text-brand-900">
+            <option value="Sneakers">Sneakers</option>
+            <option value="Apparel">Apparel</option>
+            <option value="Wellness">Wellness</option>
+          </select>
+        </div>
+
+        <div>
+          <label class="block text-xs font-semibold text-brand-900 mb-1">Image URL (Optional)</label>
+          <input type="url" id="prod-image" placeholder="https://images.unsplash.com/..." class="w-full px-4 py-2.5 text-xs bg-brand-50 border border-brand-200 rounded-xl focus:outline-none focus:border-brand-600 font-medium" />
+        </div>
+
+        <div class="pt-4 flex items-center justify-end gap-3">
+          <button type="button" id="cancel-modal-btn" class="px-4 py-2.5 text-xs font-semibold text-slate-600 hover:bg-brand-50 rounded-xl transition-all">Cancel</button>
+          <button type="submit" class="px-5 py-2.5 bg-brand-600 hover:bg-brand-700 text-white text-xs font-semibold rounded-xl shadow transition-all">Save to Catalog</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script src="catalog.js"></script>
+</body>
+</html>

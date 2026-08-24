@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full bg-[#fbf9f5]">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>LUVON Q ORÉLUNE | Daraja M-Pesa Terminal</title>
+  
+  <!-- Tailwind CSS via CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  
+  <!-- Tailwind JavaScript Theme Configuration -->
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              50: '#fcfaf6',
+              100: '#f5eee1',
+              200: '#e7e2d8',
+              500: '#a38446',
+              600: '#8c7038',
+              700: '#735b2c',
+              900: '#1c1917',
+            }
+          },
+          fontFamily: {
+            sans: ['Inter', 'sans-serif'],
+            serif: ['Playfair Display', 'serif']
+          }
+        }
+      }
+    }
+  </script>
+
+  <!-- Google Fonts & Lucide Icons -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Playfair+Display:ital,wght@0,600;0,700;1,400&display=swap" rel="stylesheet">
+  <script src="https://unpkg.com/lucide@latest"></script>
+  
+  <!-- External Custom Stylesheet -->
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body class="h-full font-sans text-brand-900 antialiased flex flex-col md:flex-row">
+
+  <!-- Sidebar Navigation -->
+ <!-- Sidebar Navigation -->
+  <aside class="w-full md:w-64 bg-white border-r border-brand-200 flex-shrink-0 flex flex-col justify-between p-6">
+    <div class="space-y-8">
+      
+      <!-- Brand Logo (Image Only - Text Removed) -->
+      <div class="flex items-center justify-start">
+        <img src="Luvon q logo.png" alt="Luvon Q Logo" class="h-20 w-auto object-contain" />
+      </div>
+
+      <!-- Navigation Links -->
+      <nav class="space-y-1">
+        <a href="index.html" class="nav-link active flex items-center gap-3 px-3 py-2.5 rounded-lg font-medium text-sm">
+          <i data-lucide="layout-dashboard" class="w-4 h-4"></i> Overview
+        </a>
+        <a href="catalog.html" class="nav-link flex items-center gap-3 px-3 py-2.5 rounded-lg text-slate-600 hover:bg-brand-50 hover:text-brand-700 transition-all font-medium text-sm">
+          <i data-lucide="shopping-bag" class="w-4 h-4"></i> Catalog & Stock
+        </a>
+        <a href="inbox.html" class="nav-link flex items-center gap-3 px-3 py-2.5 rounded-lg text-slate-600 hover:bg-brand-50 hover:text-brand-700 transition-all font-medium text-sm">
+          <i data-lucide="message-square" class="w-4 h-4"></i> Omnichannel Inbox
+        </a>
+        <a href="voice.html" class="nav-link flex items-center gap-3 px-3 py-2.5 rounded-lg text-slate-600 hover:bg-brand-50 hover:text-brand-700 transition-all font-medium text-sm">
+          <i data-lucide="mic" class="w-4 h-4"></i> Voice & Persona
+        </a>
+        <a href="payments.html" class="nav-link flex items-center gap-3 px-3 py-2.5 rounded-lg text-slate-600 hover:bg-brand-50 hover:text-brand-700 transition-all font-medium text-sm">
+          <i data-lucide="credit-card" class="w-4 h-4"></i> Daraja M-Pesa
+        </a>
+      </nav>
+    </div>
+
+    <!-- Active Tenant Card -->
+    <div class="pt-6 border-t border-brand-200">
+      <div class="p-3 bg-brand-50 rounded-xl border border-brand-200 flex items-center gap-3">
+        <div class="w-8 h-8 rounded-lg bg-brand-600 text-white flex items-center justify-center font-bold text-xs">
+          NK
+        </div>
+        <div class="overflow-hidden">
+          <p class="text-xs font-semibold text-brand-900 truncate">Nairobi Kicks Studio</p>
+          <span class="inline-block px-1.5 py-0.5 text-[10px] font-semibold text-emerald-700 bg-emerald-100 rounded">Pro Tier</span>
+        </div>
+      </div>
+    </div>
+  </aside>
+
+  <!-- Main Content Area -->
+  <main class="flex-1 overflow-y-auto p-6 md:p-10 space-y-8">
+    
+    <!-- Header Bar -->
+    <header class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-brand-200 pb-6">
+      <div>
+        <h2 class="text-2xl font-serif font-bold text-brand-900">Safaricom Daraja M-Pesa Terminal</h2>
+        <p class="text-xs text-slate-500 mt-1">Direct store settlement integration for autonomous STK push checkouts</p>
+      </div>
+      <button id="save-daraja-btn" class="px-5 py-2.5 bg-brand-600 hover:bg-brand-700 text-white rounded-xl text-xs font-semibold shadow transition-all flex items-center gap-2">
+        <i data-lucide="save" class="w-4 h-4"></i> Save Credentials
+      </button>
+    </header>
+
+    <div class="grid lg:grid-cols-12 gap-8">
+      
+      <!-- Left Column: Daraja Configuration Form -->
+      <div class="lg:col-span-7 space-y-6">
+        <div class="bg-white rounded-xl border border-brand-200 p-6 shadow-sm space-y-5">
+          <h3 class="font-serif font-bold text-lg text-brand-900">1. Settlement Account Type</h3>
+          
+          <!-- Type Toggle -->
+          <div class="grid grid-cols-2 gap-4">
+            <button type="button" id="type-buygoods" class="p-3.5 rounded-xl border-2 border-brand-600 bg-brand-50/50 text-xs font-bold text-brand-900 flex items-center justify-center gap-2 transition-all">
+              <i data-lucide="shopping-cart" class="w-4 h-4 text-brand-600"></i> Buy Goods (Till Number)
+            </button>
+            <button type="button" id="type-paybill" class="p-3.5 rounded-xl border border-brand-200 bg-white hover:border-brand-500 text-xs font-bold text-slate-600 flex items-center justify-center gap-2 transition-all">
+              <i data-lucide="building-2" class="w-4 h-4 text-slate-400"></i> Paybill Account
+            </button>
+          </div>
+
+          <hr class="border-brand-200/60" />
+
+          <h3 class="font-serif font-bold text-lg text-brand-900">2. API Credentials</h3>
+
+          <div class="space-y-4">
+            <div>
+              <label class="block text-xs font-semibold text-brand-900 mb-1.5">Shortcode / Till Number</label>
+              <input type="text" id="daraja-shortcode" value="684920" class="w-full px-4 py-2.5 text-xs bg-brand-50 border border-brand-200 rounded-xl focus:outline-none focus:border-brand-600 font-medium" />
+            </div>
+
+            <div>
+              <label class="block text-xs font-semibold text-brand-900 mb-1.5">Consumer Key</label>
+              <input type="password" id="daraja-key" value="d89a7f9a8d7sf9a87d" class="w-full px-4 py-2.5 text-xs bg-brand-50 border border-brand-200 rounded-xl focus:outline-none focus:border-brand-600 font-mono" />
+            </div>
+
+            <div>
+              <label class="block text-xs font-semibold text-brand-900 mb-1.5">Consumer Secret</label>
+              <input type="password" id="daraja-secret" value="k98df7s98d7f98s7df98s" class="w-full px-4 py-2.5 text-xs bg-brand-50 border border-brand-200 rounded-xl focus:outline-none focus:border-brand-600 font-mono" />
+            </div>
+
+            <div>
+              <label class="block text-xs font-semibold text-brand-900 mb-1.5">Online Passkey</label>
+              <input type="password" id="daraja-passkey" value="bfb279f9aa9bdbcf158e97dd71a467cd2e0c893059b10f78e6b72ada1ed2c919" class="w-full px-4 py-2.5 text-xs bg-brand-50 border border-brand-200 rounded-xl focus:outline-none focus:border-brand-600 font-mono" />
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Right Column: Diagnostic Sandbox Trigger -->
+      <div class="lg:col-span-5 space-y-6">
+        <div class="bg-white rounded-xl border border-brand-200 p-6 shadow-sm space-y-5">
+          <div class="flex items-center justify-between">
+            <h3 class="font-serif font-bold text-lg text-brand-900">Diagnostic Sandbox</h3>
+            <span class="text-[10px] font-bold text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded">Live Test Tool</span>
+          </div>
+
+          <p class="text-xs text-slate-500 leading-relaxed">
+            Send a real-time KSh 1 payment prompt to your phone to verify Daraja API credentials and callback webhooks.
+          </p>
+
+          <div class="space-y-4 pt-2">
+            <div>
+              <label class="block text-xs font-semibold text-brand-900 mb-1.5">Phone Number for Test Prompt</label>
+              <div class="relative">
+                <i data-lucide="smartphone" class="w-4 h-4 absolute left-3 top-3 text-slate-400"></i>
+                <input type="text" id="test-phone" value="+254 712 345 678" class="w-full pl-10 pr-4 py-2.5 text-xs bg-brand-50 border border-brand-200 rounded-xl focus:outline-none focus:border-brand-600 font-medium" />
+              </div>
+            </div>
+
+            <div>
+              <label class="block text-xs font-semibold text-brand-900 mb-1.5">Test Amount</label>
+              <input type="text" value="KSh 1 (Test Charge)" disabled class="w-full px-4 py-2.5 text-xs bg-slate-100 border border-slate-200 rounded-xl font-semibold text-slate-500 cursor-not-allowed" />
+            </div>
+
+            <button id="trigger-stk-btn" class="w-full py-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-semibold shadow-md transition-all flex items-center justify-center gap-2">
+              <i data-lucide="send" class="w-4 h-4"></i> Trigger Test STK Push
+            </button>
+          </div>
+
+          <!-- Status Result Box -->
+          <div id="stk-status-box" class="hidden p-4 rounded-xl bg-slate-50 border border-slate-200 space-y-2">
+            <div class="flex items-center justify-between">
+              <span class="text-xs font-bold text-slate-800">API Response</span>
+              <span id="stk-status-badge" class="text-[9px] font-bold px-1.5 py-0.5 rounded bg-amber-100 text-amber-800">PENDING</span>
+            </div>
+            <p id="stk-status-text" class="text-[11px] text-slate-600 font-mono leading-relaxed">Initiating STK Push request to Safaricom Daraja...</p>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+  </main>
+
+  <script src="payments.js"></script>
+</body>
+</html>

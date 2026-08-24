@@ -1,0 +1,40 @@
+/* Custom CSS Variables for Luvon Q Orélune Theme */
+:root {
+  --color-brand-50: #fcfaf6;
+  --color-brand-100: #f5eee1;
+  --color-brand-200: #e7e2d8;
+  --color-brand-500: #a38446;
+  --color-brand-600: #8c7038;
+  --color-brand-700: #735b2c;
+  --color-brand-900: #1c1917;
+}
+
+/* Custom Navigation Link Active State */
+.nav-link.active {
+  background-color: #f5eee1;
+  color: #735b2c;
+}
+
+/* Glassmorphism utility */
+.glass-panel {
+  background: rgba(255, 255, 255, 0.08);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+}
+
+/* Scrollbar Customization */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: #fbf9f5;
+}
+::-webkit-scrollbar-thumb {
+  background: #e7e2d8;
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #a38446;
+}
