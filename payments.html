@@ -47,13 +47,23 @@
   <!-- Sidebar Navigation -->
  <!-- Sidebar Navigation -->
  <!-- Sidebar Navigation -->
-<aside class="w-full md:w-64 bg-white/80 backdrop-blur-md border-r border-brand-200/50 flex-shrink-0 flex flex-col justify-between p-6">
-  <div class="space-y-8">
+<aside id="sidebarNav" class="fixed inset-y-0 left-0 z-40 w-64 bg-white/95 backdrop-blur-md border-r border-brand-200/50 flex flex-col justify-between p-6 -translate-x-full md:translate-x-0 transition-transform duration-300 ease-in-out md:static md:w-64"></aside>  <div class="space-y-8">
     
     <!-- Clean Brand Logo (Image Only) -->
-    <div class="flex items-center justify-start">
-      <img src="Luvon q logo.png" alt="Luvon Q Logo" class="h-20 w-auto object-contain" />
-    </div>
+   <!-- Mobile Top Bar & Brand Logo -->
+<div class="flex items-center justify-between md:justify-start">
+  <img src="Luvon q logo.png" alt="Luvon Q Logo" class="h-14 md:h-20 w-auto object-contain" />
+  
+  <!-- Hamburger Button (Only visible on mobile screens) -->
+  <button 
+    type="button" 
+    onclick="toggleMobileMenu()" 
+    class="md:hidden p-2 text-slate-600 hover:text-brand-600 focus:outline-none"
+    aria-label="Toggle Navigation"
+  >
+    <i data-lucide="menu" class="w-6 h-6"></i>
+  </button>
+</div>
 
     <!-- Navigation Links -->
     <nav class="space-y-1">
