@@ -257,9 +257,11 @@ document.addEventListener('DOMContentLoaded', () => {
   updateAuthUI(isLoggedIn);
 });
 // Mobile Sidebar Toggle Handler
+// Mobile Sidebar & Overlay Toggle
 function toggleMobileMenu() {
   const sidebar = document.getElementById('sidebarNav');
-  if (sidebar) {
-    sidebar.classList.toggle('-translate-x-full');
-  }
+  const backdrop = document.getElementById('sidebarBackdrop');
+
+  if (sidebar) sidebar.classList.toggle('-translate-x-full');
+  if (backdrop) backdrop.classList.toggle('hidden');
 }
