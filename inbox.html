@@ -107,44 +107,126 @@
 
   <!-- Main Split-View Container -->
   <main class="flex-1 flex flex-col md:flex-row h-screen overflow-hidden">
-    
-    <!-- 1. Left Conversation List Panel -->
-    <div class="w-full md:w-80 border-r border-slate-200 bg-white flex flex-col h-full">
-      <div class="p-4 border-b border-slate-200">
-        <input type="text" placeholder="Search phone or name..." class="w-full px-3 py-2 bg-slate-100 border border-slate-200 rounded-lg text-xs" />
-      </div>
-      <div class="flex-1 overflow-y-auto">
-        <!-- Chat items list -->
+  
+  <!-- 1. Left Conversation List Panel -->
+  <div class="w-full md:w-80 border-r border-slate-200 bg-white flex flex-col h-full flex-shrink-0">
+    <!-- Search Bar -->
+    <div class="p-4 border-b border-slate-200">
+      <div class="relative">
+        <i data-lucide="search" class="w-4 h-4 absolute left-3 top-2.5 text-slate-400"></i>
+        <input type="text" placeholder="Search phone or name..." class="w-full pl-9 pr-3 py-2 bg-slate-100 border border-slate-200 rounded-lg text-xs focus:outline-none focus:ring-1 focus:ring-brand-500" />
       </div>
     </div>
 
-    <!-- 2. Right Active Chat Area -->
-    <div class="flex-1 flex flex-col bg-slate-50 h-full">
-      
-      <!-- Chat Header -->
-      <div class="p-4 bg-white border-b border-slate-200 flex items-center justify-between">
-        <div class="flex items-center gap-3">
-          <div class="w-10 h-10 rounded-full bg-slate-200 flex items-center justify-center font-bold text-sm">FK</div>
-          <div>
-            <h3 class="font-semibold text-sm text-slate-800">Faith K.</h3>
-            <p class="text-xs text-slate-500">+254 712 987 654</p>
+    <!-- Contact List -->
+    <div class="flex-1 overflow-y-auto divide-y divide-slate-100">
+      <!-- Active Chat: Faith K. -->
+      <button class="w-full p-3 bg-brand-50/60 flex items-start gap-3 text-left border-l-4 border-brand-600">
+        <div class="w-9 h-9 rounded-full bg-brand-100 text-brand-800 flex items-center justify-center font-bold text-xs flex-shrink-0">FK</div>
+        <div class="flex-1 overflow-hidden">
+          <div class="flex items-center justify-between mb-1">
+            <h4 class="text-xs font-semibold text-slate-800 truncate">Faith K.</h4>
+            <span class="text-[10px] text-slate-400">10:16 AM</span>
           </div>
+          <p class="text-xs text-slate-500 truncate mb-1.5">Eeh niko ready, send the M-Pesa prompt.</p>
+          <span class="inline-block px-1.5 py-0.5 text-[9px] font-semibold text-emerald-700 bg-emerald-100 rounded-full">WHATSAPP</span>
+        </div>
+      </button>
+
+      <!-- Contact 2: Brian O. -->
+      <button class="w-full p-3 hover:bg-slate-50 flex items-start gap-3 text-left transition-colors">
+        <div class="w-9 h-9 rounded-full bg-purple-100 text-purple-800 flex items-center justify-center font-bold text-xs flex-shrink-0">BO</div>
+        <div class="flex-1 overflow-hidden">
+          <div class="flex items-center justify-between mb-1">
+            <h4 class="text-xs font-semibold text-slate-800 truncate">Brian O.</h4>
+            <span class="text-[10px] text-slate-400">09:31 AM</span>
+          </div>
+          <p class="text-xs text-slate-500 truncate mb-1.5">Welcome to Nairobi Kicks Studio...</p>
+          <span class="inline-block px-1.5 py-0.5 text-[9px] font-semibold text-purple-700 bg-purple-100 rounded-full">INSTAGRAM</span>
+        </div>
+      </button>
+
+      <!-- Contact 3: Amina M. -->
+      <button class="w-full p-3 hover:bg-slate-50 flex items-start gap-3 text-left transition-colors">
+        <div class="w-9 h-9 rounded-full bg-slate-100 text-slate-700 flex items-center justify-center font-bold text-xs flex-shrink-0">AM</div>
+        <div class="flex-1 overflow-hidden">
+          <div class="flex items-center justify-between mb-1">
+            <h4 class="text-xs font-semibold text-slate-800 truncate">Amina M.</h4>
+            <span class="text-[10px] text-slate-400">Yesterday</span>
+          </div>
+          <p class="text-xs text-slate-500 truncate mb-1.5">Payment received! Your order is being...</p>
+          <span class="inline-block px-1.5 py-0.5 text-[9px] font-semibold text-slate-700 bg-slate-200 rounded-full">TIKTOK</span>
+        </div>
+      </button>
+    </div>
+  </div>
+
+  <!-- 2. Right Active Chat Area -->
+  <div class="flex-1 flex flex-col bg-slate-50 h-full overflow-hidden">
+    
+    <!-- Active Contact Header -->
+    <div class="p-4 bg-white border-b border-slate-200 flex items-center justify-between shadow-sm">
+      <div class="flex items-center gap-3">
+        <div class="w-10 h-10 rounded-full bg-brand-100 text-brand-800 flex items-center justify-center font-bold text-sm">FK</div>
+        <div>
+          <div class="flex items-center gap-2">
+            <h3 class="font-semibold text-sm text-slate-800">Faith K.</h3>
+            <span class="px-2 py-0.5 text-[10px] font-semibold text-emerald-700 bg-emerald-100 rounded-full">WHATSAPP</span>
+            <span class="px-2 py-0.5 text-[10px] font-semibold text-amber-700 bg-amber-100 rounded-full">CLOSING</span>
+          </div>
+          <p class="text-xs text-slate-400">+254 712 987 654</p>
+        </div>
+      </div>
+      
+      <!-- AI Status Badge -->
+      <div class="hidden sm:flex items-center gap-2 px-3 py-1.5 bg-emerald-600 text-white rounded-xl text-xs font-medium shadow-sm">
+        <i data-lucide="bot" class="w-4 h-4"></i>
+        <span>AI Responding</span>
+      </div>
+    </div>
+
+    <!-- Chat Messages Scroll Container -->
+    <div class="flex-1 p-4 md:p-6 overflow-y-auto space-y-4">
+      
+      <!-- Customer Message -->
+      <div class="flex justify-start">
+        <div class="max-w-[80%] bg-white border border-slate-200 rounded-2xl p-3.5 shadow-sm text-xs text-slate-700 space-y-1">
+          <p>Niaje! Is the Air Force 1 White pair in size 41 available?</p>
+          <span class="block text-[10px] text-slate-400 text-right">10:14 AM</span>
         </div>
       </div>
 
-      <!-- Chat Messages Scrollable Box -->
-      <div class="flex-1 p-4 overflow-y-auto space-y-4">
-        <!-- Message Bubbles ONLY (No Sign In Button here!) -->
+      <!-- AI / Agent Response -->
+      <div class="flex justify-end">
+        <div class="max-w-[80%] bg-brand-600 text-white rounded-2xl p-3.5 shadow-sm text-xs space-y-1">
+          <p>Niaje! Yes, we have 4 pairs of Air Force 1 White left in size 41 at KSh 2,500. Would you like me to trigger an M-Pesa STK push for checkout?</p>
+          <span class="block text-[10px] text-brand-200 text-right">10:15 AM</span>
+        </div>
       </div>
 
-      <!-- Chat Input Field -->
-      <div class="p-4 bg-white border-t border-slate-200">
-        <!-- Input field and send button -->
+      <!-- Customer Reply -->
+      <div class="flex justify-start">
+        <div class="max-w-[80%] bg-white border border-slate-200 rounded-2xl p-3.5 shadow-sm text-xs text-slate-700 space-y-1">
+          <p>Eeh niko ready, send the M-Pesa prompt.</p>
+          <span class="block text-[10px] text-slate-400 text-right">10:16 AM</span>
+        </div>
       </div>
 
     </div>
 
-  </main>  <!-- Email/Password Auth Modal -->
+    <!-- Chat Input Form -->
+    <div class="p-4 bg-white border-t border-slate-200">
+      <form class="flex items-center gap-2" onsubmit="event.preventDefault();">
+        <input type="text" placeholder="Type a message or trigger automated M-Pesa STK prompt..." class="flex-1 px-4 py-2.5 bg-slate-100 border border-slate-200 rounded-xl text-xs focus:outline-none focus:ring-1 focus:ring-brand-500" />
+        <button type="submit" class="p-2.5 bg-brand-600 text-white rounded-xl hover:bg-brand-700 transition-colors shadow-sm">
+          <i data-lucide="send" class="w-4 h-4"></i>
+        </button>
+      </form>
+    </div>
+
+  </div>
+
+</main> <!-- Email/Password Auth Modal -->
 <!-- Email/Password & Registration Auth Modal -->
 <div id="authModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center hidden p-4">
   <div class="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6 relative border border-brand-100 animate-in fade-in zoom-in duration-200">
