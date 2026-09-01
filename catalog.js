@@ -1,49 +1,56 @@
-// Catalog state matching Prisma Database schema[cite: 1]
-let catalogItems = [
-  {
-    id: "prod_1",
-    name: "Air Force 1 White",
-    category: "Sneakers",
-    price: 2500,
-    stock: 4,
-    hasImage: true,
-    imageUrl: "https://images.unsplash.com/photo-1595950653106-6c9ebd614d3a?auto=format&fit=crop&w=200&q=80"
-  },
-  {
-    id: "prod_2",
-    name: "Jordan 4 Retro Black",
-    category: "Sneakers",
-    price: 4800,
-    stock: 0,
-    hasImage: true,
-    imageUrl: "https://images.unsplash.com/photo-1584735935682-2f2b69dff9d2?auto=format&fit=crop&w=200&q=80"
-  },
-  {
-    id: "prod_3",
-    name: "Luxury Silk Spa Robe",
-    category: "Wellness",
-    price: 6500,
-    stock: 12,
-    hasImage: true,
-    imageUrl: "https://images.unsplash.com/photo-1540555700478-4be289fbecef?auto=format&fit=crop&w=200&q=80"
-  }
-];
+// ==========================================
+// 1. STATE & API HELPER
+// ==========================================
+let catalogItems = [];
 
+async function fetchTenantCatalog() {
+  try {
+    const data = typeof apiCall === 'function'
+      ? await apiCall('/inventory')
+      : await (await fetch('http://localhost:3000/api/tenant/inventory', {
+          headers: { 'x-tenant-id': 'luvon_q_flagship' }
+        })).json();
+
+    catalogItems = Array.isArray(data) ? data : [];
+    renderCatalog(catalogItems);
+  } catch (err) {
+    console.error('❌ Failed to load catalog from server:', err.message);
+  }
+}
+
+// ==========================================
+// 2. DOM RENDERING
+// ==========================================
 function renderCatalog(items) {
   const tbody = document.getElementById("catalog-table-body");
   if (!tbody) return;
 
+  if (items.length === 0) {
+    tbody.innerHTML = `
+      <tr>
+        <td colspan="6" class="p-6 text-center text-slate-400 font-medium">
+          No inventory items found. Click "+ Add Product" to create one.
+        </td>
+      </tr>
+    `;
+    return;
+  }
+
   tbody.innerHTML = items.map(item => `
-    <tr class="hover:bg-brand-50/50 transition-colors">
+    <tr class="hover:bg-brand-50/50 transition-colors border-b border-slate-100">
       <td class="p-4 flex items-center gap-3">
-        <img src="${item.imageUrl || 'https://images.unsplash.com/photo-1549298916-b41d501d3772?auto=format&fit=crop&w=100&q=80'}" class="w-10 h-10 rounded-lg object-cover border border-brand-200" />
+        <img 
+          src="${item.imageUrl || 'https://images.unsplash.com/photo-1549298916-b41d501d3772?auto=format&fit=crop&w=100&q=80'}" 
+          class="w-10 h-10 rounded-lg object-cover border border-brand-200" 
+          onerror="this.src='https://images.unsplash.com/photo-1549298916-b41d501d3772?auto=format&fit=crop&w=100&q=80'"
+        />
         <div>
           <span class="font-bold text-brand-900 text-xs block">${item.name}</span>
           <span class="text-[10px] text-slate-400">ID: ${item.id}</span>
         </div>
       </td>
-      <td class="p-4 font-medium text-slate-600">${item.category}</td>
-      <td class="p-4 font-bold text-brand-900">KSh ${item.price.toLocaleString()}</td>
+      <td class="p-4 font-medium text-slate-600">${item.category || 'General'}</td>
+      <td class="p-4 font-bold text-brand-900">KSh ${Number(item.price).toLocaleString()}</td>
       <td class="p-4 font-medium">${item.stock} units</td>
       <td class="p-4">
         ${item.stock > 0 
@@ -52,21 +59,25 @@ function renderCatalog(items) {
         }
       </td>
       <td class="p-4 text-right">
-        <button onclick="deleteProduct('${item.id}')" class="text-rose-600 hover:underline font-semibold text-xs">Delete</button>
+        <button onclick="deleteProductLocal('${item.id}')" class="text-rose-600 hover:underline font-semibold text-xs">Delete</button>
       </td>
     </tr>
   `).join('');
 }
 
-function deleteProduct(id) {
-  catalogItems = catalogItems.filter(item => item.id !== id);
+function deleteProductLocal(id) {
+  catalogItems = catalogItems.filter(item => String(item.id) !== String(id));
   renderCatalog(catalogItems);
 }
 
+// ==========================================
+// 3. EVENT LISTENERS & MODAL MANAGEMENT
+// ==========================================
 document.addEventListener("DOMContentLoaded", () => {
   if (window.lucide) lucide.createIcons();
   
-  renderCatalog(catalogItems);
+  // Initial live fetch
+  fetchTenantCatalog();
 
   // Modal Handlers
   const modal = document.getElementById("product-modal");
@@ -76,44 +87,75 @@ document.addEventListener("DOMContentLoaded", () => {
   const form = document.getElementById("product-form");
 
   const toggleModal = (show) => {
-    if (show) modal.classList.remove("hidden");
-    else modal.classList.add("hidden");
+    if (show) modal?.classList.remove("hidden");
+    else modal?.classList.add("hidden");
   };
 
   openBtn?.addEventListener("click", () => toggleModal(true));
   closeBtn?.addEventListener("click", () => toggleModal(false));
   cancelBtn?.addEventListener("click", () => toggleModal(false));
 
-  // Form Submit Handler
-  form?.addEventListener("submit", (e) => {
+  // Form Submit (POST to backend)
+  form?.addEventListener("submit", async (e) => {
     e.preventDefault();
-    const newItem = {
-      id: `prod_${Date.now()}`,
-      name: document.getElementById("prod-name").value,
-      price: Number(document.getElementById("prod-price").value),
-      stock: Number(document.getElementById("prod-stock").value),
-      category: document.getElementById("prod-category").value,
-      hasImage: true,
-      imageUrl: document.getElementById("prod-image").value || null
+    const name = document.getElementById("prod-name").value;
+    const price = Number(document.getElementById("prod-price").value);
+    const stock = Number(document.getElementById("prod-stock").value);
+    const category = document.getElementById("prod-category").value;
+    const imageUrl = document.getElementById("prod-image")?.value || null;
+
+    const payload = {
+      name,
+      price,
+      stock,
+      category,
+      hasImage: Boolean(imageUrl),
+      imageUrl,
+      tags: [category.toLowerCase(), name.toLowerCase()]
     };
 
-    catalogItems.unshift(newItem);
-    renderCatalog(catalogItems);
-    form.reset();
-    toggleModal(false);
+    try {
+      if (typeof apiCall === 'function') {
+        await apiCall('/inventory', {
+          method: 'POST',
+          body: JSON.stringify(payload)
+        });
+      } else {
+        await fetch('http://localhost:3000/api/tenant/inventory', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-tenant-id': 'luvon_q_flagship'
+          },
+          body: JSON.stringify(payload)
+        });
+      }
+
+      form.reset();
+      toggleModal(false);
+      await fetchTenantCatalog(); // Refresh list from server
+    } catch (err) {
+      alert('Failed to save product to backend: ' + err.message);
+    }
   });
 
   // Search Filter Handler
   document.getElementById("catalog-search")?.addEventListener("input", (e) => {
-    const term = e.target.value.toLowerCase();
-    const filtered = catalogItems.filter(i => i.name.toLowerCase().includes(term) || i.category.toLowerCase().includes(term));
+    const term = e.target.value.toLowerCase().trim();
+    const filtered = catalogItems.filter(i => 
+      i.name.toLowerCase().includes(term) || 
+      (i.category && i.category.toLowerCase().includes(term))
+    );
     renderCatalog(filtered);
   });
 
   // Category Filter Handler
   document.getElementById("category-filter")?.addEventListener("change", (e) => {
     const cat = e.target.value;
-    if (cat === "ALL") renderCatalog(catalogItems);
-    else renderCatalog(catalogItems.filter(i => i.category === cat));
+    if (cat === "ALL" || !cat) {
+      renderCatalog(catalogItems);
+    } else {
+      renderCatalog(catalogItems.filter(i => i.category?.toLowerCase() === cat.toLowerCase()));
+    }
   });
 });
