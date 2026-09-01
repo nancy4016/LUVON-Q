@@ -11,9 +11,8 @@ console.log("🤖 Loaded Gemini API Key Prefix:", process.env.GEMINI_API_KEY ? p
 
 const app = express();
 app.use(express.json());
-app.use(express.static(path.join(__dirname))); // Serve static frontend files (HTML/CSS/JS)
+app.use(express.static(path.join(__dirname)));
 
-// Enable CORS for Frontend Dashboard
 app.use((req, res, next) => {
   res.header('Access-Control-Allow-Origin', '*');
   res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
@@ -24,8 +23,9 @@ app.use((req, res, next) => {
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
-const DEFAULT_FEMALE_VOICE_ID = "EXAVITQu4vr4xnSDxMaL"; // Sarah (Soft Neutral Female)
-const DEFAULT_SANDBOX_PASSKEY = "bfb279f9aa9bdbaca158e97dd71a467cd2e0c893059b10f78e6b72ada1ed2c919";
+const DEFAULT_FEMALE_VOICE_ID = "EXAVITQu4vr4xnSDxMaL";
+// Official Safaricom Daraja Sandbox Passkey
+const DEFAULT_SANDBOX_PASSKEY = "bfb279f9aa9bdbcf158e97dd71a467cd2e0c893059b10f78e6b72ada1ed2c919";
 
 // ==========================================
 // 1. MULTI-TENANT PERSISTENT DATABASE STORE
@@ -58,10 +58,10 @@ function initializeStore() {
           instagramPageId: null,
           daraja: {
             type: "CustomerPayBillOnline",
-            shortcode: String(process.env.DARAJA_BUSINESS_SHORTCODE || "174379").trim(),
+            shortcode: "174379",
             passkey: DEFAULT_SANDBOX_PASSKEY,
-            consumerKey: String(process.env.DARAJA_CONSUMER_KEY || "").trim(),
-            consumerSecret: String(process.env.DARAJA_CONSUMER_SECRET || "").trim()
+            consumerKey: String(process.env.DARAJA_CONSUMER_KEY || "5U68vQHgUCU7HpYSQZXegh2pFmzG1uBPTMNFcw5obW96GPVn").trim(),
+            consumerSecret: String(process.env.DARAJA_CONSUMER_SECRET || "2qwVKez82Raza13QyV9Ti8GqNLWKgGPWrJVpr1eot3OGNWluJAO1QaAjr1WaDsII").trim()
           },
           catalog: [
             {
@@ -213,7 +213,7 @@ async function executeDarajaSTK(tenant, phoneNumber, amount, itemRef, isRetry = 
     // Base64 Password: Shortcode + Passkey + Timestamp
     const password = Buffer.from(`${shortcode}${passkey}${timestamp}`).toString('base64');
 
-    // Phone format: 254XXXXXXXXX
+    // Clean Phone format: 254XXXXXXXXX
     let cleanPhone = String(phoneNumber).replace(/\D/g, '').trim();
     if (cleanPhone.startsWith('0')) cleanPhone = '254' + cleanPhone.slice(1);
     if (!cleanPhone.startsWith('254')) cleanPhone = '254' + cleanPhone;
@@ -951,8 +951,7 @@ app.post('/api/tenant/conversations/send-message', tenantMiddleware, async (req,
 });
 
 app.post('/api/tenant/payments/daraja', tenantMiddleware, (req, res) => {
-  const { type, shortcode, consumerKey, consumerSecret, passkey } = req.body;
-  const cleanShortcode = String(shortcode || "174379").trim();
+  const { type, shortcode, consumerKey, consumerSecret } = req.body;
   
   if (!req.tenant.daraja) req.tenant.daraja = {};
   
@@ -960,8 +959,12 @@ app.post('/api/tenant/payments/daraja', tenantMiddleware, (req, res) => {
   req.tenant.daraja.shortcode = "174379";
   req.tenant.daraja.passkey = DEFAULT_SANDBOX_PASSKEY;
 
-  if (consumerKey && !consumerKey.includes('•')) req.tenant.daraja.consumerKey = consumerKey.trim();
-  if (consumerSecret && !consumerSecret.includes('•')) req.tenant.daraja.consumerSecret = consumerSecret.trim();
+  if (consumerKey && !consumerKey.includes('•')) {
+    req.tenant.daraja.consumerKey = consumerKey.trim();
+  }
+  if (consumerSecret && !consumerSecret.includes('•')) {
+    req.tenant.daraja.consumerSecret = consumerSecret.trim();
+  }
 
   saveStore();
   res.json({ success: true, daraja: req.tenant.daraja });
