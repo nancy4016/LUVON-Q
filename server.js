@@ -5,9 +5,9 @@ const express = require('express');
 const axios = require('axios');
 const FormData = require('form-data');
 const cron = require('node-cron');
-const { GoogleGenAI } = require('@google/genai');
 
 console.log("🔑 Loaded WhatsApp Token Prefix:", process.env.WHATSAPP_ACCESS_TOKEN ? process.env.WHATSAPP_ACCESS_TOKEN.substring(0, 14) + "..." : "❌ NO TOKEN LOADED");
+console.log("🤖 Loaded Gemini API Key Prefix:", process.env.GEMINI_API_KEY ? process.env.GEMINI_API_KEY.substring(0, 10) + "..." : "❌ NO GEMINI KEY LOADED");
 
 const app = express();
 app.use(express.json());
@@ -22,7 +22,6 @@ app.use((req, res, next) => {
   next();
 });
 
-const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 const DEFAULT_FEMALE_VOICE_ID = "EXAVITQu4vr4xnSDxMaL"; // Sarah (Soft Neutral Female)
@@ -278,7 +277,7 @@ async function triggerTenantSTKPush(tenant, phoneNumber, amount, itemRef) {
 }
 
 // ==========================================
-// 3. MULTI-AGENT INSTRUCTION ENGINE
+// 3. GEMINI 3.7 FLASH INSTRUCTION ENGINE
 // ==========================================
 function buildTenantSystemInstruction(tenant, profile) {
   return `
@@ -319,6 +318,68 @@ If no action is triggered, output conversational prose.
 `.trim();
 }
 
+async function generateGeminiSalesResponse(tenant, profile, newParts) {
+  const apiKey = (process.env.GEMINI_API_KEY || "").trim();
+  if (!apiKey) {
+    throw new Error("GEMINI_API_KEY is not configured.");
+  }
+
+  // Build conversational history contents
+  const contents = [];
+  const history = profile.conversationHistory || [];
+
+  for (const turn of history.slice(-10)) {
+    contents.push({
+      role: turn.role === 'model' ? 'model' : 'user',
+      parts: [{ text: turn.text }]
+    });
+  }
+
+  // Append new user turn parts
+  contents.push({
+    role: 'user',
+    parts: newParts
+  });
+
+  const requestBody = {
+    contents,
+    systemInstruction: {
+      parts: [{ text: buildTenantSystemInstruction(tenant, profile) }]
+    },
+    generationConfig: {
+      temperature: 0.7,
+      maxOutputTokens: 800
+    }
+  };
+
+  // Primary model target with automated fallback
+  const models = ['gemini-2.5-flash', 'gemini-1.5-flash'];
+  let lastError = null;
+
+  for (const model of models) {
+    try {
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`;
+      const response = await axios.post(url, requestBody, {
+        headers: {
+          'Content-Type': 'application/json',
+          'x-goog-api-key': apiKey
+        },
+        timeout: 25000
+      });
+
+      const candidateText = response.data?.candidates?.[0]?.content?.parts?.[0]?.text;
+      if (candidateText) {
+        return candidateText.trim();
+      }
+    } catch (err) {
+      lastError = err.response?.data || err.message;
+      console.warn(`⚠️ Model [${model}] attempt notice:`, JSON.stringify(lastError));
+    }
+  }
+
+  throw new Error(`Gemini generation failed: ${JSON.stringify(lastError)}`);
+}
+
 function getOrCreateCustomerSession(tenant, customerId, channel = 'whatsapp') {
   const sessionKey = `${tenant.id}_${customerId}`;
   let profile = db.crmProfiles[sessionKey];
@@ -339,28 +400,7 @@ function getOrCreateCustomerSession(tenant, customerId, channel = 'whatsapp') {
   }
 
   profile.lastInteraction = new Date().toISOString();
-
-  const chatHistory = (profile.conversationHistory || []).map(h => ({
-    role: h.role === 'model' ? 'model' : 'user',
-    parts: [{ text: h.text }]
-  }));
-
-  if (chatHistory.length === 0) {
-    chatHistory.push(
-      { role: 'user', parts: [{ text: 'Niaje' }] },
-      { role: 'model', parts: [{ text: `Fiti sana! Karibu ${tenant.businessName}. Looking for something special today?` }] }
-    );
-  }
-
-  const chat = ai.chats.create({
-    model: 'gemini-3.7-flash',
-    history: chatHistory,
-    config: {
-      systemInstruction: buildTenantSystemInstruction(tenant, profile)
-    }
-  });
-
-  return { chat, profile, sessionKey };
+  return { profile, sessionKey };
 }
 
 // ==========================================
@@ -551,7 +591,7 @@ app.post('/webhook', async (req, res) => {
 
     console.log(`📩 Processing message from +${fromNumber} (Type: ${msgType}, VoiceTrigger: ${isVoiceInput}) via PhoneID [${incomingPhoneId}]`);
 
-    const { chat, profile } = getOrCreateCustomerSession(tenant, fromNumber, 'whatsapp');
+    const { profile } = getOrCreateCustomerSession(tenant, fromNumber, 'whatsapp');
 
     if (msgType === 'text') {
       const incomingText = incomingTextRaw.trim().toLowerCase();
@@ -600,9 +640,8 @@ app.post('/webhook', async (req, res) => {
       }
     }
 
-    console.log(`🤖 Generating Gemini sales response (gemini-3.7-flash)...`);
-    const aiResponse = await chat.sendMessage({ message: userPromptParts });
-    let responseText = (aiResponse.text || "").trim();
+    console.log(`🤖 Generating Gemini sales response...`);
+    let responseText = await generateGeminiSalesResponse(tenant, profile, userPromptParts);
 
     if (!responseText) {
       responseText = `Karibu ${tenant.businessName}! How can I help you today?`;
