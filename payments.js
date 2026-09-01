@@ -1,7 +1,11 @@
 document.addEventListener("DOMContentLoaded", async () => {
   if (window.lucide) lucide.createIcons();
 
-  const API_BASE = 'http://localhost:3000/api/tenant';
+  // ✅ Dynamic API base compatible with localhost and Render production
+  const API_BASE = window.location.origin.includes('localhost') 
+    ? 'http://localhost:3000/api/tenant' 
+    : '/api/tenant';
+    
   const TENANT_ID = 'luvon_q_flagship';
 
   let selectedType = "CustomerPayBillOnline"; // Default for Paybill 174379
@@ -83,7 +87,6 @@ document.addEventListener("DOMContentLoaded", async () => {
         shortcode: shortcode || "174379"
       };
 
-      // Only attach if user actively supplied a value (avoid overwriting backend defaults with empty strings)
       if (consumerKey && !consumerKey.includes('•')) payload.consumerKey = consumerKey;
       if (consumerSecret && !consumerSecret.includes('•')) payload.consumerSecret = consumerSecret;
       if (passkey && !passkey.includes('•')) payload.passkey = passkey;
@@ -162,9 +165,10 @@ document.addEventListener("DOMContentLoaded", async () => {
           },
           body: JSON.stringify({ testPhone: formattedPhone })
         });
-        const resData = await res.json();
+        
+        const resData = await res.json().catch(() => null);
 
-        if (resData.success && (resData.result?.ResponseCode === "0" || resData.result?.CheckoutRequestID)) {
+        if (res.ok && resData?.success && (resData.result?.ResponseCode === "0" || resData.result?.CheckoutRequestID)) {
           if (statusBadge) {
             statusBadge.className = "text-[9px] font-bold px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-800";
             statusBadge.textContent = "SUCCESS (200 OK)";
@@ -173,7 +177,7 @@ document.addEventListener("DOMContentLoaded", async () => {
             statusText.textContent = `[CheckoutRequestID: ${resData.result?.CheckoutRequestID || 'N/A'}]\n${resData.result?.CustomerMessage || 'Prompt delivered to handset. Enter your M-Pesa PIN!'}`;
           }
         } else {
-          const errMsg = resData.result?.errorMessage || resData.result?.ResponseDescription || resData.message || "STK Push failed at gateway";
+          const errMsg = resData?.result?.errorMessage || resData?.result?.ResponseDescription || resData?.message || `Gateway error (HTTP ${res.status})`;
           throw new Error(errMsg);
         }
       } catch (err) {
