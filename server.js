@@ -124,10 +124,10 @@ function initializeStore() {
 
     flagship.daraja = {
       type: "CustomerPayBillOnline",
-      shortcode: String(process.env.DARAJA_BUSINESS_SHORTCODE || "174379").trim(),
+      shortcode: "174379",
       passkey: DEFAULT_SANDBOX_PASSKEY,
-      consumerKey: String(process.env.DARAJA_CONSUMER_KEY || "").trim(),
-      consumerSecret: String(process.env.DARAJA_CONSUMER_SECRET || "").trim()
+      consumerKey: String(process.env.DARAJA_CONSUMER_KEY || "5U68vQHgUCU7HpYSQZXegh2pFmzG1uBPTMNFcw5obW96GPVn").trim(),
+      consumerSecret: String(process.env.DARAJA_CONSUMER_SECRET || "2qwVKez82Raza13QyV9Ti8GqNLWKgGPWrJVpr1eot3OGNWluJAO1QaAjr1WaDsII").trim()
     };
   }
 
@@ -164,8 +164,12 @@ let tokenExpiryTime = 0;
 function getValidDarajaCredentials(tenant) {
   let key = (process.env.DARAJA_CONSUMER_KEY || tenant?.daraja?.consumerKey || "5U68vQHgUCU7HpYSQZXegh2pFmzG1uBPTMNFcw5obW96GPVn").trim();
   let secret = (process.env.DARAJA_CONSUMER_SECRET || tenant?.daraja?.consumerSecret || "2qwVKez82Raza13QyV9Ti8GqNLWKgGPWrJVpr1eot3OGNWluJAO1QaAjr1WaDsII").trim();
-  let passkey = DEFAULT_SANDBOX_PASSKEY;
-  let shortcode = "174379";
+
+  if (!key || key.includes('•')) key = "5U68vQHgUCU7HpYSQZXegh2pFmzG1uBPTMNFcw5obW96GPVn";
+  if (!secret || secret.includes('•')) secret = "2qwVKez82Raza13QyV9Ti8GqNLWKgGPWrJVpr1eot3OGNWluJAO1QaAjr1WaDsII";
+
+  const passkey = DEFAULT_SANDBOX_PASSKEY;
+  const shortcode = "174379";
 
   return { key, secret, passkey, shortcode };
 }
@@ -177,10 +181,6 @@ async function getTenantDarajaToken(tenant, forceRefresh = false) {
   }
 
   const { key, secret } = getValidDarajaCredentials(tenant);
-  if (!key || !secret) {
-    throw new Error("Missing Daraja Consumer Key or Secret");
-  }
-
   const auth = Buffer.from(`${key}:${secret}`).toString('base64');
 
   console.log("🔄 Requesting Daraja OAuth Token from Safaricom...");
@@ -202,28 +202,21 @@ async function getTenantDarajaToken(tenant, forceRefresh = false) {
 async function executeDarajaSTK(tenant, phoneNumber, amount, itemRef, isRetry = false) {
   try {
     const { passkey, shortcode } = getValidDarajaCredentials(tenant);
-    const token = await getTenantDarajaToken(tenant, isRetry);
+    const rawToken = await getTenantDarajaToken(tenant, isRetry);
+    const token = String(rawToken).trim();
 
-    // Format Timestamp: YYYYMMDDHHmmss using strict UTC digits
-    const now = new Date();
+    // 14-digit East Africa Time (UTC+3) timestamp: YYYYMMDDHHmmss
+    const eatDate = new Date(Date.now() + (3 * 60 * 60 * 1000));
     const pad = (n) => String(n).padStart(2, '0');
-    const timestamp = 
-      now.getUTCFullYear().toString() +
-      pad(now.getUTCMonth() + 1) +
-      pad(now.getUTCDate()) +
-      pad(now.getUTCHours()) +
-      pad(now.getUTCMinutes()) +
-      pad(now.getUTCSeconds());
+    const timestamp = `${eatDate.getUTCFullYear()}${pad(eatDate.getUTCMonth() + 1)}${pad(eatDate.getUTCDate())}${pad(eatDate.getUTCHours())}${pad(eatDate.getUTCMinutes())}${pad(eatDate.getUTCSeconds())}`;
 
+    // Base64 Password: Shortcode + Passkey + Timestamp
     const password = Buffer.from(`${shortcode}${passkey}${timestamp}`).toString('base64');
 
-    // Clean phone number to 254XXXXXXXXX
+    // Phone format: 254XXXXXXXXX
     let cleanPhone = String(phoneNumber).replace(/\D/g, '').trim();
     if (cleanPhone.startsWith('0')) cleanPhone = '254' + cleanPhone.slice(1);
     if (!cleanPhone.startsWith('254')) cleanPhone = '254' + cleanPhone;
-
-    const callbackUrl = "https://luvon-engine.onrender.com/api/stk-callback";
-    const cleanRef = "LuvonStore";
 
     const payload = {
       BusinessShortCode: shortcode,
@@ -234,20 +227,21 @@ async function executeDarajaSTK(tenant, phoneNumber, amount, itemRef, isRetry = 
       PartyA: cleanPhone,
       PartyB: shortcode,
       PhoneNumber: cleanPhone,
-      CallBackURL: callbackUrl,
-      AccountReference: cleanRef,
+      CallBackURL: "https://luvon-engine.onrender.com/api/stk-callback",
+      AccountReference: "LuvonStore",
       TransactionDesc: "Payment"
     };
 
-    console.log(`📤 Dispatching Daraja STK Push to +${cleanPhone}...`);
+    console.log(`📤 Dispatching Daraja STK Push to +${cleanPhone} (Timestamp: ${timestamp})...`);
 
     const res = await axios.post(
       'https://sandbox.safaricom.co.ke/mpesa/stkpush/v1/processrequest',
       payload,
       {
         headers: {
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'application/json'
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
         },
         timeout: 25000
       }
@@ -256,13 +250,17 @@ async function executeDarajaSTK(tenant, phoneNumber, amount, itemRef, isRetry = 
     console.log(`✅ STK Push Handshake Successful:`, JSON.stringify(res.data));
     return res.data;
   } catch (err) {
-    const errorDetails = err.response?.data || { errorMessage: err.message, status: err.response?.status };
-    console.error(`❌ STK Push Failed:`, JSON.stringify(errorDetails));
+    const rawData = err.response?.data;
+    const errorDetails = (rawData && typeof rawData === 'object')
+      ? rawData
+      : { errorMessage: err.message, status: err.response?.status };
+
+    console.error(`❌ STK Push Error Details:`, JSON.stringify(errorDetails));
 
     if (!isRetry && (err.response?.status === 401 || JSON.stringify(errorDetails).includes('Invalid Access Token'))) {
-      console.warn("⚠️ Gateway token issue detected. Refreshing token and retrying in 1.2s...");
+      console.warn("⚠️ Gateway token expired. Retrying...");
       cachedDarajaToken = null;
-      await sleep(1200);
+      await sleep(1000);
       return await executeDarajaSTK(tenant, phoneNumber, amount, itemRef, true);
     }
 
@@ -322,7 +320,6 @@ async function generateGeminiSalesResponse(tenant, profile, newParts) {
     throw new Error("GEMINI_API_KEY is not configured.");
   }
 
-  // Build conversational history contents
   const contents = [];
   const history = profile.conversationHistory || [];
 
@@ -333,7 +330,6 @@ async function generateGeminiSalesResponse(tenant, profile, newParts) {
     });
   }
 
-  // Append new user turn parts
   contents.push({
     role: 'user',
     parts: newParts
@@ -350,7 +346,6 @@ async function generateGeminiSalesResponse(tenant, profile, newParts) {
     }
   };
 
-  // Target Gemini 3.7 Flash directly
   const models = ['gemini-3.7-flash', 'gemini-3.6-flash', 'gemini-3.5-flash-lite'];
   let lastError = null;
 
@@ -961,9 +956,10 @@ app.post('/api/tenant/payments/daraja', tenantMiddleware, (req, res) => {
   
   if (!req.tenant.daraja) req.tenant.daraja = {};
   
-  req.tenant.daraja.type = (cleanShortcode === "174379" || !type) ? "CustomerPayBillOnline" : type;
-  req.tenant.daraja.shortcode = cleanShortcode;
+  req.tenant.daraja.type = "CustomerPayBillOnline";
+  req.tenant.daraja.shortcode = "174379";
   req.tenant.daraja.passkey = DEFAULT_SANDBOX_PASSKEY;
+
   if (consumerKey && !consumerKey.includes('•')) req.tenant.daraja.consumerKey = consumerKey.trim();
   if (consumerSecret && !consumerSecret.includes('•')) req.tenant.daraja.consumerSecret = consumerSecret.trim();
 
@@ -979,8 +975,9 @@ app.post('/api/tenant/payments/test-stk', tenantMiddleware, async (req, res) => 
   if (result && (result.ResponseCode === "0" || result.CheckoutRequestID)) {
     res.json({ success: true, message: "STK prompt sent to your phone!", result });
   } else {
-    const errMsg = result?.details?.errorMessage || result?.details?.ResponseDescription || "STK prompt failed";
-    res.status(500).json({ success: false, message: errMsg, result: result?.details || result });
+    const rawDetails = result?.details || result;
+    const errMsg = rawDetails?.errorMessage || rawDetails?.ResponseDescription || (typeof rawDetails === 'string' ? rawDetails : "STK prompt failed");
+    res.status(500).json({ success: false, message: errMsg, result: rawDetails });
   }
 });
 
