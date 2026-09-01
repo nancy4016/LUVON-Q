@@ -60,7 +60,7 @@ async function loadLiveDashboardData() {
   try {
     const metrics = typeof apiCall === 'function' 
       ? await apiCall('/metrics') 
-      : await (await fetch('http://localhost:3000/api/tenant/metrics', {
+      : await (await fetch('/api/tenant/metrics', {
           headers: { 'x-tenant-id': 'luvon_q_flagship' }
         })).json();
 
@@ -81,7 +81,7 @@ async function loadLiveDashboardData() {
   try {
     const inventory = typeof apiCall === 'function'
       ? await apiCall('/inventory')
-      : await (await fetch('http://localhost:3000/api/tenant/inventory', {
+      : await (await fetch('/api/tenant/inventory', {
           headers: { 'x-tenant-id': 'luvon_q_flagship' }
         })).json();
 
@@ -212,12 +212,8 @@ function toggleMobileMenu() {
   const sidebar = document.getElementById('sidebarNav');
   const backdrop = document.getElementById('sidebarBackdrop');
 
-  if (sidebar) {
-    sidebar.classList.toggle('-translate-x-full');
-  }
-  if (backdrop) {
-    backdrop.classList.toggle('hidden');
-  }
+  if (sidebar) sidebar.classList.toggle('-translate-x-full');
+  if (backdrop) backdrop.classList.toggle('hidden');
 }
 
 function highlightActiveRoute() {
@@ -248,18 +244,6 @@ document.addEventListener("DOMContentLoaded", () => {
 
   const isLoggedIn = localStorage.getItem('luvon_authenticated') === 'true';
   updateAuthUI(isLoggedIn);
-<<<<<<< HEAD
-});
-// Mobile Sidebar Toggle Handler
-// Mobile Sidebar & Overlay Toggle
-function toggleMobileMenu() {
-  const sidebar = document.getElementById('sidebarNav');
-  const backdrop = document.getElementById('sidebarBackdrop');
-
-  if (sidebar) sidebar.classList.toggle('-translate-x-full');
-  if (backdrop) backdrop.classList.toggle('hidden');
-}
-=======
 
   // Carousel timer
   setInterval(() => {
@@ -278,4 +262,3 @@ function toggleMobileMenu() {
     updateCarousel(nextIndex);
   });
 });
->>>>>>> 42525fa (feat: complete Luvon Q engine, Gemini 3.7 integration, and portal dashboard)
