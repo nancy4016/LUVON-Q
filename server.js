@@ -167,7 +167,7 @@ function getValidDarajaCredentials(tenant) {
   let passkey = (process.env.DARAJA_PASSKEY || tenant?.daraja?.passkey || DEFAULT_SANDBOX_PASSKEY).trim();
   let shortcode = String(process.env.DARAJA_BUSINESS_SHORTCODE || tenant?.daraja?.shortcode || "174379").trim();
 
-  if (passkey.includes('bdbcf') || passkey.length < 30) {
+  if (shortcode === "174379" || passkey.includes('bdbcf') || passkey.length < 30) {
     passkey = DEFAULT_SANDBOX_PASSKEY;
   }
 
@@ -208,20 +208,29 @@ async function executeDarajaSTK(tenant, phoneNumber, amount, itemRef, isRetry = 
     const { passkey, shortcode } = getValidDarajaCredentials(tenant);
     const token = await getTenantDarajaToken(tenant, isRetry);
 
-    const timestamp = new Date().toISOString().replace(/[^0-9]/g, '').slice(0, 14);
+    const now = new Date();
+    const timestamp = 
+      now.getFullYear().toString() +
+      String(now.getMonth() + 1).padStart(2, '0') +
+      String(now.getDate()).padStart(2, '0') +
+      String(now.getHours()).padStart(2, '0') +
+      String(now.getMinutes()).padStart(2, '0') +
+      String(now.getSeconds()).padStart(2, '0');
+
     const password = Buffer.from(`${shortcode}${passkey}${timestamp}`).toString('base64');
-    const cleanPhone = phoneNumber.toString().replace(/\+/g, '').trim();
+    const cleanPhone = phoneNumber.toString().replace(/\D/g, '').trim();
 
     let txType = "CustomerPayBillOnline";
     if (shortcode !== "174379" && tenant.daraja?.type === "CustomerBuyGoodsOnline") {
       txType = "CustomerBuyGoodsOnline";
     }
 
-    let serverUrl = process.env.SERVER_URL || 'https://sandbox.safaricom.co.ke';
-    if (serverUrl.includes('localhost') || !serverUrl.startsWith('http')) {
-      serverUrl = 'https://sandbox.safaricom.co.ke';
-    }
+    let serverUrl = process.env.RENDER_EXTERNAL_URL || process.env.SERVER_URL || 'https://luvon-engine.onrender.com';
     const callbackUrl = `${serverUrl.replace(/\/$/, '')}/api/stk-callback`;
+
+    const cleanRef = (itemRef || tenant.businessName || "LuvonQ")
+      .replace(/[^a-zA-Z0-9]/g, '')
+      .substring(0, 12) || "OrderPay";
 
     const payload = {
       BusinessShortCode: shortcode,
@@ -233,11 +242,11 @@ async function executeDarajaSTK(tenant, phoneNumber, amount, itemRef, isRetry = 
       PartyB: shortcode,
       PhoneNumber: cleanPhone,
       CallBackURL: callbackUrl,
-      AccountReference: (itemRef || tenant.businessName || "LuvonQ").substring(0, 12),
-      TransactionDesc: `Pay for ${itemRef || "Item"}`
+      AccountReference: cleanRef,
+      TransactionDesc: "Payment"
     };
 
-    console.log(`📤 Dispatching Daraja STK Push [${shortcode} | ${txType}] to +${cleanPhone}...`);
+    console.log(`📤 Dispatching Daraja STK Push [${shortcode} | ${txType}] to +${cleanPhone} (Ref: ${cleanRef}, Callback: ${callbackUrl})...`);
 
     const res = await axios.post(
       'https://sandbox.safaricom.co.ke/mpesa/stkpush/v1/processrequest',
