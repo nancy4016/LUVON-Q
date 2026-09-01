@@ -13,6 +13,7 @@ const app = express();
 app.use(express.json());
 app.use(express.static(path.join(__dirname)));
 
+// Enable CORS for Frontend Dashboard
 app.use((req, res, next) => {
   res.header('Access-Control-Allow-Origin', '*');
   res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
@@ -24,7 +25,6 @@ app.use((req, res, next) => {
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 const DEFAULT_FEMALE_VOICE_ID = "EXAVITQu4vr4xnSDxMaL";
-// Official Safaricom Daraja Sandbox Passkey
 const DEFAULT_SANDBOX_PASSKEY = "bfb279f9aa9bdbcf158e97dd71a467cd2e0c893059b10f78e6b72ada1ed2c919";
 
 // ==========================================
@@ -213,23 +213,24 @@ async function executeDarajaSTK(tenant, phoneNumber, amount, itemRef, isRetry = 
     // Base64 Password: Shortcode + Passkey + Timestamp
     const password = Buffer.from(`${shortcode}${passkey}${timestamp}`).toString('base64');
 
-    // Clean Phone format: 254XXXXXXXXX
+    // Phone format: 254XXXXXXXXX
     let cleanPhone = String(phoneNumber).replace(/\D/g, '').trim();
     if (cleanPhone.startsWith('0')) cleanPhone = '254' + cleanPhone.slice(1);
     if (!cleanPhone.startsWith('254')) cleanPhone = '254' + cleanPhone;
 
+    // Strict schema: Amount as string ("1"), exact fields matching Daraja simulator
     const payload = {
       BusinessShortCode: shortcode,
       Password: password,
       Timestamp: timestamp,
       TransactionType: "CustomerPayBillOnline",
-      Amount: Math.max(1, Math.round(Number(amount) || 1)),
+      Amount: String(Math.max(1, Math.round(Number(amount) || 1))),
       PartyA: cleanPhone,
       PartyB: shortcode,
       PhoneNumber: cleanPhone,
-      CallBackURL: "https://luvon-engine.onrender.com/api/stk-callback",
-      AccountReference: "LuvonStore",
-      TransactionDesc: "Payment"
+      CallBackURL: "https://mydomain.com/mpesa-endpoint",
+      AccountReference: "Test",
+      TransactionDesc: "Test"
     };
 
     console.log(`📤 Dispatching Daraja STK Push to +${cleanPhone} (Timestamp: ${timestamp})...`);
@@ -240,8 +241,7 @@ async function executeDarajaSTK(tenant, phoneNumber, amount, itemRef, isRetry = 
       {
         headers: {
           'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-          'Accept': 'application/json'
+          'Content-Type': 'application/json'
         },
         timeout: 25000
       }
@@ -974,7 +974,7 @@ app.post('/api/tenant/payments/test-stk', tenantMiddleware, async (req, res) => 
   const { testPhone } = req.body;
   if (!testPhone) return res.status(400).json({ error: "testPhone is required" });
 
-  const result = await triggerTenantSTKPush(req.tenant, testPhone, 1, "TestSTK");
+  const result = await triggerTenantSTKPush(req.tenant, testPhone, 1, "Test");
   if (result && (result.ResponseCode === "0" || result.CheckoutRequestID)) {
     res.json({ success: true, message: "STK prompt sent to your phone!", result });
   } else {
