@@ -352,12 +352,13 @@ async function generateGeminiSalesResponse(tenant, profile, newParts) {
     }
   };
 
-  // Primary model target with automated fallback
-  const models = ['gemini-2.5-flash', 'gemini-1.5-flash'];
+  // ✅ TARGETING GEMINI 3.7 FLASH DIRECTLY
+  const models = ['gemini-3.7-flash', 'gemini-3.6-flash', 'gemini-3.5-flash-lite'];
   let lastError = null;
 
   for (const model of models) {
     try {
+      console.log(`🤖 Invoking ${model}...`);
       const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`;
       const response = await axios.post(url, requestBody, {
         headers: {
@@ -640,7 +641,7 @@ app.post('/webhook', async (req, res) => {
       }
     }
 
-    console.log(`🤖 Generating Gemini sales response...`);
+    console.log(`🤖 Generating Gemini sales response (gemini-3.7-flash)...`);
     let responseText = await generateGeminiSalesResponse(tenant, profile, userPromptParts);
 
     if (!responseText) {
