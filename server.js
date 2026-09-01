@@ -162,12 +162,12 @@ let cachedDarajaToken = null;
 let tokenExpiryTime = 0;
 
 function getValidDarajaCredentials(tenant) {
-  let key = (process.env.DARAJA_CONSUMER_KEY || tenant?.daraja?.consumerKey || "").trim();
-  let secret = (process.env.DARAJA_CONSUMER_SECRET || tenant?.daraja?.consumerSecret || "").trim();
+  let key = (process.env.DARAJA_CONSUMER_KEY || tenant?.daraja?.consumerKey || "5U68vQHgUCU7HpYSQZXegh2pFmzG1uBPTMNFcw5obW96GPVn").trim();
+  let secret = (process.env.DARAJA_CONSUMER_SECRET || tenant?.daraja?.consumerSecret || "2qwVKez82Raza13QyV9Ti8GqNLWKgGPWrJVpr1eot3OGNWluJAO1QaAjr1WaDsII").trim();
   let passkey = (process.env.DARAJA_PASSKEY || tenant?.daraja?.passkey || DEFAULT_SANDBOX_PASSKEY).trim();
   let shortcode = String(process.env.DARAJA_BUSINESS_SHORTCODE || tenant?.daraja?.shortcode || "174379").trim();
 
-  if (shortcode === "174379" || passkey.includes('bdbcf') || passkey.length < 30) {
+  if (shortcode === "174379" || passkey.includes('•') || passkey.length < 30) {
     passkey = DEFAULT_SANDBOX_PASSKEY;
   }
 
@@ -208,17 +208,23 @@ async function executeDarajaSTK(tenant, phoneNumber, amount, itemRef, isRetry = 
     const { passkey, shortcode } = getValidDarajaCredentials(tenant);
     const token = await getTenantDarajaToken(tenant, isRetry);
 
+    // Format Timestamp: YYYYMMDDHHmmss
     const now = new Date();
+    const pad = (n) => String(n).padStart(2, '0');
     const timestamp = 
       now.getFullYear().toString() +
-      String(now.getMonth() + 1).padStart(2, '0') +
-      String(now.getDate()).padStart(2, '0') +
-      String(now.getHours()).padStart(2, '0') +
-      String(now.getMinutes()).padStart(2, '0') +
-      String(now.getSeconds()).padStart(2, '0');
+      pad(now.getMonth() + 1) +
+      pad(now.getDate()) +
+      pad(now.getHours()) +
+      pad(now.getMinutes()) +
+      pad(now.getSeconds());
 
     const password = Buffer.from(`${shortcode}${passkey}${timestamp}`).toString('base64');
-    const cleanPhone = phoneNumber.toString().replace(/\D/g, '').trim();
+
+    // Clean phone number to 254XXXXXXXXX
+    let cleanPhone = String(phoneNumber).replace(/\D/g, '').trim();
+    if (cleanPhone.startsWith('0')) cleanPhone = '254' + cleanPhone.slice(1);
+    if (!cleanPhone.startsWith('254')) cleanPhone = '254' + cleanPhone;
 
     let txType = "CustomerPayBillOnline";
     if (shortcode !== "174379" && tenant.daraja?.type === "CustomerBuyGoodsOnline") {
@@ -230,7 +236,7 @@ async function executeDarajaSTK(tenant, phoneNumber, amount, itemRef, isRetry = 
 
     const cleanRef = (itemRef || tenant.businessName || "LuvonQ")
       .replace(/[^a-zA-Z0-9]/g, '')
-      .substring(0, 12) || "OrderPay";
+      .substring(0, 10) || "Payment";
 
     const payload = {
       BusinessShortCode: shortcode,
@@ -243,10 +249,10 @@ async function executeDarajaSTK(tenant, phoneNumber, amount, itemRef, isRetry = 
       PhoneNumber: cleanPhone,
       CallBackURL: callbackUrl,
       AccountReference: cleanRef,
-      TransactionDesc: "Payment"
+      TransactionDesc: cleanRef
     };
 
-    console.log(`📤 Dispatching Daraja STK Push [${shortcode} | ${txType}] to +${cleanPhone} (Ref: ${cleanRef}, Callback: ${callbackUrl})...`);
+    console.log(`📤 Dispatching Daraja STK Push [${shortcode} | ${txType}] to +${cleanPhone}...`);
 
     const res = await axios.post(
       'https://sandbox.safaricom.co.ke/mpesa/stkpush/v1/processrequest',
@@ -260,23 +266,19 @@ async function executeDarajaSTK(tenant, phoneNumber, amount, itemRef, isRetry = 
       }
     );
 
-    console.log(`✅ STK Push Handshake Successful [${tenant.businessName}]:`, res.data);
+    console.log(`✅ STK Push Handshake Successful [${tenant.businessName}]:`, JSON.stringify(res.data));
     return res.data;
   } catch (err) {
-    let errorDetails = err.response?.data || { errorMessage: err.message };
+    const errorDetails = err.response?.data || { errorMessage: err.message, status: err.response?.status };
+    console.error(`❌ STK Push Failed [${tenant.businessName}]:`, JSON.stringify(errorDetails));
 
-    if (!isRetry && (err.response?.status === 401 || err.response?.status === 500 || err.code === 'ECONNABORTED' || JSON.stringify(errorDetails).includes('Wrong credentials'))) {
-      console.warn("⚠️ Gateway handshake issue detected. Refreshing token and retrying in 1.2s...");
+    if (!isRetry && (err.response?.status === 401 || JSON.stringify(errorDetails).includes('Wrong credentials') || JSON.stringify(errorDetails).includes('Invalid Access Token'))) {
+      console.warn("⚠️ Gateway token issue detected. Refreshing token and retrying in 1.2s...");
       cachedDarajaToken = null;
       await sleep(1200);
       return await executeDarajaSTK(tenant, phoneNumber, amount, itemRef, true);
     }
 
-    if (typeof errorDetails === 'string' && errorDetails.includes('Incapsula')) {
-      errorDetails = { errorMessage: "Safaricom Gateway Rate Limited / WAF Blocked. Please wait 30 seconds." };
-    }
-
-    console.error(`❌ STK Push Failed [${tenant.businessName}]:`, JSON.stringify(errorDetails));
     return { error: true, details: errorDetails };
   }
 }
@@ -361,7 +363,7 @@ async function generateGeminiSalesResponse(tenant, profile, newParts) {
     }
   };
 
-  // ✅ TARGETING GEMINI 3.7 FLASH DIRECTLY
+  // Primary model target: gemini-3.7-flash with modern fallback options
   const models = ['gemini-3.7-flash', 'gemini-3.6-flash', 'gemini-3.5-flash-lite'];
   let lastError = null;
 
@@ -967,16 +969,16 @@ app.post('/api/tenant/conversations/send-message', tenantMiddleware, async (req,
 });
 
 app.post('/api/tenant/payments/daraja', tenantMiddleware, (req, res) => {
-  const { type, shortcode } = req.body;
+  const { type, shortcode, consumerKey, consumerSecret, passkey } = req.body;
   const cleanShortcode = String(shortcode || "174379").trim();
   
   if (!req.tenant.daraja) req.tenant.daraja = {};
   
   req.tenant.daraja.type = (cleanShortcode === "174379" || !type) ? "CustomerPayBillOnline" : type;
   req.tenant.daraja.shortcode = cleanShortcode;
-  req.tenant.daraja.passkey = DEFAULT_SANDBOX_PASSKEY;
-  req.tenant.daraja.consumerKey = String(process.env.DARAJA_CONSUMER_KEY || "").trim();
-  req.tenant.daraja.consumerSecret = String(process.env.DARAJA_CONSUMER_SECRET || "").trim();
+  req.tenant.daraja.passkey = (passkey && !passkey.includes('•')) ? passkey.trim() : DEFAULT_SANDBOX_PASSKEY;
+  if (consumerKey && !consumerKey.includes('•')) req.tenant.daraja.consumerKey = consumerKey.trim();
+  if (consumerSecret && !consumerSecret.includes('•')) req.tenant.daraja.consumerSecret = consumerSecret.trim();
 
   saveStore();
   res.json({ success: true, daraja: req.tenant.daraja });
@@ -987,7 +989,7 @@ app.post('/api/tenant/payments/test-stk', tenantMiddleware, async (req, res) => 
   if (!testPhone) return res.status(400).json({ error: "testPhone is required" });
 
   const result = await triggerTenantSTKPush(req.tenant, testPhone, 1, "TestSTK");
-  if (result && result.ResponseCode === "0") {
+  if (result && (result.ResponseCode === "0" || result.CheckoutRequestID)) {
     res.json({ success: true, message: "STK prompt sent to your phone!", result });
   } else {
     const errMsg = result?.details?.errorMessage || result?.details?.ResponseDescription || "STK prompt failed";
