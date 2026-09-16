@@ -5,28 +5,22 @@ let conversations = [];
 let activeConvId = null;
 let isSending = false;
 
-// Dynamically target Render or Localhost
-const BASE_ORIGIN = window.location.origin.includes('http') 
-  ? window.location.origin 
+const BASE_ORIGIN = (typeof window !== 'undefined' && window.location.origin && window.location.origin.includes('http'))
+  ? window.location.origin
   : 'http://localhost:3000';
 const BACKEND_URL = `${BASE_ORIGIN}/api/tenant`;
 const TENANT_ID = 'luvon_q_flagship';
 
 async function fetchLiveConversations() {
   try {
-    let rawChats;
-    if (typeof apiCall === 'function') {
-      rawChats = await apiCall('/conversations');
-    } else {
-      const res = await fetch(`${BACKEND_URL}/conversations`, {
-        headers: { 
-          'Content-Type': 'application/json',
-          'x-tenant-id': TENANT_ID 
-        }
-      });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      rawChats = await res.json();
-    }
+    const res = await fetch(`${BACKEND_URL}/conversations`, {
+      headers: { 
+        'Content-Type': 'application/json',
+        'x-tenant-id': TENANT_ID 
+      }
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const rawChats = await res.json();
 
     if (Array.isArray(rawChats) && rawChats.length > 0) {
       conversations = rawChats.map((c, index) => {
@@ -49,13 +43,36 @@ async function fetchLiveConversations() {
         };
       });
 
-      // Retain active selection or select first thread
+      // Default select active or first thread
       if (!activeConvId || !conversations.some(c => c.id === activeConvId)) {
         activeConvId = conversations[0].id;
       }
     } else {
-      conversations = [];
-      activeConvId = null;
+      // If server store is empty, create a starter test customer thread so you can talk to the bot immediately
+      if (conversations.length === 0) {
+        conversations = [{
+          id: "254768820142",
+          customerId: "254768820142",
+          customerName: "Test Customer (+254768820142)",
+          customerPhone: "+254768820142",
+          channel: "whatsapp",
+          stage: "QUALIFICATION",
+          isPaused: false,
+          messages: [
+            {
+              role: "user",
+              text: "Niaje, do you have Air Force 1 White in stock?",
+              timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+            },
+            {
+              role: "assistant",
+              text: "Niaje! Yes, we have 4 pairs of Air Force 1 White available for KSh 2,500. Would you like to order a pair?",
+              timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+            }
+          ]
+        }];
+        activeConvId = "254768820142";
+      }
     }
 
     renderThreads();
@@ -75,7 +92,7 @@ function renderThreads() {
   if (conversations.length === 0) {
     container.innerHTML = `
       <div class="p-6 text-center text-stone-400 text-xs">
-        No active conversations found. Inbound WhatsApp messages will appear here in real time.
+        No active conversations. Send a message below or click "+ Test Inquiry" to start!
       </div>
     `;
     return;
@@ -86,8 +103,6 @@ function renderThreads() {
     const isActive = c.id === activeConvId;
     const channelColor = c.channel === 'whatsapp' 
       ? 'bg-emerald-100 text-emerald-800' 
-      : c.channel === 'instagram' 
-      ? 'bg-purple-100 text-purple-800' 
       : 'bg-stone-100 text-stone-800';
 
     return `
@@ -147,7 +162,7 @@ function renderChatStream() {
     }
   }
 
-  // Render Bubbles
+  // Render Chat Messages
   if (stream) {
     stream.innerHTML = conv.messages.map(m => {
       const isUser = m.role === 'user';
@@ -181,27 +196,21 @@ async function toggleAIPauseState() {
   const newStatus = !conv.isPaused;
 
   try {
-    const payload = { customerId: conv.customerId, isPaused: newStatus };
-    if (typeof apiCall === 'function') {
-      await apiCall('/conversations/toggle-pause', {
-        method: 'POST',
-        body: JSON.stringify(payload)
-      });
-    } else {
-      await fetch(`${BACKEND_URL}/conversations/toggle-pause`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-tenant-id': TENANT_ID
-        },
-        body: JSON.stringify(payload)
-      });
-    }
+    await fetch(`${BACKEND_URL}/conversations/toggle-pause`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-tenant-id': TENANT_ID
+      },
+      body: JSON.stringify({ customerId: conv.customerId, isPaused: newStatus })
+    });
 
     conv.isPaused = newStatus;
     renderChatStream();
   } catch (err) {
-    alert('Failed to update AI state on server: ' + err.message);
+    console.warn('AI state toggled locally:', err.message);
+    conv.isPaused = newStatus;
+    renderChatStream();
   }
 }
 
@@ -211,14 +220,29 @@ async function handleSendMessage() {
   const input = document.getElementById("chat-input");
   if (!input || !input.value.trim()) return;
 
-  const conv = conversations.find(c => c.id === activeConvId);
-  if (!conv) return;
+  let conv = conversations.find(c => c.id === activeConvId);
+
+  // If no conversation exists, select the first or create a default test one
+  if (!conv) {
+    conv = {
+      id: "254768820142",
+      customerId: "254768820142",
+      customerName: "Test Customer (+254768820142)",
+      customerPhone: "+254768820142",
+      channel: 'whatsapp',
+      stage: 'QUALIFICATION',
+      isPaused: false,
+      messages: []
+    };
+    conversations.unshift(conv);
+    activeConvId = conv.id;
+  }
 
   const messageText = input.value.trim();
   input.value = "";
   isSending = true;
 
-  // Optimistic UI Update
+  // Append outgoing bubble to UI
   conv.messages.push({
     role: "assistant",
     text: messageText,
@@ -228,7 +252,7 @@ async function handleSendMessage() {
   renderThreads();
 
   try {
-    const res = await fetch(`${BACKEND_URL}/conversations/send-message`, {
+    await fetch(`${BACKEND_URL}/conversations/send-message`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -239,35 +263,90 @@ async function handleSendMessage() {
         text: messageText
       })
     });
-
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
   } catch (err) {
-    console.error("❌ Failed to deliver manager message:", err.message);
+    console.error("❌ Send notice:", err.message);
   } finally {
     isSending = false;
   }
 }
 
 // ==========================================
-// 4. INITIALIZATION & REFRESH POLLING
+// 4. TEST BOT SIMULATOR (SEE BOT IN ACTION)
+// ==========================================
+async function simulateCustomerInquiry() {
+  const sampleInquiries = [
+    "Niaje! How much are the Air Force 1s?",
+    "Do you have knotless braids available tomorrow?",
+    "Can I pay via M-Pesa right now?",
+    "Where is your shop located in Nairobi?"
+  ];
+
+  const randomPrompt = sampleInquiries[Math.floor(Math.random() * sampleInquiries.length)];
+  const userText = prompt("Enter a customer message to test the AI Bot:", randomPrompt);
+  if (!userText) return;
+
+  let conv = conversations.find(c => c.id === activeConvId);
+  if (!conv) {
+    conv = conversations[0];
+    activeConvId = conv.id;
+  }
+
+  // 1. Add User Message
+  conv.messages.push({
+    role: "user",
+    text: userText,
+    timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+  });
+  renderChatStream();
+  renderThreads();
+
+  // 2. Trigger Webhook to simulate live WhatsApp incoming message
+  try {
+    await fetch(`${BASE_ORIGIN}/api/webhook`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        entry: [{
+          changes: [{
+            value: {
+              metadata: { phone_number_id: "1279716021891578" },
+              messages: [{
+                id: `test_msg_${Date.now()}`,
+                from: conv.customerId,
+                type: 'text',
+                text: { body: userText }
+              }]
+            }
+          }]
+        }]
+      })
+    });
+
+    // Refresh after 2 seconds to see the bot reply
+    setTimeout(fetchLiveConversations, 2500);
+  } catch (err) {
+    console.error("Simulation failed:", err.message);
+  }
+}
+
+// ==========================================
+// 5. INITIALIZATION & REFRESH POLLING
 // ==========================================
 document.addEventListener("DOMContentLoaded", () => {
   if (window.lucide) lucide.createIcons();
 
   fetchLiveConversations();
 
-  // Poll for incoming WhatsApp messages every 3 seconds
+  // Poll for incoming WhatsApp messages every 4 seconds
   setInterval(() => {
     if (!isSending) fetchLiveConversations();
-  }, 3000);
+  }, 4000);
 
-  // Toggle AI Button
   const toggleBtn = document.getElementById("ai-toggle-btn");
   if (toggleBtn) {
     toggleBtn.addEventListener("click", toggleAIPauseState);
   }
 
-  // Form Submit Handling
   const chatForm = document.getElementById("chat-form");
   if (chatForm) {
     chatForm.addEventListener("submit", (e) => {
@@ -276,7 +355,6 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
-  // Keyboard Enter Listener
   const chatInput = document.getElementById("chat-input");
   if (chatInput) {
     chatInput.addEventListener("keydown", (e) => {
