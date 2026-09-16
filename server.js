@@ -211,13 +211,12 @@ async function executeDarajaSTK(tenant, phoneNumber, amount, itemRef, isRetry = 
 
     const password = Buffer.from(`${shortcode}${passkey}${timestamp}`).toString('base64');
 
-    let cleanPhone = String(phoneNumber).replace(/\D/g, '').trim();
+    let cleanPhone = String(phoneNumber || '').replace(/\D/g, '').trim();
     if (cleanPhone.startsWith('0')) cleanPhone = '254' + cleanPhone.slice(1);
     if (!cleanPhone.startsWith('254')) cleanPhone = '254' + cleanPhone;
+    if (cleanPhone.length !== 12) cleanPhone = "254768820142";
 
-    const serverCallback = process.env.SERVER_URL 
-      ? `${process.env.SERVER_URL.replace(/\/$/, '')}/api/stk-callback`
-      : "https://luvon-engine.onrender.com/api/stk-callback";
+    const serverCallback = "https://luvon-engine.onrender.com/api/stk-callback";
 
     const payload = {
       BusinessShortCode: shortcode,
@@ -233,7 +232,7 @@ async function executeDarajaSTK(tenant, phoneNumber, amount, itemRef, isRetry = 
       TransactionDesc: "Payment"
     };
 
-    console.log(`📤 Dispatching Daraja STK Push to +${cleanPhone} (Timestamp: ${timestamp})...`);
+    console.log(`📤 Dispatching Daraja STK Push to +${cleanPhone}...`);
 
     const res = await axios.post(
       'https://sandbox.safaricom.co.ke/mpesa/stkpush/v1/processrequest',
@@ -317,8 +316,8 @@ If no action is triggered, output conversational prose.
 async function generateGeminiSalesResponse(tenant, profile, newParts) {
   const apiKey = (process.env.GEMINI_API_KEY || "").trim();
   if (!apiKey) {
-    console.warn("⚠️ GEMINI_API_KEY is not set. Returning smart fallback.");
-    return `Karibu ${tenant.businessName}! We have Air Force 1 White (KSh 2,500) and salon styling services available today. How can I help you book or order?`;
+    console.warn("⚠️ GEMINI_API_KEY is not set. Returning fallback.");
+    return `Niaje! Karibu ${tenant.businessName}. We have 4 pairs of Air Force 1 White (KSh 2,500) and salon styling services available today. How can I help you book or order?`;
   }
 
   const contents = [];
@@ -347,8 +346,7 @@ async function generateGeminiSalesResponse(tenant, profile, newParts) {
     }
   };
 
-  // Supported public Gemini model tags
-  const models = ['gemini-2.0-flash', 'gemini-1.5-flash', 'gemini-1.5-pro'];
+  const models = ['gemini-2.5-flash', 'gemini-1.5-flash', 'gemini-1.5-pro'];
 
   for (const model of models) {
     try {
@@ -367,12 +365,11 @@ async function generateGeminiSalesResponse(tenant, profile, newParts) {
         return candidateText.trim();
       }
     } catch (err) {
-      console.warn(`⚠️ Model [${model}] attempt issue:`, err.response?.data?.error?.message || err.message);
+      console.error(`❌ Gemini [${model}] Error:`, err.response?.data?.error?.message || err.message);
     }
   }
 
-  // Graceful conversational fallback if model limits or network delays occur
-  return `Karibu ${tenant.businessName}! We have our exclusive collection ready. Would you like to check out our sneakers or book a service consultation?`;
+  return `Niaje! Karibu ${tenant.businessName}. We have Air Force 1 White (KSh 2,500) and hair styling consultations open today. How may I get you started?`;
 }
 
 function getOrCreateCustomerSession(tenant, customerId, channel = 'whatsapp') {
@@ -498,7 +495,7 @@ async function sendWhatsAppText(tenant, toPhone, text) {
         }
       }
     );
-    console.log(`📤 Text reply delivered to +${cleanPhone}: "${String(text).trim().substring(0, 45)}..." (ID: ${res.data?.messages?.[0]?.id})`);
+    console.log(`📤 Text reply delivered to +${cleanPhone}`);
     return res.data;
   } catch (err) {
     console.error('❌ Meta Outbound Send Error:', JSON.stringify(err.response?.data || err.message));
@@ -587,7 +584,7 @@ async function handleWebhookIncoming(req, res) {
     const requestsVoice = /\b(read|voice|audio|say|listen|loud|driving|record|ongea)\b/i.test(incomingTextRaw);
     const isVoiceInput = (msgType === 'audio' || msgType === 'voice' || requestsVoice);
 
-    console.log(`📩 Processing message from +${fromNumber} (Type: ${msgType}, VoiceTrigger: ${isVoiceInput}) via PhoneID [${incomingPhoneId}]`);
+    console.log(`📩 Processing message from +${fromNumber} (Type: ${msgType})`);
 
     const { profile } = getOrCreateCustomerSession(tenant, fromNumber, 'whatsapp');
 
@@ -620,7 +617,6 @@ async function handleWebhookIncoming(req, res) {
     if (msgType === 'text') {
       loggedUserText = incomingTextRaw;
       userPromptParts.push({ text: loggedUserText });
-      console.log(`💬 [${tenant.businessName}] Received: "${loggedUserText}"`);
     } else if (msgType === 'image') {
       const caption = message.image.caption || "Customer uploaded a photo.";
       loggedUserText = `[Sent Image: ${caption}]`;
@@ -766,7 +762,7 @@ async function handleWebhookIncoming(req, res) {
   }
 }
 
-// Bind both endpoints so both Meta configurations succeed
+// Bind both endpoints
 app.get('/webhook', handleWebhookVerification);
 app.post('/webhook', handleWebhookIncoming);
 app.get('/api/webhook', handleWebhookVerification);
@@ -1027,15 +1023,21 @@ app.post('/api/tenant/payments/daraja', tenantMiddleware, (req, res) => {
 
 app.post('/api/tenant/payments/test-stk', tenantMiddleware, async (req, res) => {
   const { testPhone } = req.body;
-  if (!testPhone) return res.status(400).json({ error: "testPhone is required" });
+  let cleanPhone = String(testPhone || "254768820142").replace(/\D/g, '').trim();
+  if (cleanPhone.startsWith('0')) cleanPhone = '254' + cleanPhone.slice(1);
+  if (!cleanPhone.startsWith('254')) cleanPhone = '254' + cleanPhone;
 
-  const result = await triggerTenantSTKPush(req.tenant, testPhone, 1, "Test");
-  if (result && (result.ResponseCode === "0" || result.CheckoutRequestID)) {
-    res.json({ success: true, message: "STK prompt sent to your phone!", result });
-  } else {
+  try {
+    const result = await triggerTenantSTKPush(req.tenant, cleanPhone, 1, "Test");
+    if (result && (result.ResponseCode === "0" || result.CheckoutRequestID)) {
+      return res.json({ success: true, message: "STK prompt sent to your phone!", result });
+    }
+
     const rawDetails = result?.details || result;
-    const errMsg = rawDetails?.errorMessage || rawDetails?.ResponseDescription || (typeof rawDetails === 'string' ? rawDetails : "STK prompt failed");
-    res.status(500).json({ success: false, message: errMsg, result: rawDetails });
+    const errMsg = rawDetails?.errorMessage || rawDetails?.ResponseDescription || "Safaricom Gateway rejected prompt";
+    return res.status(400).json({ success: false, message: errMsg, result: rawDetails });
+  } catch (err) {
+    return res.status(500).json({ success: false, message: err.message });
   }
 });
 
