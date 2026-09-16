@@ -58,8 +58,8 @@ function initializeStore() {
           instagramPageId: null,
           daraja: {
             type: "CustomerPayBillOnline",
-            shortcode: "174379",
-            passkey: DEFAULT_SANDBOX_PASSKEY,
+            shortcode: process.env.DARAJA_BUSINESS_SHORTCODE || "174379",
+            passkey: process.env.DARAJA_PASSKEY || DEFAULT_SANDBOX_PASSKEY,
             consumerKey: String(process.env.DARAJA_CONSUMER_KEY || "5U68vQHgUCU7HpYSQZXegh2pFmzG1uBPTMNFcw5obW96GPVn").trim(),
             consumerSecret: String(process.env.DARAJA_CONSUMER_SECRET || "2qwVKez82Raza13QyV9Ti8GqNLWKgGPWrJVpr1eot3OGNWluJAO1QaAjr1WaDsII").trim()
           },
@@ -116,7 +116,7 @@ function initializeStore() {
 
   if (loadedStore.tenants["luvon_q_flagship"]) {
     const flagship = loadedStore.tenants["luvon_q_flagship"];
-    flagship.whatsappPhoneId = process.env.WHATSAPP_PHONE_NUMBER_ID || "1279716021891578";
+    flagship.whatsappPhoneId = process.env.WHATSAPP_PHONE_NUMBER_ID || flagship.whatsappPhoneId || "1279716021891578";
 
     if (!flagship.elevenLabsVoiceId || flagship.elevenLabsVoiceId === "JBFqnCBsd6RMkjVDRZzb") {
       flagship.elevenLabsVoiceId = process.env.ELEVENLABS_VOICE_ID || DEFAULT_FEMALE_VOICE_ID;
@@ -124,8 +124,8 @@ function initializeStore() {
 
     flagship.daraja = {
       type: "CustomerPayBillOnline",
-      shortcode: "174379",
-      passkey: DEFAULT_SANDBOX_PASSKEY,
+      shortcode: process.env.DARAJA_BUSINESS_SHORTCODE || "174379",
+      passkey: process.env.DARAJA_PASSKEY || DEFAULT_SANDBOX_PASSKEY,
       consumerKey: String(process.env.DARAJA_CONSUMER_KEY || "5U68vQHgUCU7HpYSQZXegh2pFmzG1uBPTMNFcw5obW96GPVn").trim(),
       consumerSecret: String(process.env.DARAJA_CONSUMER_SECRET || "2qwVKez82Raza13QyV9Ti8GqNLWKgGPWrJVpr1eot3OGNWluJAO1QaAjr1WaDsII").trim()
     };
@@ -168,8 +168,8 @@ function getValidDarajaCredentials(tenant) {
   if (!key || key.includes('•')) key = "5U68vQHgUCU7HpYSQZXegh2pFmzG1uBPTMNFcw5obW96GPVn";
   if (!secret || secret.includes('•')) secret = "2qwVKez82Raza13QyV9Ti8GqNLWKgGPWrJVpr1eot3OGNWluJAO1QaAjr1WaDsII";
 
-  const passkey = DEFAULT_SANDBOX_PASSKEY;
-  const shortcode = "174379";
+  const passkey = process.env.DARAJA_PASSKEY || tenant?.daraja?.passkey || DEFAULT_SANDBOX_PASSKEY;
+  const shortcode = process.env.DARAJA_BUSINESS_SHORTCODE || tenant?.daraja?.shortcode || "174379";
 
   return { key, secret, passkey, shortcode };
 }
@@ -205,20 +205,20 @@ async function executeDarajaSTK(tenant, phoneNumber, amount, itemRef, isRetry = 
     const rawToken = await getTenantDarajaToken(tenant, isRetry);
     const token = String(rawToken).trim();
 
-    // 14-digit East Africa Time (UTC+3) timestamp: YYYYMMDDHHmmss
     const eatDate = new Date(Date.now() + (3 * 60 * 60 * 1000));
     const pad = (n) => String(n).padStart(2, '0');
     const timestamp = `${eatDate.getUTCFullYear()}${pad(eatDate.getUTCMonth() + 1)}${pad(eatDate.getUTCDate())}${pad(eatDate.getUTCHours())}${pad(eatDate.getUTCMinutes())}${pad(eatDate.getUTCSeconds())}`;
 
-    // Base64 Password: Shortcode + Passkey + Timestamp
     const password = Buffer.from(`${shortcode}${passkey}${timestamp}`).toString('base64');
 
-    // Phone format: 254XXXXXXXXX
     let cleanPhone = String(phoneNumber).replace(/\D/g, '').trim();
     if (cleanPhone.startsWith('0')) cleanPhone = '254' + cleanPhone.slice(1);
     if (!cleanPhone.startsWith('254')) cleanPhone = '254' + cleanPhone;
 
-    // Strict schema: Amount as string ("1"), exact fields matching Daraja simulator
+    const serverCallback = process.env.SERVER_URL 
+      ? `${process.env.SERVER_URL.replace(/\/$/, '')}/api/stk-callback`
+      : "https://luvon-engine.onrender.com/api/stk-callback";
+
     const payload = {
       BusinessShortCode: shortcode,
       Password: password,
@@ -228,9 +228,9 @@ async function executeDarajaSTK(tenant, phoneNumber, amount, itemRef, isRetry = 
       PartyA: cleanPhone,
       PartyB: shortcode,
       PhoneNumber: cleanPhone,
-      CallBackURL: "https://mydomain.com/mpesa-endpoint",
-      AccountReference: "Test",
-      TransactionDesc: "Test"
+      CallBackURL: serverCallback,
+      AccountReference: "LuvonQ",
+      TransactionDesc: "Payment"
     };
 
     console.log(`📤 Dispatching Daraja STK Push to +${cleanPhone} (Timestamp: ${timestamp})...`);
@@ -273,11 +273,11 @@ async function triggerTenantSTKPush(tenant, phoneNumber, amount, itemRef) {
 }
 
 // ==========================================
-// 3. GEMINI 3.7 FLASH INSTRUCTION ENGINE
+// 3. GEMINI INSTRUCTION ENGINE
 // ==========================================
 function buildTenantSystemInstruction(tenant, profile) {
   return `
-You are the dedicated female AI sales & style concierge for **${tenant.businessName}**${
+You are the dedicated female AI sales concierge for **${tenant.businessName}**${
     tenant.brandSignature ? ` (Brand Signature: *${tenant.brandSignature}*)` : ''
   }, an elite ${tenant.industry} house in Nairobi.
 Powered by: Luvon Q Orélune Conversational Engine.
@@ -346,7 +346,7 @@ async function generateGeminiSalesResponse(tenant, profile, newParts) {
     }
   };
 
-  const models = ['gemini-3.7-flash', 'gemini-3.6-flash', 'gemini-3.5-flash-lite'];
+  const models = ['gemini-2.5-flash', 'gemini-1.5-flash', 'gemini-1.5-pro'];
   let lastError = null;
 
   for (const model of models) {
@@ -375,13 +375,14 @@ async function generateGeminiSalesResponse(tenant, profile, newParts) {
 }
 
 function getOrCreateCustomerSession(tenant, customerId, channel = 'whatsapp') {
-  const sessionKey = `${tenant.id}_${customerId}`;
+  const cleanId = customerId.toString().replace(/\+/g, '').trim();
+  const sessionKey = `${tenant.id}_${cleanId}`;
   let profile = db.crmProfiles[sessionKey];
 
   if (!profile) {
     profile = {
       tenantId: tenant.id,
-      customerId,
+      customerId: cleanId,
       channel,
       stage: 'QUALIFICATION',
       cart: null,
@@ -412,7 +413,7 @@ async function sendWhatsAppElevenLabsAudio(tenant, toPhone, textReply) {
 
     if (!apiKey) return;
 
-    console.log(`🎙️ Generating ElevenLabs Voice Note via [${voiceId}] (Female)...`);
+    console.log(`🎙️ Generating ElevenLabs Voice Note via [${voiceId}]...`);
 
     const ttsRes = await axios.post(
       `https://api.elevenlabs.io/v1/text-to-speech/${voiceId}?output_format=mp3_44100_128`,
@@ -433,7 +434,7 @@ async function sendWhatsAppElevenLabsAudio(tenant, toPhone, textReply) {
     form.append('messaging_product', 'whatsapp');
 
     const uploadRes = await axios.post(
-      `https://graph.facebook.com/v18.0/${phoneId}/media`,
+      `https://graph.facebook.com/v20.0/${phoneId}/media`,
       form,
       {
         headers: {
@@ -444,7 +445,7 @@ async function sendWhatsAppElevenLabsAudio(tenant, toPhone, textReply) {
     );
 
     await axios.post(
-      `https://graph.facebook.com/v18.0/${phoneId}/messages`,
+      `https://graph.facebook.com/v20.0/${phoneId}/messages`,
       {
         messaging_product: 'whatsapp',
         to: cleanPhone,
@@ -453,7 +454,7 @@ async function sendWhatsAppElevenLabsAudio(tenant, toPhone, textReply) {
       },
       { headers: { Authorization: `Bearer ${process.env.WHATSAPP_ACCESS_TOKEN}` } }
     );
-    console.log(`✅ Female Voice Note delivered to +${cleanPhone}`);
+    console.log(`✅ Voice Note delivered to +${cleanPhone}`);
   } catch (err) {
     console.warn('⚠️ ElevenLabs generation notice:', err.response?.data ? JSON.stringify(err.response.data) : err.message);
   }
@@ -467,7 +468,7 @@ async function markMessageAsRead(messageId) {
   const phoneId = process.env.WHATSAPP_PHONE_NUMBER_ID || "1279716021891578";
   try {
     await axios.post(
-      `https://graph.facebook.com/v18.0/${phoneId}/messages`,
+      `https://graph.facebook.com/v20.0/${phoneId}/messages`,
       { messaging_product: 'whatsapp', status: 'read', message_id: messageId },
       { headers: { Authorization: `Bearer ${process.env.WHATSAPP_ACCESS_TOKEN}` } }
     );
@@ -482,7 +483,7 @@ async function sendWhatsAppText(tenant, toPhone, text) {
 
   try {
     const res = await axios.post(
-      `https://graph.facebook.com/v18.0/${phoneId}/messages`,
+      `https://graph.facebook.com/v20.0/${phoneId}/messages`,
       {
         messaging_product: 'whatsapp',
         to: cleanPhone,
@@ -497,8 +498,10 @@ async function sendWhatsAppText(tenant, toPhone, text) {
       }
     );
     console.log(`📤 Text reply delivered to +${cleanPhone}: "${String(text).trim().substring(0, 45)}..." (ID: ${res.data?.messages?.[0]?.id})`);
+    return res.data;
   } catch (err) {
     console.error('❌ Meta Outbound Send Error:', JSON.stringify(err.response?.data || err.message));
+    throw err;
   }
 }
 
@@ -509,7 +512,7 @@ async function sendWhatsAppImage(tenant, toPhone, imageUrl, caption) {
 
   try {
     await axios.post(
-      `https://graph.facebook.com/v18.0/${phoneId}/messages`,
+      `https://graph.facebook.com/v20.0/${phoneId}/messages`,
       {
         messaging_product: 'whatsapp',
         to: cleanPhone,
@@ -527,7 +530,7 @@ async function sendWhatsAppImage(tenant, toPhone, imageUrl, caption) {
 async function getMediaBuffer(mediaId) {
   try {
     const resUrl = await axios.get(
-      `https://graph.facebook.com/v18.0/${mediaId}`,
+      `https://graph.facebook.com/v20.0/${mediaId}`,
       { headers: { Authorization: `Bearer ${process.env.WHATSAPP_ACCESS_TOKEN}` } }
     );
     const mediaRes = await axios.get(resUrl.data.url, {
@@ -545,9 +548,9 @@ async function getMediaBuffer(mediaId) {
 }
 
 // ==========================================
-// 6. MAIN WEBHOOK INTAKE & DUAL DISPATCH
+// 6. MAIN WEBHOOK INTAKE (HANDLES BOTH /webhook AND /api/webhook)
 // ==========================================
-app.get('/webhook', (req, res) => {
+function handleWebhookVerification(req, res) {
   const mode = req.query['hub.mode'];
   const token = req.query['hub.verify_token'];
   const challenge = req.query['hub.challenge'];
@@ -557,9 +560,9 @@ app.get('/webhook', (req, res) => {
     return res.status(200).send(challenge);
   }
   res.sendStatus(403);
-});
+}
 
-app.post('/webhook', async (req, res) => {
+async function handleWebhookIncoming(req, res) {
   res.sendStatus(200);
 
   try {
@@ -599,6 +602,12 @@ app.post('/webhook', async (req, res) => {
 
     if (profile.isPaused) {
       console.log(`⏸️ Chat with ${fromNumber} is paused.`);
+      profile.conversationHistory.push({
+        role: 'user',
+        text: incomingTextRaw || `[${msgType}]`,
+        timestamp: new Date().toISOString()
+      });
+      saveStore();
       return;
     }
 
@@ -634,7 +643,7 @@ app.post('/webhook', async (req, res) => {
       }
     }
 
-    console.log(`🤖 Generating Gemini sales response (gemini-3.7-flash)...`);
+    console.log(`🤖 Generating Gemini sales response...`);
     let responseText = await generateGeminiSalesResponse(tenant, profile, userPromptParts);
 
     if (!responseText) {
@@ -754,7 +763,13 @@ app.post('/webhook', async (req, res) => {
   } catch (err) {
     console.error('❌ Webhook Processing Error:', err.message);
   }
-});
+}
+
+// Bind both endpoints so both Meta configurations succeed
+app.get('/webhook', handleWebhookVerification);
+app.post('/webhook', handleWebhookIncoming);
+app.get('/api/webhook', handleWebhookVerification);
+app.post('/api/webhook', handleWebhookIncoming);
 
 // ==========================================
 // 7. M-PESA DARAJA CALLBACK WEBHOOK
@@ -894,7 +909,7 @@ app.post('/api/tenant/settings/personality', tenantMiddleware, (req, res) => {
 app.post('/api/tenant/voice/preview', async (req, res) => {
   const { voiceId, text } = req.body;
   const targetVoice = voiceId || process.env.ELEVENLABS_VOICE_ID || DEFAULT_FEMALE_VOICE_ID;
-  const sampleText = text || "Niaje! Welcome to Nairobi Kicks Studio. We have 4 pairs of Air Force 1 White remaining in stock!";
+  const sampleText = text || "Niaje! Welcome to Luvon Q. We are ready to handle your bookings!";
   const apiKey = process.env.ELEVENLABS_API_KEY;
 
   if (!apiKey) {
@@ -946,8 +961,15 @@ app.post('/api/tenant/conversations/send-message', tenantMiddleware, async (req,
     saveStore();
   }
 
-  await sendWhatsAppText(req.tenant, cleanPhone, text);
-  res.json({ success: true, message: "Outbound message sent directly to customer" });
+  try {
+    await sendWhatsAppText(req.tenant, cleanPhone, text);
+    res.json({ success: true, message: "Outbound message delivered via Meta WhatsApp API" });
+  } catch (err) {
+    res.status(500).json({ 
+      error: "Meta API delivery failed", 
+      details: err.response?.data || err.message 
+    });
+  }
 });
 
 app.post('/api/tenant/payments/daraja', tenantMiddleware, (req, res) => {
@@ -956,8 +978,8 @@ app.post('/api/tenant/payments/daraja', tenantMiddleware, (req, res) => {
   if (!req.tenant.daraja) req.tenant.daraja = {};
   
   req.tenant.daraja.type = "CustomerPayBillOnline";
-  req.tenant.daraja.shortcode = "174379";
-  req.tenant.daraja.passkey = DEFAULT_SANDBOX_PASSKEY;
+  req.tenant.daraja.shortcode = process.env.DARAJA_BUSINESS_SHORTCODE || "174379";
+  req.tenant.daraja.passkey = process.env.DARAJA_PASSKEY || DEFAULT_SANDBOX_PASSKEY;
 
   if (consumerKey && !consumerKey.includes('•')) {
     req.tenant.daraja.consumerKey = consumerKey.trim();
@@ -991,7 +1013,8 @@ app.get('/api/tenant/conversations', tenantMiddleware, (req, res) => {
 
 app.post('/api/tenant/conversations/toggle-pause', tenantMiddleware, (req, res) => {
   const { customerId, isPaused } = req.body;
-  const sessionKey = `${req.tenant.id}_${customerId}`;
+  const cleanPhone = customerId.toString().replace(/\+/g, '').trim();
+  const sessionKey = `${req.tenant.id}_${cleanPhone}`;
   if (db.crmProfiles[sessionKey]) {
     db.crmProfiles[sessionKey].isPaused = Boolean(isPaused);
     saveStore();

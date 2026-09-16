@@ -1,9 +1,16 @@
 // api.js
-const API_BASE = '/api/tenant';
+// Dynamically resolve base host (Render vs Localhost)
+const BASE_URL = (typeof window !== 'undefined' && window.location.origin && window.location.origin.includes('http'))
+  ? window.location.origin
+  : 'http://localhost:3000';
+
+const API_BASE = `${BASE_URL}/api/tenant`;
 const TENANT_ID = 'luvon_q_flagship';
 
 async function apiCall(endpoint, options = {}) {
-  const url = `${API_BASE}${endpoint.startsWith('/') ? endpoint : '/' + endpoint}`;
+  const cleanEndpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
+  const url = `${API_BASE}${cleanEndpoint}`;
+
   const config = {
     ...options,
     headers: {
@@ -36,6 +43,14 @@ const API = {
   saveInventoryItem: (item) => apiCall('/inventory', { method: 'POST', body: JSON.stringify(item) }),
   getMetrics: () => apiCall('/metrics'),
   getConversations: () => apiCall('/conversations'),
+  togglePause: (customerId, isPaused) => apiCall('/conversations/toggle-pause', { 
+    method: 'POST', 
+    body: JSON.stringify({ customerId, isPaused }) 
+  }),
+  sendMessage: (customerId, text) => apiCall('/conversations/send-message', {
+    method: 'POST',
+    body: JSON.stringify({ customerId, text })
+  }),
   saveDarajaSettings: (payload) => apiCall('/payments/daraja', { method: 'POST', body: JSON.stringify(payload) }),
   triggerTestSTK: (testPhone) => apiCall('/payments/test-stk', { method: 'POST', body: JSON.stringify({ testPhone }) }),
   previewVoice: (voiceId, text) => fetch(`${API_BASE}/voice/preview`, {
@@ -44,3 +59,8 @@ const API = {
     body: JSON.stringify({ voiceId, text })
   })
 };
+
+if (typeof window !== 'undefined') {
+  window.API = API;
+  window.apiCall = apiCall;
+}
