@@ -3,13 +3,21 @@
 // ==========================================
 let catalogItems = [];
 
+const BASE_ORIGIN = (typeof window !== 'undefined' && window.location.origin && window.location.origin.includes('http'))
+  ? window.location.origin
+  : 'http://localhost:3000';
+const API_BASE = `${BASE_ORIGIN}/api/tenant`;
+const TENANT_ID = 'luvon_q_flagship';
+
 async function fetchTenantCatalog() {
   try {
-    const data = typeof apiCall === 'function'
-      ? await apiCall('/inventory')
-      : await (await fetch('http://localhost:3000/api/tenant/inventory', {
-          headers: { 'x-tenant-id': 'luvon_q_flagship' }
-        })).json();
+    const data = (typeof window.API !== 'undefined' && typeof window.API.getInventory === 'function')
+      ? await window.API.getInventory()
+      : (typeof apiCall === 'function')
+        ? await apiCall('/inventory')
+        : await (await fetch(`${API_BASE}/inventory`, {
+            headers: { 'x-tenant-id': TENANT_ID }
+          })).json();
 
     catalogItems = Array.isArray(data) ? data : [];
     renderCatalog(catalogItems);
@@ -59,7 +67,7 @@ function renderCatalog(items) {
         }
       </td>
       <td class="p-4 text-right">
-        <button onclick="deleteProductLocal('${item.id}')" class="text-rose-600 hover:underline font-semibold text-xs">Delete</button>
+        <button onclick="deleteProductLocal('${item.id}')" class="text-rose-600 hover:underline font-semibold text-xs cursor-pointer">Delete</button>
       </td>
     </tr>
   `).join('');
@@ -76,10 +84,8 @@ function deleteProductLocal(id) {
 document.addEventListener("DOMContentLoaded", () => {
   if (window.lucide) lucide.createIcons();
   
-  // Initial live fetch
   fetchTenantCatalog();
 
-  // Modal Handlers
   const modal = document.getElementById("product-modal");
   const openBtn = document.getElementById("open-modal-btn");
   const closeBtn = document.getElementById("close-modal-btn");
@@ -95,7 +101,6 @@ document.addEventListener("DOMContentLoaded", () => {
   closeBtn?.addEventListener("click", () => toggleModal(false));
   cancelBtn?.addEventListener("click", () => toggleModal(false));
 
-  // Form Submit (POST to backend)
   form?.addEventListener("submit", async (e) => {
     e.preventDefault();
     const name = document.getElementById("prod-name").value;
@@ -115,17 +120,19 @@ document.addEventListener("DOMContentLoaded", () => {
     };
 
     try {
-      if (typeof apiCall === 'function') {
+      if (typeof window.API !== 'undefined' && typeof window.API.saveInventoryItem === 'function') {
+        await window.API.saveInventoryItem(payload);
+      } else if (typeof apiCall === 'function') {
         await apiCall('/inventory', {
           method: 'POST',
           body: JSON.stringify(payload)
         });
       } else {
-        await fetch('http://localhost:3000/api/tenant/inventory', {
+        await fetch(`${API_BASE}/inventory`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            'x-tenant-id': 'luvon_q_flagship'
+            'x-tenant-id': TENANT_ID
           },
           body: JSON.stringify(payload)
         });
@@ -133,13 +140,12 @@ document.addEventListener("DOMContentLoaded", () => {
 
       form.reset();
       toggleModal(false);
-      await fetchTenantCatalog(); // Refresh list from server
+      await fetchTenantCatalog();
     } catch (err) {
       alert('Failed to save product to backend: ' + err.message);
     }
   });
 
-  // Search Filter Handler
   document.getElementById("catalog-search")?.addEventListener("input", (e) => {
     const term = e.target.value.toLowerCase().trim();
     const filtered = catalogItems.filter(i => 
@@ -149,7 +155,6 @@ document.addEventListener("DOMContentLoaded", () => {
     renderCatalog(filtered);
   });
 
-  // Category Filter Handler
   document.getElementById("category-filter")?.addEventListener("change", (e) => {
     const cat = e.target.value;
     if (cat === "ALL" || !cat) {

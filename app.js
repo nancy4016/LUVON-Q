@@ -55,14 +55,21 @@ function updateCarousel(index) {
 // ==========================================
 // 2. LIVE BACKEND DATA INTEGRATION
 // ==========================================
+const BASE_ORIGIN = (typeof window !== 'undefined' && window.location.origin && window.location.origin.includes('http'))
+  ? window.location.origin
+  : 'http://localhost:3000';
+const TENANT_ID = 'luvon_q_flagship';
+
 async function loadLiveDashboardData() {
   // 1. Fetch KPI Metrics
   try {
-    const metrics = typeof apiCall === 'function' 
-      ? await apiCall('/metrics') 
-      : await (await fetch('/api/tenant/metrics', {
-          headers: { 'x-tenant-id': 'luvon_q_flagship' }
-        })).json();
+    const metrics = (typeof window.API !== 'undefined' && typeof window.API.getMetrics === 'function')
+      ? await window.API.getMetrics()
+      : (typeof apiCall === 'function')
+        ? await apiCall('/metrics')
+        : await (await fetch(`${BASE_ORIGIN}/api/tenant/metrics`, {
+            headers: { 'x-tenant-id': TENANT_ID }
+          })).json();
 
     const revEl = document.getElementById('totalRevenue') || document.querySelector('[data-metric="revenue"]');
     const closedEl = document.getElementById('dealsClosed') || document.querySelector('[data-metric="deals"]');
@@ -79,11 +86,13 @@ async function loadLiveDashboardData() {
 
   // 2. Fetch Live Inventory Catalog
   try {
-    const inventory = typeof apiCall === 'function'
-      ? await apiCall('/inventory')
-      : await (await fetch('/api/tenant/inventory', {
-          headers: { 'x-tenant-id': 'luvon_q_flagship' }
-        })).json();
+    const inventory = (typeof window.API !== 'undefined' && typeof window.API.getInventory === 'function')
+      ? await window.API.getInventory()
+      : (typeof apiCall === 'function')
+        ? await apiCall('/inventory')
+        : await (await fetch(`${BASE_ORIGIN}/api/tenant/inventory`, {
+            headers: { 'x-tenant-id': TENANT_ID }
+          })).json();
 
     renderInventoryTable(inventory);
   } catch (err) {
@@ -169,7 +178,7 @@ function handleCustomerAuth(event) {
   const emailInput = document.getElementById('email');
   const nameInput = document.getElementById('fullName');
   const email = emailInput ? emailInput.value : '';
-  const fullName = nameInput && nameInput.value ? nameInput.value : 'Nairobi Kicks Studio';
+  const fullName = nameInput && nameInput.value ? nameInput.value : 'Luvon Q Flagship';
 
   localStorage.setItem('luvon_authenticated', 'true');
   localStorage.setItem('luvon_user_email', email);
@@ -245,13 +254,13 @@ document.addEventListener("DOMContentLoaded", () => {
   const isLoggedIn = localStorage.getItem('luvon_authenticated') === 'true';
   updateAuthUI(isLoggedIn);
 
-  // Carousel timer
+  // Carousel auto-advance
   setInterval(() => {
     const nextIndex = (currentSlideIndex + 1) % slides.length;
     updateCarousel(nextIndex);
   }, 5000);
 
-  // Manual Carousel Buttons
+  // Manual Carousel Controls
   document.getElementById("prev-slide")?.addEventListener("click", () => {
     const prevIndex = (currentSlideIndex - 1 + slides.length) % slides.length;
     updateCarousel(prevIndex);

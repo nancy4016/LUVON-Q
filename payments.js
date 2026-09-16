@@ -1,14 +1,14 @@
 document.addEventListener("DOMContentLoaded", async () => {
   if (window.lucide) lucide.createIcons();
 
-  // ✅ Dynamic API base compatible with localhost and Render production
-  const API_BASE = window.location.origin.includes('localhost') 
-    ? 'http://localhost:3000/api/tenant' 
-    : '/api/tenant';
-    
+  // Dynamic origin resolution matching local and Render environments
+  const BASE_ORIGIN = (typeof window !== 'undefined' && window.location.origin && window.location.origin.includes('http'))
+    ? window.location.origin
+    : 'http://localhost:3000';
+  const API_BASE = `${BASE_ORIGIN}/api/tenant`;
   const TENANT_ID = 'luvon_q_flagship';
 
-  let selectedType = "CustomerPayBillOnline"; // Default for Paybill 174379
+  let selectedType = "CustomerPayBillOnline";
 
   const btnBuyGoods = document.getElementById("type-buygoods");
   const btnPaybill = document.getElementById("type-paybill");
@@ -26,7 +26,6 @@ document.addEventListener("DOMContentLoaded", async () => {
   const statusBadge = document.getElementById("stk-status-badge");
   const statusText = document.getElementById("stk-status-text");
 
-  // 1. Account Type Toggle Handlers
   function setAccountType(type) {
     selectedType = type;
     if (type === "CustomerPayBillOnline") {
@@ -57,9 +56,11 @@ document.addEventListener("DOMContentLoaded", async () => {
   if (btnBuyGoods) btnBuyGoods.addEventListener("click", () => setAccountType("CustomerBuyGoodsOnline"));
   if (btnPaybill) btnPaybill.addEventListener("click", () => setAccountType("CustomerPayBillOnline"));
 
-  // 2. Pre-load Active Configuration from Backend
+  // Pre-load Active Configuration
   try {
-    const res = await fetch(`${API_BASE}/settings`, { headers: { 'x-tenant-id': TENANT_ID } });
+    const res = await fetch(`${API_BASE}/settings`, { 
+      headers: { 'x-tenant-id': TENANT_ID } 
+    });
     const data = await res.json();
     if (data.success && data.tenant?.daraja) {
       const d = data.tenant.daraja;
@@ -73,7 +74,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     console.warn("Could not pre-load Daraja credentials:", err.message);
   }
 
-  // 3. Save Credentials Handler
+  // Save Credentials
   if (saveBtn) {
     saveBtn.addEventListener("click", async (e) => {
       e.preventDefault();
@@ -95,16 +96,21 @@ document.addEventListener("DOMContentLoaded", async () => {
         saveBtn.classList.add("opacity-60");
         saveBtn.textContent = "Saving...";
 
-        const res = await fetch(`${API_BASE}/payments/daraja`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'x-tenant-id': TENANT_ID
-          },
-          body: JSON.stringify(payload)
-        });
+        let data;
+        if (typeof window.API !== 'undefined' && typeof window.API.saveDarajaSettings === 'function') {
+          data = await window.API.saveDarajaSettings(payload);
+        } else {
+          const res = await fetch(`${API_BASE}/payments/daraja`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'x-tenant-id': TENANT_ID
+            },
+            body: JSON.stringify(payload)
+          });
+          data = await res.json();
+        }
 
-        const data = await res.json();
         if (data.success) {
           alert(`✅ Daraja settings saved successfully!\nAccount Type: ${selectedType}\nShortcode: ${payload.shortcode}`);
         } else {
@@ -120,7 +126,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     });
   }
 
-  // 4. Trigger STK Push Test Handler
+  // Trigger STK Push Test
   if (stkBtn) {
     stkBtn.addEventListener("click", async (e) => {
       e.preventDefault();
@@ -131,7 +137,6 @@ document.addEventListener("DOMContentLoaded", async () => {
         return;
       }
 
-      // Standardize to 254XXXXXXXXX
       let formattedPhone = rawPhone;
       if (formattedPhone.startsWith('0')) {
         formattedPhone = '254' + formattedPhone.substring(1);
@@ -157,18 +162,22 @@ document.addEventListener("DOMContentLoaded", async () => {
       }
 
       try {
-        const res = await fetch(`${API_BASE}/payments/test-stk`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'x-tenant-id': TENANT_ID
-          },
-          body: JSON.stringify({ testPhone: formattedPhone })
-        });
-        
-        const resData = await res.json().catch(() => null);
+        let resData;
+        if (typeof window.API !== 'undefined' && typeof window.API.triggerTestSTK === 'function') {
+          resData = await window.API.triggerTestSTK(formattedPhone);
+        } else {
+          const res = await fetch(`${API_BASE}/payments/test-stk`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'x-tenant-id': TENANT_ID
+            },
+            body: JSON.stringify({ testPhone: formattedPhone })
+          });
+          resData = await res.json().catch(() => null);
+        }
 
-        if (res.ok && resData?.success && (resData.result?.ResponseCode === "0" || resData.result?.CheckoutRequestID)) {
+        if (resData?.success && (resData.result?.ResponseCode === "0" || resData.result?.CheckoutRequestID)) {
           if (statusBadge) {
             statusBadge.className = "text-[9px] font-bold px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-800";
             statusBadge.textContent = "SUCCESS (200 OK)";
@@ -177,7 +186,7 @@ document.addEventListener("DOMContentLoaded", async () => {
             statusText.textContent = `[CheckoutRequestID: ${resData.result?.CheckoutRequestID || 'N/A'}]\n${resData.result?.CustomerMessage || 'Prompt delivered to handset. Enter your M-Pesa PIN!'}`;
           }
         } else {
-          const errMsg = resData?.result?.errorMessage || resData?.result?.ResponseDescription || resData?.message || `Gateway error (HTTP ${res.status})`;
+          const errMsg = resData?.result?.errorMessage || resData?.result?.ResponseDescription || resData?.message || "Gateway rejection";
           throw new Error(errMsg);
         }
       } catch (err) {
