@@ -129,7 +129,7 @@
           <div class="flex items-center gap-1.5">
             <button 
               id="test-inquiry-btn"
-              onclick="triggerTestInquiryUI()" 
+              onclick="openTestInquiryModal()" 
               type="button" 
               class="px-2.5 py-1 text-[11px] font-bold text-brand-900 bg-brand-100 hover:bg-brand-200 border border-brand-300 rounded-lg transition-all flex items-center gap-1.5 shadow-sm cursor-pointer"
             >
@@ -212,7 +212,7 @@
           <button 
             type="button" 
             id="quick-stk-btn"
-            onclick="triggerQuickSTK()"
+            onclick="openQuickSTKModal()"
             title="Dispatch M-Pesa STK Push to this customer"
             class="px-3.5 py-2.5 bg-emerald-50 text-emerald-800 border border-emerald-300 rounded-xl hover:bg-emerald-100 transition-all shadow-sm flex items-center gap-1.5 text-xs font-bold cursor-pointer flex-shrink-0"
           >
@@ -229,7 +229,7 @@
             class="flex-1 px-4 py-2.5 bg-[#fcfaf6] border border-brand-200 focus:border-brand-600 rounded-xl text-xs focus:outline-none text-stone-900 placeholder-stone-400 transition-all shadow-inner" 
           />
 
-          <!-- Updated Send Button -->
+          <!-- Send Button -->
           <button 
             type="submit" 
             id="send-btn"
@@ -243,7 +243,141 @@
     </section>
   </main>
 
-  <!-- Complete In-Line Controller Script -->
+  <!-- Modern Luxury Modal: Test Inquiry Simulator -->
+  <div id="testInquiryModal" class="fixed inset-0 bg-stone-900/60 backdrop-blur-sm z-50 flex items-center justify-center hidden p-4 transition-all">
+    <div class="bg-white rounded-2xl shadow-2xl max-w-lg w-full p-6 border border-brand-200 relative transform transition-all">
+      <button onclick="closeTestInquiryModal()" class="absolute top-4 right-4 text-stone-400 hover:text-stone-700 cursor-pointer">
+        <i data-lucide="x" class="w-5 h-5"></i>
+      </button>
+
+      <div class="flex items-center gap-2.5 mb-2">
+        <div class="w-8 h-8 rounded-lg bg-brand-100 border border-brand-300 flex items-center justify-center text-brand-700">
+          <i data-lucide="sparkles" class="w-4 h-4"></i>
+        </div>
+        <div>
+          <h3 class="text-base font-serif font-bold text-brand-900">Simulate Customer WhatsApp Inquiry</h3>
+          <p class="text-[11px] text-stone-500">Test Gemini AI sales responses, catalog recommendations, and tone.</p>
+        </div>
+      </div>
+
+      <!-- Quick Choice Pills -->
+      <div class="my-3.5 space-y-1.5">
+        <p class="text-[10px] font-bold text-stone-500 uppercase tracking-wider">Quick Prompts:</p>
+        <div class="flex flex-wrap gap-1.5">
+          <button type="button" onclick="setSimText(this.innerText)" class="text-[11px] px-2.5 py-1 bg-brand-50 hover:bg-brand-100 text-brand-800 rounded-lg border border-brand-200/80 transition-colors cursor-pointer text-left">
+            Where is your luxury salon located in Nairobi?
+          </button>
+          <button type="button" onclick="setSimText(this.innerText)" class="text-[11px] px-2.5 py-1 bg-brand-50 hover:bg-brand-100 text-brand-800 rounded-lg border border-brand-200/80 transition-colors cursor-pointer text-left">
+            Niaje! How much are the Air Force 1s?
+          </button>
+          <button type="button" onclick="setSimText(this.innerText)" class="text-[11px] px-2.5 py-1 bg-brand-50 hover:bg-brand-100 text-brand-800 rounded-lg border border-brand-200/80 transition-colors cursor-pointer text-left">
+            Do you have knotless braids available tomorrow?
+          </button>
+          <button type="button" onclick="setSimText(this.innerText)" class="text-[11px] px-2.5 py-1 bg-brand-50 hover:bg-brand-100 text-brand-800 rounded-lg border border-brand-200/80 transition-colors cursor-pointer text-left">
+            Nataka kulipa na M-Pesa sasa hivi.
+          </button>
+        </div>
+      </div>
+
+      <div class="space-y-1.5 mb-4">
+        <label for="sim-input-text" class="text-xs font-semibold text-stone-700">Inquiry Message</label>
+        <textarea 
+          id="sim-input-text" 
+          rows="3" 
+          class="w-full p-3 text-xs bg-[#fcfaf6] border border-brand-300 rounded-xl focus:outline-none focus:ring-1 focus:ring-brand-600 text-stone-900 resize-none shadow-inner"
+          placeholder="Type an inquiry..."
+        >Where is your luxury salon located in Nairobi?</textarea>
+      </div>
+
+      <div class="flex items-center justify-end gap-2">
+        <button 
+          type="button" 
+          onclick="closeTestInquiryModal()" 
+          class="px-4 py-2 text-xs font-semibold text-stone-600 hover:text-stone-900 rounded-xl transition-colors cursor-pointer"
+        >
+          Cancel
+        </button>
+        <button 
+          type="button" 
+          id="submit-sim-btn"
+          onclick="executeSimulateInquiry()" 
+          class="px-4 py-2 text-xs font-bold bg-brand-600 hover:bg-brand-700 text-white rounded-xl shadow-sm transition-all flex items-center gap-1.5 cursor-pointer"
+        >
+          <i data-lucide="send" class="w-3.5 h-3.5"></i>
+          <span>Send Inquiry to Bot</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modern Luxury Modal: Quick STK Push Trigger -->
+  <div id="quickSTKModal" class="fixed inset-0 bg-stone-900/60 backdrop-blur-sm z-50 flex items-center justify-center hidden p-4 transition-all">
+    <div class="bg-white rounded-2xl shadow-2xl max-w-sm w-full p-6 border border-brand-200 relative">
+      <button onclick="closeQuickSTKModal()" class="absolute top-4 right-4 text-stone-400 hover:text-stone-700 cursor-pointer">
+        <i data-lucide="x" class="w-5 h-5"></i>
+      </button>
+
+      <div class="flex items-center gap-2.5 mb-3">
+        <div class="w-8 h-8 rounded-lg bg-emerald-100 border border-emerald-300 flex items-center justify-center text-emerald-800">
+          <i data-lucide="banknote" class="w-4 h-4"></i>
+        </div>
+        <div>
+          <h3 class="text-base font-serif font-bold text-stone-900">M-Pesa STK Push</h3>
+          <p class="text-[11px] text-stone-500">Trigger prompt to customer handset</p>
+        </div>
+      </div>
+
+      <div class="space-y-3 mb-4">
+        <div>
+          <label class="text-xs font-semibold text-stone-700 block mb-1">Target Phone Number</label>
+          <input 
+            type="text" 
+            id="stk-modal-phone" 
+            class="w-full p-2.5 text-xs bg-[#fcfaf6] border border-brand-200 rounded-xl font-mono text-stone-900 focus:outline-none focus:border-brand-600"
+            readonly
+          />
+        </div>
+        <div>
+          <label class="text-xs font-semibold text-stone-700 block mb-1">Amount (KSh)</label>
+          <input 
+            type="number" 
+            id="stk-modal-amount" 
+            value="1" 
+            min="1" 
+            class="w-full p-2.5 text-xs bg-[#fcfaf6] border border-brand-300 rounded-xl font-bold text-brand-900 focus:outline-none focus:border-brand-600"
+          />
+        </div>
+      </div>
+
+      <div class="flex items-center justify-end gap-2">
+        <button 
+          type="button" 
+          onclick="closeQuickSTKModal()" 
+          class="px-4 py-2 text-xs font-semibold text-stone-600 hover:text-stone-900 rounded-xl transition-colors cursor-pointer"
+        >
+          Cancel
+        </button>
+        <button 
+          type="button" 
+          id="submit-stk-btn"
+          onclick="executeQuickSTK()" 
+          class="px-4 py-2 text-xs font-bold bg-emerald-700 hover:bg-emerald-800 text-white rounded-xl shadow-sm transition-all flex items-center gap-1.5 cursor-pointer"
+        >
+          <i data-lucide="zap" class="w-3.5 h-3.5"></i>
+          <span>Dispatch Prompt</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast Notification Container -->
+  <div id="toast" class="fixed bottom-5 right-5 z-50 hidden transition-all duration-300">
+    <div id="toast-inner" class="px-4 py-3 rounded-xl shadow-xl flex items-center gap-2.5 text-xs font-semibold border">
+      <span id="toast-msg">Notification</span>
+    </div>
+  </div>
+
+  <!-- In-Line Controller Script with Modern Dialogs -->
   <script>
     let conversations = [];
     let activeConvId = "254768820142";
@@ -254,6 +388,26 @@
       : 'http://localhost:3000';
     const BACKEND_URL = `${BASE_ORIGIN}/api/tenant`;
     const TENANT_ID = 'luvon_q_flagship';
+
+    // Toast Utility
+    function showToast(message, type = 'info') {
+      const toast = document.getElementById('toast');
+      const inner = document.getElementById('toast-inner');
+      const msg = document.getElementById('toast-msg');
+      if (!toast || !inner || !msg) return;
+
+      msg.textContent = message;
+      if (type === 'success') {
+        inner.className = "px-4 py-3 rounded-xl shadow-xl flex items-center gap-2.5 text-xs font-semibold border bg-emerald-900 text-emerald-100 border-emerald-700";
+      } else if (type === 'error') {
+        inner.className = "px-4 py-3 rounded-xl shadow-xl flex items-center gap-2.5 text-xs font-semibold border bg-rose-900 text-rose-100 border-rose-700";
+      } else {
+        inner.className = "px-4 py-3 rounded-xl shadow-xl flex items-center gap-2.5 text-xs font-semibold border bg-stone-900 text-brand-100 border-brand-700";
+      }
+
+      toast.classList.remove('hidden');
+      setTimeout(() => toast.classList.add('hidden'), 4000);
+    }
 
     // Default Seed Conversation
     function getStarterData() {
@@ -322,7 +476,6 @@
           }
         }
       } catch (err) {
-        console.warn('Using local starter conversation thread:', err.message);
         if (conversations.length === 0) {
           conversations = getStarterData();
           activeConvId = "254768820142";
@@ -436,8 +589,9 @@
           },
           body: JSON.stringify({ customerId: conv.customerId, isPaused: newStatus })
         });
+        showToast(`AI mode set to: ${newStatus ? 'Paused' : 'Active'}`, 'info');
       } catch (err) {
-        console.warn('AI pause updated locally:', err.message);
+        showToast('AI mode updated locally', 'info');
       }
     }
 
@@ -482,23 +636,35 @@
           })
         });
       } catch (err) {
-        console.error("Outbound send failed:", err.message);
+        console.error("Outbound send notice:", err.message);
       } finally {
         isSending = false;
       }
     }
 
-    async function triggerTestInquiryUI() {
-      const sampleQueries = [
-        "Niaje! How much are the Air Force 1s?",
-        "Do you have knotless braids available tomorrow?",
-        "Can I pay via M-Pesa right now?",
-        "Where is your luxury salon located in Nairobi?"
-      ];
+    // Modal Control Functions (Replacing native alert/prompt)
+    function openTestInquiryModal() {
+      document.getElementById("testInquiryModal")?.classList.remove("hidden");
+      if (window.lucide) lucide.createIcons();
+    }
 
-      const defaultText = sampleQueries[Math.floor(Math.random() * sampleQueries.length)];
-      const userText = prompt("Enter customer WhatsApp inquiry to test AI bot live:", defaultText);
-      if (!userText || !userText.trim()) return;
+    function closeTestInquiryModal() {
+      document.getElementById("testInquiryModal")?.classList.add("hidden");
+    }
+
+    function setSimText(text) {
+      const textarea = document.getElementById("sim-input-text");
+      if (textarea) textarea.value = text.trim();
+    }
+
+    async function executeSimulateInquiry() {
+      const text = document.getElementById("sim-input-text")?.value.trim();
+      if (!text) {
+        showToast("Please enter an inquiry message", "error");
+        return;
+      }
+
+      closeTestInquiryModal();
 
       let conv = conversations.find(c => c.id === activeConvId);
       if (!conv) {
@@ -509,13 +675,14 @@
       // Add user message to UI immediately
       conv.messages.push({
         role: "user",
-        text: userText.trim(),
+        text: text,
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
       });
       renderChatStream();
       renderThreads();
 
-      // Trigger server webhook to simulate live inbound WhatsApp message
+      showToast("Inquiry sent. Generating Gemini response...", "info");
+
       try {
         await fetch(`${BASE_ORIGIN}/api/webhook`, {
           method: 'POST',
@@ -529,7 +696,7 @@
                     id: `sim_${Date.now()}`,
                     from: conv.customerId,
                     type: 'text',
-                    text: { body: userText.trim() }
+                    text: { body: text }
                   }]
                 }
               }]
@@ -537,21 +704,31 @@
           })
         });
 
-        // Re-fetch conversations to render Gemini's sales reply
         setTimeout(fetchLiveConversations, 2500);
       } catch (err) {
-        console.error("Simulation webhook error:", err.message);
+        showToast("Webhook error: " + err.message, "error");
       }
     }
 
-    async function triggerQuickSTK() {
+    function openQuickSTKModal() {
       const phoneEl = document.getElementById("active-phone");
       const phoneText = phoneEl ? phoneEl.textContent.replace(/[^0-9]/g, '') : '254768820142';
-      const amount = prompt(`Enter M-Pesa amount (KSh) to dispatch STK push to +${phoneText}:`, "1");
-      if (!amount) return;
+      const input = document.getElementById("stk-modal-phone");
+      if (input) input.value = `+${phoneText}`;
+      document.getElementById("quickSTKModal")?.classList.remove("hidden");
+      if (window.lucide) lucide.createIcons();
+    }
 
-      const btn = document.getElementById("quick-stk-btn");
-      if (btn) btn.disabled = true;
+    function closeQuickSTKModal() {
+      document.getElementById("quickSTKModal")?.classList.add("hidden");
+    }
+
+    async function executeQuickSTK() {
+      const phoneVal = document.getElementById("stk-modal-phone")?.value.replace(/[^0-9]/g, '') || '254768820142';
+      const amountVal = document.getElementById("stk-modal-amount")?.value || '1';
+
+      closeQuickSTKModal();
+      showToast(`Dispatching KSh ${amountVal} STK Push to +${phoneVal}...`, "info");
 
       try {
         const res = await fetch(`${BACKEND_URL}/payments/test-stk`, {
@@ -560,18 +737,16 @@
             'Content-Type': 'application/json',
             'x-tenant-id': TENANT_ID
           },
-          body: JSON.stringify({ testPhone: phoneText })
+          body: JSON.stringify({ testPhone: phoneVal })
         });
         const data = await res.json();
         if (res.ok) {
-          alert(`✅ STK Push dispatched to +${phoneText}! Check your handset to enter PIN.`);
+          showToast(`✅ STK Push sent! Check handset for PIN prompt.`, "success");
         } else {
-          alert(`❌ STK Push error: ${data.message || 'Check credentials'}`);
+          showToast(`STK Error: ${data.message || 'Check Daraja configuration'}`, "error");
         }
       } catch (err) {
-        alert(`❌ Network error: ${err.message}`);
-      } finally {
-        if (btn) btn.disabled = false;
+        showToast(`Network Error: ${err.message}`, "error");
       }
     }
 
@@ -599,12 +774,17 @@
     }
 
     // Expose directly to window
-    window.triggerTestInquiryUI = triggerTestInquiryUI;
+    window.openTestInquiryModal = openTestInquiryModal;
+    window.closeTestInquiryModal = closeTestInquiryModal;
+    window.setSimText = setSimText;
+    window.executeSimulateInquiry = executeSimulateInquiry;
+    window.openQuickSTKModal = openQuickSTKModal;
+    window.closeQuickSTKModal = closeQuickSTKModal;
+    window.executeQuickSTK = executeQuickSTK;
     window.fetchLiveConversations = fetchLiveConversations;
     window.selectConversation = selectConversation;
     window.toggleAIPauseState = toggleAIPauseState;
     window.handleSendMessage = handleSendMessage;
-    window.triggerQuickSTK = triggerQuickSTK;
     window.handleSearch = handleSearch;
     window.toggleMobileMenu = toggleMobileMenu;
 
