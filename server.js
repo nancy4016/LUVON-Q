@@ -316,8 +316,8 @@ If no action is triggered, output conversational prose.
 async function generateGeminiSalesResponse(tenant, profile, newParts) {
   const apiKey = (process.env.GEMINI_API_KEY || "").trim();
   if (!apiKey) {
-    console.warn("⚠️ GEMINI_API_KEY is not set. Returning fallback.");
-    return `Niaje! Karibu ${tenant.businessName}. We have 4 pairs of Air Force 1 White (KSh 2,500) and salon styling services available today. How can I help you book or order?`;
+    console.warn("⚠️ GEMINI_API_KEY is missing. Returning local fallback.");
+    return `Karibu ${tenant.businessName}! We have Air Force 1 White (KSh 2,500) and salon appointments available. How can I help you?`;
   }
 
   const contents = [];
@@ -346,7 +346,8 @@ async function generateGeminiSalesResponse(tenant, profile, newParts) {
     }
   };
 
-  const models = ['gemini-2.5-flash', 'gemini-1.5-flash', 'gemini-1.5-pro'];
+  // Supported model endpoints
+  const models = ['gemini-2.5-flash', 'gemini-1.5-flash', 'gemini-2.0-flash'];
 
   for (const model of models) {
     try {
@@ -365,11 +366,11 @@ async function generateGeminiSalesResponse(tenant, profile, newParts) {
         return candidateText.trim();
       }
     } catch (err) {
-      console.error(`❌ Gemini [${model}] Error:`, err.response?.data?.error?.message || err.message);
+      console.error(`❌ Gemini [${model}] failed:`, err.response?.data?.error?.message || err.message);
     }
   }
 
-  return `Niaje! Karibu ${tenant.businessName}. We have Air Force 1 White (KSh 2,500) and hair styling consultations open today. How may I get you started?`;
+  return `Karibu ${tenant.businessName}! We have Air Force 1 White (KSh 2,500) and salon consultations open today. How may I assist you?`;
 }
 
 function getOrCreateCustomerSession(tenant, customerId, channel = 'whatsapp') {
@@ -495,7 +496,7 @@ async function sendWhatsAppText(tenant, toPhone, text) {
         }
       }
     );
-    console.log(`📤 Text reply delivered to +${cleanPhone}`);
+    console.log(`📤 Text reply delivered to +${cleanPhone}: "${String(text).trim().substring(0, 45)}..." (ID: ${res.data?.messages?.[0]?.id})`);
     return res.data;
   } catch (err) {
     console.error('❌ Meta Outbound Send Error:', JSON.stringify(err.response?.data || err.message));
@@ -584,7 +585,7 @@ async function handleWebhookIncoming(req, res) {
     const requestsVoice = /\b(read|voice|audio|say|listen|loud|driving|record|ongea)\b/i.test(incomingTextRaw);
     const isVoiceInput = (msgType === 'audio' || msgType === 'voice' || requestsVoice);
 
-    console.log(`📩 Processing message from +${fromNumber} (Type: ${msgType})`);
+    console.log(`📩 Processing message from +${fromNumber} (Type: ${msgType}, VoiceTrigger: ${isVoiceInput}) via PhoneID [${incomingPhoneId}]`);
 
     const { profile } = getOrCreateCustomerSession(tenant, fromNumber, 'whatsapp');
 
@@ -617,6 +618,7 @@ async function handleWebhookIncoming(req, res) {
     if (msgType === 'text') {
       loggedUserText = incomingTextRaw;
       userPromptParts.push({ text: loggedUserText });
+      console.log(`💬 [${tenant.businessName}] Received: "${loggedUserText}"`);
     } else if (msgType === 'image') {
       const caption = message.image.caption || "Customer uploaded a photo.";
       loggedUserText = `[Sent Image: ${caption}]`;
@@ -762,7 +764,6 @@ async function handleWebhookIncoming(req, res) {
   }
 }
 
-// Bind both endpoints
 app.get('/webhook', handleWebhookVerification);
 app.post('/webhook', handleWebhookIncoming);
 app.get('/api/webhook', handleWebhookVerification);
@@ -938,7 +939,7 @@ app.post('/api/tenant/voice/preview', async (req, res) => {
   }
 });
 
-// Dedicated Real-Time Simulation Endpoint for Frontend Demo Testing
+// Dedicated Real-Time Simulation Endpoint
 app.post('/api/tenant/conversations/simulate-inquiry', tenantMiddleware, async (req, res) => {
   const { customerId, text } = req.body;
   if (!text) {
