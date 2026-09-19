@@ -6,9 +6,9 @@ const axios = require('axios');
 const FormData = require('form-data');
 const cron = require('node-cron');
 
-const llamaApiKey = (process.env.LLAMA_API_KEY || process.env.GROQ_API_KEY || "").trim();
+const cerebrasApiKey = (process.env.CEREBRAS_API_KEY || process.env.LLAMA_API_KEY || "csk-c9x3t36tkcrpdyj3j9ddn3t6cppv925rynwv4f4jtw4d4d3e").trim();
 console.log("🔑 Loaded WhatsApp Token Prefix:", process.env.WHATSAPP_ACCESS_TOKEN ? process.env.WHATSAPP_ACCESS_TOKEN.substring(0, 14) + "..." : "❌ NO TOKEN LOADED");
-console.log("🦙 Loaded Meta Llama API Key Prefix:", llamaApiKey ? llamaApiKey.substring(0, 10) + "..." : "❌ NO LLAMA/GROQ KEY LOADED");
+console.log("⚡ Loaded Cerebras Meta Llama Key Prefix:", cerebrasApiKey ? cerebrasApiKey.substring(0, 10) + "..." : "❌ NO CEREBRAS KEY LOADED");
 
 const app = express();
 app.use(express.json());
@@ -286,14 +286,14 @@ async function triggerTenantSTKPush(tenant, phoneNumber, amount, itemRef) {
 }
 
 // ==========================================
-// 3. META LLAMA SALES CONCIERGE ENGINE
+// 3. CEREBRAS META LLAMA 3.3 CONCIERGE ENGINE
 // ==========================================
 function buildTenantSystemInstruction(tenant, profile) {
   return `
 You are the dedicated female AI sales concierge for **${tenant.businessName}**${
     tenant.brandSignature ? ` (Brand Signature: *${tenant.brandSignature}*)` : ''
   }, an elite ${tenant.industry} house in Nairobi.
-Powered by: Meta Llama Intelligence on Luvon Q Conversational Commerce Engine.
+Powered by: Meta Llama 3.3 Intelligence on Cerebras Ultra-Fast Cloud.
 
 Current Customer Stage: ${(profile.stage || 'QUALIFICATION').toUpperCase()}
 Customer Context: ${JSON.stringify(profile)}
@@ -328,9 +328,9 @@ If no action is triggered, output conversational prose.
 }
 
 async function generateLlamaSalesResponse(tenant, profile, userPromptText) {
-  const apiKey = (process.env.LLAMA_API_KEY || process.env.GROQ_API_KEY || "").trim();
+  const apiKey = (process.env.CEREBRAS_API_KEY || process.env.LLAMA_API_KEY || "csk-c9x3t36tkcrpdyj3j9ddn3t6cppv925rynwv4f4jtw4d4d3e").trim();
   if (!apiKey) {
-    console.warn("⚠️ LLAMA_API_KEY is not set in environment.");
+    console.warn("⚠️ CEREBRAS_API_KEY is not set in environment.");
     return `Karibu ${tenant.businessName}! We have Air Force 1 White (KSh 2,500) and salon styling services available today. How can I help you book or order?`;
   }
 
@@ -351,21 +351,14 @@ async function generateLlamaSalesResponse(tenant, profile, userPromptText) {
     content: userPromptText
   });
 
-  // Meta Llama endpoints configured in priority sequence
-  const models = [
-    'llama-3.3-70b-specdec',
-    'llama-3.1-70b-versatile',
-    'llama3-70b-8192',
-    'llama3-8b-8192',
-    'llama-3.3-70b-versatile',
-    'llama-3.1-8b-instant'
-  ];
+  // Cerebras official Meta Llama model IDs
+  const models = ['llama-3.3-70b', 'llama3.1-70b', 'llama3.1-8b'];
 
   for (const model of models) {
     try {
-      console.log(`🦙 Invoking Meta Llama model: [${model}] via Groq...`);
+      console.log(`⚡ Invoking Meta Llama model: [${model}] via Cerebras Cloud...`);
       const response = await axios.post(
-        'https://api.groq.com/openai/v1/chat/completions',
+        'https://api.cerebras.ai/v1/chat/completions',
         {
           model: model,
           messages: messages,
@@ -383,12 +376,12 @@ async function generateLlamaSalesResponse(tenant, profile, userPromptText) {
 
       const candidateText = response.data?.choices?.[0]?.message?.content;
       if (candidateText && candidateText.trim()) {
-        console.log(`✨ Meta Llama [${model}] reply generated: "${candidateText.trim().substring(0, 50)}..."`);
+        console.log(`✨ Meta Llama reply generated: "${candidateText.trim().substring(0, 50)}..."`);
         return candidateText.trim();
       }
     } catch (err) {
       const errDetail = err.response?.data?.error?.message || err.message;
-      console.error(`❌ Meta Llama [${model}] Failed:`, errDetail);
+      console.error(`❌ Cerebras Meta Llama [${model}] Failed:`, errDetail);
     }
   }
 
@@ -936,7 +929,7 @@ app.post('/api/tenant/conversations/simulate-inquiry', tenantMiddleware, async (
       success: true,
       userText: text,
       botReply,
-      modelUsed: "Meta Llama",
+      modelUsed: "Meta Llama 3.3 70B (Cerebras)",
       conversationHistory: profile.conversationHistory
     });
   } catch (err) {
