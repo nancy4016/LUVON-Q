@@ -22,6 +22,27 @@ app.use((req, res, next) => {
   next();
 });
 
+// Explicit UI Page Routes for Vercel
+app.get('/', (req, res) => {
+  res.sendFile(path.join(__dirname, 'index.html'));
+});
+
+app.get('/catalog', (req, res) => {
+  res.sendFile(path.join(__dirname, 'catalog.html'));
+});
+
+app.get('/inbox', (req, res) => {
+  res.sendFile(path.join(__dirname, 'inbox.html'));
+});
+
+app.get('/payments', (req, res) => {
+  res.sendFile(path.join(__dirname, 'payments.html'));
+});
+
+app.get('/voice', (req, res) => {
+  res.sendFile(path.join(__dirname, 'voice.html'));
+});
+
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 const DEFAULT_FEMALE_VOICE_ID = "EXAVITQu4vr4xnSDxMaL";
@@ -30,15 +51,24 @@ const DEFAULT_SANDBOX_PASSKEY = "bfb279f9aa9bdbcf158e97dd71a467cd2e0c893059b10f7
 // ==========================================
 // 1. MULTI-TENANT PERSISTENT DATABASE STORE
 // ==========================================
-const DB_FILE = path.join(__dirname, 'multi_tenant_store.json');
+// In Vercel serverless, /tmp is writable if running in an ephemeral container
+const DB_FILE = process.env.VERCEL ? path.join('/tmp', 'multi_tenant_store.json') : path.join(__dirname, 'multi_tenant_store.json');
 
 function initializeStore() {
   let loadedStore = null;
+  const seedFile = path.join(__dirname, 'multi_tenant_store.json');
+
   if (fs.existsSync(DB_FILE)) {
     try {
       loadedStore = JSON.parse(fs.readFileSync(DB_FILE, 'utf8'));
     } catch (e) {
-      console.warn("⚠️ Reinitializing database store.");
+      console.warn("⚠️ Reinitializing database store from DB_FILE.");
+    }
+  } else if (fs.existsSync(seedFile)) {
+    try {
+      loadedStore = JSON.parse(fs.readFileSync(seedFile, 'utf8'));
+    } catch (e) {
+      console.warn("⚠️ Reinitializing database store from seed.");
     }
   }
 
@@ -114,7 +144,7 @@ function initializeStore() {
     };
   }
 
-  if (loadedStore.tenants["luvon_q_flagship"]) {
+  if (loadedStore.tenants && loadedStore.tenants["luvon_q_flagship"]) {
     const flagship = loadedStore.tenants["luvon_q_flagship"];
     flagship.whatsappPhoneId = process.env.WHATSAPP_PHONE_NUMBER_ID || flagship.whatsappPhoneId || "1279716021891578";
 
@@ -123,7 +153,7 @@ function initializeStore() {
     }
 
     flagship.daraja = {
-      type: "CustomerPayBillOnline",
+      type: process.env.DARAJA_TRANSACTION_TYPE || "CustomerPayBillOnline",
       shortcode: process.env.DARAJA_BUSINESS_SHORTCODE || "174379",
       passkey: process.env.DARAJA_PASSKEY || DEFAULT_SANDBOX_PASSKEY,
       consumerKey: String(process.env.DARAJA_CONSUMER_KEY || "5U68vQHgUCU7HpYSQZXegh2pFmzG1uBPTMNFcw5obW96GPVn").trim(),
@@ -182,12 +212,13 @@ async function getTenantDarajaToken(tenant, forceRefresh = false) {
 
   const { key, secret } = getValidDarajaCredentials(tenant);
   const auth = Buffer.from(`${key}:${secret}`).toString('base64');
+  const baseUrl = (process.env.DARAJA_ENVIRONMENT === 'production') 
+    ? 'https://api.safaricom.co.ke' 
+    : 'https://sandbox.safaricom.co.ke';
 
   console.log("🔄 Requesting Daraja OAuth Token from Safaricom...");
-  const response = await axios.get('https://sandbox.safaricom.co.ke/oauth/v1/generate?grant_type=client_credentials', {
-    headers: {
-      Authorization: `Basic ${auth}`
-    },
+  const response = await axios.get(`${baseUrl}/oauth/v1/generate?grant_type=client_credentials`, {
+    headers: { Authorization: `Basic ${auth}` },
     timeout: 20000
   });
 
@@ -216,16 +247,17 @@ async function executeDarajaSTK(tenant, phoneNumber, amount, itemRef, isRetry = 
     if (!cleanPhone.startsWith('254')) cleanPhone = '254' + cleanPhone;
     if (cleanPhone.length !== 12) cleanPhone = "254768820142";
 
-    const serverCallback = "https://luvon-engine.onrender.com/api/stk-callback";
+    const serverBaseUrl = (process.env.SERVER_URL || "https://luvon-engine.onrender.com").replace(/\/$/, "");
+    const serverCallback = `${serverBaseUrl}/api/stk-callback`;
 
     const payload = {
       BusinessShortCode: shortcode,
       Password: password,
       Timestamp: timestamp,
-      TransactionType: "CustomerPayBillOnline",
+      TransactionType: tenant?.daraja?.type || process.env.DARAJA_TRANSACTION_TYPE || "CustomerPayBillOnline",
       Amount: String(Math.max(1, Math.round(Number(amount) || 1))),
       PartyA: cleanPhone,
-      PartyB: shortcode,
+      PartyB: process.env.DARAJA_TILL_NUMBER || shortcode,
       PhoneNumber: cleanPhone,
       CallBackURL: serverCallback,
       AccountReference: "LuvonQ",
@@ -233,9 +265,12 @@ async function executeDarajaSTK(tenant, phoneNumber, amount, itemRef, isRetry = 
     };
 
     console.log(`📤 Dispatching Daraja STK Push to +${cleanPhone}...`);
+    const baseUrl = (process.env.DARAJA_ENVIRONMENT === 'production') 
+      ? 'https://api.safaricom.co.ke' 
+      : 'https://sandbox.safaricom.co.ke';
 
     const res = await axios.post(
-      'https://sandbox.safaricom.co.ke/mpesa/stkpush/v1/processrequest',
+      `${baseUrl}/mpesa/stkpush/v1/processrequest`,
       payload,
       {
         headers: {
@@ -346,7 +381,6 @@ async function generateGeminiSalesResponse(tenant, profile, newParts) {
     }
   };
 
-  // Supported model endpoints
   const models = ['gemini-2.5-flash', 'gemini-1.5-flash', 'gemini-2.0-flash'];
 
   for (const model of models) {
@@ -547,7 +581,7 @@ async function getMediaBuffer(mediaId) {
 }
 
 // ==========================================
-// 6. MAIN WEBHOOK INTAKE (HANDLES BOTH /webhook AND /api/webhook)
+// 6. MAIN WEBHOOK INTAKE
 // ==========================================
 function handleWebhookVerification(req, res) {
   const mode = req.query['hub.mode'];
@@ -939,7 +973,6 @@ app.post('/api/tenant/voice/preview', async (req, res) => {
   }
 });
 
-// Dedicated Real-Time Simulation Endpoint
 app.post('/api/tenant/conversations/simulate-inquiry', tenantMiddleware, async (req, res) => {
   const { customerId, text } = req.body;
   if (!text) {
@@ -1007,7 +1040,7 @@ app.post('/api/tenant/payments/daraja', tenantMiddleware, (req, res) => {
   
   if (!req.tenant.daraja) req.tenant.daraja = {};
   
-  req.tenant.daraja.type = "CustomerPayBillOnline";
+  req.tenant.daraja.type = type || process.env.DARAJA_TRANSACTION_TYPE || "CustomerPayBillOnline";
   req.tenant.daraja.shortcode = process.env.DARAJA_BUSINESS_SHORTCODE || "174379";
   req.tenant.daraja.passkey = process.env.DARAJA_PASSKEY || DEFAULT_SANDBOX_PASSKEY;
 
@@ -1060,41 +1093,50 @@ app.post('/api/tenant/conversations/toggle-pause', tenantMiddleware, (req, res) 
 });
 
 // ==========================================
-// 9. AUTOMATED CRON SCHEDULER
+// 9. CRON SCHEDULER (Only runs if not on serverless)
 // ==========================================
-cron.schedule('0 * * * *', async () => {
-  const now = new Date();
-  for (const profile of Object.values(db.crmProfiles)) {
-    if (profile.cart && profile.stage === 'CLOSING' && !profile.isPaused) {
-      const elapsedHours = (now - new Date(profile.cart.timestamp)) / (1000 * 60 * 60);
+if (!process.env.VERCEL) {
+  cron.schedule('0 * * * *', async () => {
+    const now = new Date();
+    for (const profile of Object.values(db.crmProfiles)) {
+      if (profile.cart && profile.stage === 'CLOSING' && !profile.isPaused) {
+        const elapsedHours = (now - new Date(profile.cart.timestamp)) / (1000 * 60 * 60);
 
-      if (elapsedHours >= 2 && elapsedHours <= 4 && !profile.followedUp) {
-        profile.followedUp = true;
-        saveStore();
-        const tenant = db.tenants[profile.tenantId] || db.tenants["luvon_q_flagship"];
-        const msg = `Hey! Just checking in from ${tenant.businessName}. You were looking at *${profile.cart.item}* (KSh ${profile.cart.amount}) earlier.\n\nWould you like me to send a fresh M-Pesa prompt, or do you have any questions?`;
-        await sendWhatsAppText(tenant, profile.customerId, msg);
+        if (elapsedHours >= 2 && elapsedHours <= 4 && !profile.followedUp) {
+          profile.followedUp = true;
+          saveStore();
+          const tenant = db.tenants[profile.tenantId] || db.tenants["luvon_q_flagship"];
+          const msg = `Hey! Just checking in from ${tenant.businessName}. You were looking at *${profile.cart.item}* (KSh ${profile.cart.amount}) earlier.\n\nWould you like me to send a fresh M-Pesa prompt, or do you have any questions?`;
+          await sendWhatsAppText(tenant, profile.customerId, msg);
+        }
       }
     }
-  }
-});
+  });
 
-cron.schedule('0 20 * * 0', async () => {
-  for (const tenant of Object.values(db.tenants)) {
-    if (!tenant.escalationPhone) continue;
-    const tenantSales = db.attributionLedger.filter(t => t.tenantId === tenant.id);
-    const totalRevenue = tenantSales.reduce((sum, entry) => sum + entry.amount, 0);
-    const report = 
-`📈 *${tenant.brandSignature || tenant.businessName} REVENUE REPORT*
-━━━━━━━━━━━━━━━━━━━━━
-💰 *DIRECT REVENUE GENERATED:*
-• Total Sales: KSh ${totalRevenue.toLocaleString()}
-• Closed Deals: ${tenantSales.length}
-• Attribution Source: 100% Conversational AI Agent
-━━━━━━━━━━━━━━━━━━━━━`;
-    await sendWhatsAppText(tenant, tenant.escalationPhone, report);
-  }
-});
+  cron.schedule('0 20 * * 0', async () => {
+    for (const tenant of Object.values(db.tenants)) {
+      if (!tenant.escalationPhone) continue;
+      const tenantSales = db.attributionLedger.filter(t => t.tenantId === tenant.id);
+      const totalRevenue = tenantSales.reduce((sum, entry) => sum + entry.amount, 0);
+      const report = 
+  `📈 *${tenant.brandSignature || tenant.businessName} REVENUE REPORT*
+  ━━━━━━━━━━━━━━━━━━━━━
+  💰 *DIRECT REVENUE GENERATED:*
+  • Total Sales: KSh ${totalRevenue.toLocaleString()}
+  • Closed Deals: ${tenantSales.length}
+  • Attribution Source: 100% Conversational AI Agent
+  ━━━━━━━━━━━━━━━━━━━━━`;
+      await sendWhatsAppText(tenant, tenant.escalationPhone, report);
+    }
+  });
+}
 
+// ==========================================
+// 10. EXPORT FOR VERCEL & LOCAL LISTENER
+// ==========================================
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`🚀 Luvon Q Orélune Multi-Tenant Engine running on port ${PORT}`));
+if (process.env.NODE_ENV !== 'production' || !process.env.VERCEL) {
+  app.listen(PORT, () => console.log(`🚀 Luvon Q Orélune Multi-Tenant Engine running on port ${PORT}`));
+}
+
+module.exports = app;
