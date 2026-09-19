@@ -22,13 +22,6 @@ app.use((req, res, next) => {
   next();
 });
 
-// Explicit UI Page Routes for Vercel
-app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'index.html')));
-app.get('/catalog', (req, res) => res.sendFile(path.join(__dirname, 'catalog.html')));
-app.get('/inbox', (req, res) => res.sendFile(path.join(__dirname, 'inbox.html')));
-app.get('/payments', (req, res) => res.sendFile(path.join(__dirname, 'payments.html')));
-app.get('/voice', (req, res) => res.sendFile(path.join(__dirname, 'voice.html')));
-
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 const DEFAULT_FEMALE_VOICE_ID = "EXAVITQu4vr4xnSDxMaL";
@@ -366,12 +359,11 @@ async function generateGeminiSalesResponse(tenant, profile, newParts) {
     }
   };
 
-  // Supported Gemini models with dual authentication (Query param + Header)
   const models = ['gemini-2.5-flash', 'gemini-1.5-flash', 'gemini-2.0-flash'];
 
   for (const model of models) {
     try {
-      console.log(`🤖 Invoking Gemini model: ${model} with auth key prefix${apiKey.substring(0, 8)}...`);
+      console.log(`🤖 Invoking Gemini model: ${model} with key:${apiKey.substring(0, 10)}...`);
       const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
       const response = await axios.post(url, requestBody, {
         headers: {
@@ -383,7 +375,7 @@ async function generateGeminiSalesResponse(tenant, profile, newParts) {
 
       const candidateText = response.data?.candidates?.[0]?.content?.parts?.[0]?.text;
       if (candidateText && candidateText.trim()) {
-        console.log(`✨ Gemini generated response successfully via [${model}]: "${candidateText.trim().substring(0, 60)}..."`);
+        console.log(`✨ Gemini reply generated via [${model}]`);
         return candidateText.trim();
       }
     } catch (err) {
@@ -518,7 +510,7 @@ async function sendWhatsAppText(tenant, toPhone, text) {
         }
       }
     );
-    console.log(`📤 Text reply delivered to +${cleanPhone}: "${String(text).trim().substring(0, 45)}..." (ID: ${res.data?.messages?.[0]?.id})`);
+    console.log(`📤 Text reply delivered to +${cleanPhone}: "${String(text).trim().substring(0, 45)}..."`);
     return res.data;
   } catch (err) {
     console.error('❌ Meta Outbound Send Error:', JSON.stringify(err.response?.data || err.message));
@@ -569,7 +561,7 @@ async function getMediaBuffer(mediaId) {
 }
 
 // ==========================================
-// 6. MAIN WEBHOOK INTAKE (HANDLES BOTH /webhook AND /api/webhook)
+// 6. MAIN WEBHOOK INTAKE
 // ==========================================
 function handleWebhookVerification(req, res) {
   const mode = req.query['hub.mode'];
@@ -607,7 +599,7 @@ async function handleWebhookIncoming(req, res) {
     const requestsVoice = /\b(read|voice|audio|say|listen|loud|driving|record|ongea)\b/i.test(incomingTextRaw);
     const isVoiceInput = (msgType === 'audio' || msgType === 'voice' || requestsVoice);
 
-    console.log(`📩 Processing message from +${fromNumber} (Type: ${msgType}, VoiceTrigger: ${isVoiceInput}) via PhoneID [${incomingPhoneId}]`);
+    console.log(`📩 Processing message from +${fromNumber} (Type: ${msgType}, VoiceTrigger: ${isVoiceInput})`);
 
     const { profile } = getOrCreateCustomerSession(tenant, fromNumber, 'whatsapp');
 
@@ -640,7 +632,6 @@ async function handleWebhookIncoming(req, res) {
     if (msgType === 'text') {
       loggedUserText = incomingTextRaw;
       userPromptParts.push({ text: loggedUserText });
-      console.log(`💬 [${tenant.businessName}] Received: "${loggedUserText}"`);
     } else if (msgType === 'image') {
       const caption = message.image.caption || "Customer uploaded a photo.";
       loggedUserText = `[Sent Image: ${caption}]`;
