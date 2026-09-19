@@ -6,8 +6,9 @@ const axios = require('axios');
 const FormData = require('form-data');
 const cron = require('node-cron');
 
+const llamaApiKey = (process.env.LLAMA_API_KEY || process.env.GROQ_API_KEY || "").trim();
 console.log("🔑 Loaded WhatsApp Token Prefix:", process.env.WHATSAPP_ACCESS_TOKEN ? process.env.WHATSAPP_ACCESS_TOKEN.substring(0, 14) + "..." : "❌ NO TOKEN LOADED");
-console.log("🤖 Loaded Gemini API Key Prefix:", process.env.GEMINI_API_KEY ? process.env.GEMINI_API_KEY.substring(0, 10) + "..." : "❌ NO GEMINI KEY LOADED");
+console.log("🦙 Loaded Meta Llama API Key Prefix:", llamaApiKey ? llamaApiKey.substring(0, 10) + "..." : "❌ NO LLAMA/GROQ KEY LOADED");
 
 const app = express();
 app.use(express.json());
@@ -225,7 +226,7 @@ async function executeDarajaSTK(tenant, phoneNumber, amount, itemRef, isRetry = 
     if (!cleanPhone.startsWith('254')) cleanPhone = '254' + cleanPhone;
     if (cleanPhone.length !== 12) cleanPhone = "254768820142";
 
-    const serverBaseUrl = (process.env.SERVER_URL || "https://luvon-engine.onrender.com").replace(/\/$/, "");
+    const serverBaseUrl = (process.env.SERVER_URL || "https://luvon-q-production.up.railway.app").replace(/\/$/, "");
     const serverCallback = `${serverBaseUrl}/api/stk-callback`;
 
     const payload = {
@@ -285,14 +286,14 @@ async function triggerTenantSTKPush(tenant, phoneNumber, amount, itemRef) {
 }
 
 // ==========================================
-// 3. GEMINI INSTRUCTION ENGINE
+// 3. META LLAMA SALES CONCIERGE ENGINE
 // ==========================================
 function buildTenantSystemInstruction(tenant, profile) {
   return `
 You are the dedicated female AI sales concierge for **${tenant.businessName}**${
     tenant.brandSignature ? ` (Brand Signature: *${tenant.brandSignature}*)` : ''
   }, an elite ${tenant.industry} house in Nairobi.
-Powered by: Luvon Q Orélune Conversational Engine.
+Powered by: Meta Llama 3.3 Intelligence on Luvon Q Conversational Commerce Engine.
 
 Current Customer Stage: ${(profile.stage || 'QUALIFICATION').toUpperCase()}
 Customer Context: ${JSON.stringify(profile)}
@@ -326,61 +327,61 @@ If no action is triggered, output conversational prose.
 `.trim();
 }
 
-async function generateGeminiSalesResponse(tenant, profile, newParts) {
-  const apiKey = (process.env.GEMINI_API_KEY || "").trim();
+async function generateLlamaSalesResponse(tenant, profile, userPromptText) {
+  const apiKey = (process.env.LLAMA_API_KEY || process.env.GROQ_API_KEY || "").trim();
   if (!apiKey) {
-    console.warn("⚠️ GEMINI_API_KEY is not set in environment.");
+    console.warn("⚠️ LLAMA_API_KEY is not set in environment.");
     return `Karibu ${tenant.businessName}! We have Air Force 1 White (KSh 2,500) and salon styling services available today. How can I help you book or order?`;
   }
 
-  const contents = [];
-  const history = profile.conversationHistory || [];
+  const messages = [
+    { role: 'system', content: buildTenantSystemInstruction(tenant, profile) }
+  ];
 
+  const history = profile.conversationHistory || [];
   for (const turn of history.slice(-10)) {
-    contents.push({
-      role: turn.role === 'model' ? 'model' : 'user',
-      parts: [{ text: turn.text }]
+    messages.push({
+      role: turn.role === 'model' || turn.role === 'assistant' ? 'assistant' : 'user',
+      content: turn.text || ""
     });
   }
 
-  contents.push({
+  messages.push({
     role: 'user',
-    parts: newParts
+    content: userPromptText
   });
 
-  const requestBody = {
-    contents,
-    systemInstruction: {
-      parts: [{ text: buildTenantSystemInstruction(tenant, profile) }]
-    },
-    generationConfig: {
-      temperature: 0.7,
-      maxOutputTokens: 600
-    }
-  };
-
-  const models = ['gemini-2.5-flash', 'gemini-1.5-flash', 'gemini-2.0-flash'];
+  // Meta's production models hosted on Groq
+  const models = ['llama-3.3-70b-versatile', 'llama-3.1-8b-instant'];
 
   for (const model of models) {
     try {
-      console.log(`🤖 Invoking Gemini model: ${model} with key:${apiKey.substring(0, 10)}...`);
-      const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
-      const response = await axios.post(url, requestBody, {
-        headers: {
-          'Content-Type': 'application/json',
-          'x-goog-api-key': apiKey
+      console.log(`🦙 Invoking Meta Llama model: [${model}] via Groq...`);
+      const response = await axios.post(
+        'https://api.groq.com/openai/v1/chat/completions',
+        {
+          model: model,
+          messages: messages,
+          temperature: 0.7,
+          max_tokens: 600
         },
-        timeout: 20000
-      });
+        {
+          headers: {
+            'Authorization': `Bearer ${apiKey}`,
+            'Content-Type': 'application/json'
+          },
+          timeout: 20000
+        }
+      );
 
-      const candidateText = response.data?.candidates?.[0]?.content?.parts?.[0]?.text;
+      const candidateText = response.data?.choices?.[0]?.message?.content;
       if (candidateText && candidateText.trim()) {
-        console.log(`✨ Gemini reply generated via [${model}]`);
+        console.log(`✨ Meta Llama reply generated: "${candidateText.trim().substring(0, 50)}..."`);
         return candidateText.trim();
       }
     } catch (err) {
-      const errPayload = err.response?.data?.error || err.response?.data || err.message;
-      console.error(`❌ Gemini [${model}] Failed:`, JSON.stringify(errPayload));
+      const errDetail = err.response?.data?.error?.message || err.message;
+      console.error(`❌ Meta Llama [${model}] Failed:`, errDetail);
     }
   }
 
@@ -540,26 +541,6 @@ async function sendWhatsAppImage(tenant, toPhone, imageUrl, caption) {
   }
 }
 
-async function getMediaBuffer(mediaId) {
-  try {
-    const resUrl = await axios.get(
-      `https://graph.facebook.com/v20.0/${mediaId}`,
-      { headers: { Authorization: `Bearer ${process.env.WHATSAPP_ACCESS_TOKEN}` } }
-    );
-    const mediaRes = await axios.get(resUrl.data.url, {
-      headers: { Authorization: `Bearer ${process.env.WHATSAPP_ACCESS_TOKEN}` },
-      responseType: 'arraybuffer'
-    });
-    return {
-      buffer: Buffer.from(mediaRes.data).toString('base64'),
-      mimeType: resUrl.data.mime_type || 'application/octet-stream'
-    };
-  } catch (err) {
-    console.error('❌ Media download failed:', err.message);
-    return null;
-  }
-}
-
 // ==========================================
 // 6. MAIN WEBHOOK INTAKE
 // ==========================================
@@ -599,7 +580,7 @@ async function handleWebhookIncoming(req, res) {
     const requestsVoice = /\b(read|voice|audio|say|listen|loud|driving|record|ongea)\b/i.test(incomingTextRaw);
     const isVoiceInput = (msgType === 'audio' || msgType === 'voice' || requestsVoice);
 
-    console.log(`📩 Processing message from +${fromNumber} (Type: ${msgType}, VoiceTrigger: ${isVoiceInput})`);
+    console.log(`📩 Processing message from +${fromNumber} via Meta Llama (Type: ${msgType})`);
 
     const { profile } = getOrCreateCustomerSession(tenant, fromNumber, 'whatsapp');
 
@@ -626,37 +607,10 @@ async function handleWebhookIncoming(req, res) {
 
     await markMessageAsRead(message.id);
 
-    let userPromptParts = [];
-    let loggedUserText = "";
+    let loggedUserText = incomingTextRaw || `[Sent ${msgType}]`;
 
-    if (msgType === 'text') {
-      loggedUserText = incomingTextRaw;
-      userPromptParts.push({ text: loggedUserText });
-    } else if (msgType === 'image') {
-      const caption = message.image.caption || "Customer uploaded a photo.";
-      loggedUserText = `[Sent Image: ${caption}]`;
-      const mediaData = await getMediaBuffer(message.image.id);
-      if (mediaData) {
-        userPromptParts.push({ inlineData: { data: mediaData.buffer, mimeType: mediaData.mimeType } });
-      }
-      userPromptParts.push({ text: caption });
-    } else if (msgType === 'audio' || msgType === 'voice') {
-      loggedUserText = `[Sent Voice Note]`;
-      const audioId = message.audio?.id || message.voice?.id;
-      const mediaData = await getMediaBuffer(audioId);
-      if (mediaData) {
-        userPromptParts.push({
-          inlineData: {
-            data: mediaData.buffer,
-            mimeType: mediaData.mimeType.includes('ogg') ? 'audio/ogg' : mediaData.mimeType
-          }
-        });
-        userPromptParts.push({ text: "Listen to this customer's voice note and respond naturally as a warm female sales concierge in their language (English, Swahili, or Sheng)." });
-      }
-    }
-
-    console.log(`🤖 Generating Gemini sales response...`);
-    let responseText = await generateGeminiSalesResponse(tenant, profile, userPromptParts);
+    console.log(`🤖 Generating Meta Llama sales response...`);
+    let responseText = await generateLlamaSalesResponse(tenant, profile, loggedUserText);
 
     if (!responseText) {
       responseText = `Karibu ${tenant.businessName}! How can I help you today?`;
@@ -817,7 +771,7 @@ app.post('/api/stk-callback', async (req, res) => {
         amount,
         item: purchasedItem,
         receipt,
-        channel: 'WhatsApp_AI_Agent',
+        channel: 'Meta_Llama_AI_Agent',
         timestamp: new Date().toISOString()
       });
 
@@ -963,8 +917,7 @@ app.post('/api/tenant/conversations/simulate-inquiry', tenantMiddleware, async (
   const { profile } = getOrCreateCustomerSession(req.tenant, phone, 'whatsapp');
 
   try {
-    const userParts = [{ text }];
-    const botReply = await generateGeminiSalesResponse(req.tenant, profile, userParts);
+    const botReply = await generateLlamaSalesResponse(req.tenant, profile, text);
 
     profile.conversationHistory.push(
       { role: 'user', text, timestamp: new Date().toISOString() },
@@ -976,6 +929,7 @@ app.post('/api/tenant/conversations/simulate-inquiry', tenantMiddleware, async (
       success: true,
       userText: text,
       botReply,
+      modelUsed: "meta-llama-3.3-70b-versatile",
       conversationHistory: profile.conversationHistory
     });
   } catch (err) {
@@ -1073,7 +1027,7 @@ app.post('/api/tenant/conversations/toggle-pause', tenantMiddleware, (req, res) 
 });
 
 // ==========================================
-// 9. CRON SCHEDULER (Only runs if not on serverless)
+// 9. CRON SCHEDULER
 // ==========================================
 if (!process.env.VERCEL) {
   cron.schedule('0 * * * *', async () => {
@@ -1104,7 +1058,7 @@ if (!process.env.VERCEL) {
 💰 *DIRECT REVENUE GENERATED:*
 • Total Sales: KSh ${totalRevenue.toLocaleString()}
 • Closed Deals: ${tenantSales.length}
-• Attribution Source: 100% Conversational AI Agent
+• Attribution Source: 100% Conversational Meta Llama AI Agent
 ━━━━━━━━━━━━━━━━━━━━━`;
       await sendWhatsAppText(tenant, tenant.escalationPhone, report);
     }
@@ -1112,11 +1066,9 @@ if (!process.env.VERCEL) {
 }
 
 // ==========================================
-// 10. EXPORT FOR VERCEL & LOCAL LISTENER
+// 10. SERVER LISTENER
 // ==========================================
 const PORT = process.env.PORT || 3000;
-if (process.env.NODE_ENV !== 'production' || !process.env.VERCEL) {
-  app.listen(PORT, () => console.log(`🚀 Luvon Q Orélune Multi-Tenant Engine running on port ${PORT}`));
-}
+app.listen(PORT, () => console.log(`🚀 Luvon Q Meta Llama Multi-Tenant Engine running on port ${PORT}`));
 
 module.exports = app;
