@@ -293,7 +293,7 @@ function buildTenantSystemInstruction(tenant, profile) {
 You are the dedicated female AI sales concierge for **${tenant.businessName}**${
     tenant.brandSignature ? ` (Brand Signature: *${tenant.brandSignature}*)` : ''
   }, an elite ${tenant.industry} house in Nairobi.
-Powered by: Meta Llama 3.3 Intelligence on Luvon Q Conversational Commerce Engine.
+Powered by: Meta Llama Intelligence on Luvon Q Conversational Commerce Engine.
 
 Current Customer Stage: ${(profile.stage || 'QUALIFICATION').toUpperCase()}
 Customer Context: ${JSON.stringify(profile)}
@@ -351,8 +351,15 @@ async function generateLlamaSalesResponse(tenant, profile, userPromptText) {
     content: userPromptText
   });
 
-  // Meta's production models hosted on Groq
-  const models = ['llama-3.3-70b-versatile', 'llama-3.1-8b-instant'];
+  // Meta Llama endpoints configured in priority sequence
+  const models = [
+    'llama-3.3-70b-specdec',
+    'llama-3.1-70b-versatile',
+    'llama3-70b-8192',
+    'llama3-8b-8192',
+    'llama-3.3-70b-versatile',
+    'llama-3.1-8b-instant'
+  ];
 
   for (const model of models) {
     try {
@@ -376,7 +383,7 @@ async function generateLlamaSalesResponse(tenant, profile, userPromptText) {
 
       const candidateText = response.data?.choices?.[0]?.message?.content;
       if (candidateText && candidateText.trim()) {
-        console.log(`✨ Meta Llama reply generated: "${candidateText.trim().substring(0, 50)}..."`);
+        console.log(`✨ Meta Llama [${model}] reply generated: "${candidateText.trim().substring(0, 50)}..."`);
         return candidateText.trim();
       }
     } catch (err) {
@@ -929,7 +936,7 @@ app.post('/api/tenant/conversations/simulate-inquiry', tenantMiddleware, async (
       success: true,
       userText: text,
       botReply,
-      modelUsed: "meta-llama-3.3-70b-versatile",
+      modelUsed: "Meta Llama",
       conversationHistory: profile.conversationHistory
     });
   } catch (err) {
