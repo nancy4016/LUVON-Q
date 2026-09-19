@@ -352,7 +352,7 @@ async function generateLlamaSalesResponse(tenant, profile, userPromptText) {
   });
 
   // Cerebras official Meta Llama model IDs
-  const models = ['llama-3.3-70b', 'llama3.1-70b', 'llama3.1-8b'];
+  const models = ['llama3.3-70b', 'llama3.1-8b'];
 
   for (const model of models) {
     try {
