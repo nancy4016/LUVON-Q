@@ -23,25 +23,11 @@ app.use((req, res, next) => {
 });
 
 // Explicit UI Page Routes for Vercel
-app.get('/', (req, res) => {
-  res.sendFile(path.join(__dirname, 'index.html'));
-});
-
-app.get('/catalog', (req, res) => {
-  res.sendFile(path.join(__dirname, 'catalog.html'));
-});
-
-app.get('/inbox', (req, res) => {
-  res.sendFile(path.join(__dirname, 'inbox.html'));
-});
-
-app.get('/payments', (req, res) => {
-  res.sendFile(path.join(__dirname, 'payments.html'));
-});
-
-app.get('/voice', (req, res) => {
-  res.sendFile(path.join(__dirname, 'voice.html'));
-});
+app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'index.html')));
+app.get('/catalog', (req, res) => res.sendFile(path.join(__dirname, 'catalog.html')));
+app.get('/inbox', (req, res) => res.sendFile(path.join(__dirname, 'inbox.html')));
+app.get('/payments', (req, res) => res.sendFile(path.join(__dirname, 'payments.html')));
+app.get('/voice', (req, res) => res.sendFile(path.join(__dirname, 'voice.html')));
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -51,7 +37,6 @@ const DEFAULT_SANDBOX_PASSKEY = "bfb279f9aa9bdbcf158e97dd71a467cd2e0c893059b10f7
 // ==========================================
 // 1. MULTI-TENANT PERSISTENT DATABASE STORE
 // ==========================================
-// In Vercel serverless, /tmp is writable if running in an ephemeral container
 const DB_FILE = process.env.VERCEL ? path.join('/tmp', 'multi_tenant_store.json') : path.join(__dirname, 'multi_tenant_store.json');
 
 function initializeStore() {
@@ -351,8 +336,8 @@ If no action is triggered, output conversational prose.
 async function generateGeminiSalesResponse(tenant, profile, newParts) {
   const apiKey = (process.env.GEMINI_API_KEY || "").trim();
   if (!apiKey) {
-    console.warn("⚠️ GEMINI_API_KEY is missing. Returning local fallback.");
-    return `Karibu ${tenant.businessName}! We have Air Force 1 White (KSh 2,500) and salon appointments available. How can I help you?`;
+    console.warn("⚠️ GEMINI_API_KEY is not set in environment.");
+    return `Karibu ${tenant.businessName}! We have Air Force 1 White (KSh 2,500) and salon styling services available today. How can I help you book or order?`;
   }
 
   const contents = [];
@@ -381,12 +366,13 @@ async function generateGeminiSalesResponse(tenant, profile, newParts) {
     }
   };
 
+  // Supported Gemini models with dual authentication (Query param + Header)
   const models = ['gemini-2.5-flash', 'gemini-1.5-flash', 'gemini-2.0-flash'];
 
   for (const model of models) {
     try {
-      console.log(`🤖 Invoking Gemini model: ${model}...`);
-      const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`;
+      console.log(`🤖 Invoking Gemini model: ${model} with auth key prefix${apiKey.substring(0, 8)}...`);
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
       const response = await axios.post(url, requestBody, {
         headers: {
           'Content-Type': 'application/json',
@@ -397,14 +383,16 @@ async function generateGeminiSalesResponse(tenant, profile, newParts) {
 
       const candidateText = response.data?.candidates?.[0]?.content?.parts?.[0]?.text;
       if (candidateText && candidateText.trim()) {
+        console.log(`✨ Gemini generated response successfully via [${model}]: "${candidateText.trim().substring(0, 60)}..."`);
         return candidateText.trim();
       }
     } catch (err) {
-      console.error(`❌ Gemini [${model}] failed:`, err.response?.data?.error?.message || err.message);
+      const errPayload = err.response?.data?.error || err.response?.data || err.message;
+      console.error(`❌ Gemini [${model}] Failed:`, JSON.stringify(errPayload));
     }
   }
 
-  return `Karibu ${tenant.businessName}! We have Air Force 1 White (KSh 2,500) and salon consultations open today. How may I assist you?`;
+  return `Karibu ${tenant.businessName}! We have our exclusive collection ready. Would you like to check out our sneakers or book a service consultation?`;
 }
 
 function getOrCreateCustomerSession(tenant, customerId, channel = 'whatsapp') {
@@ -581,7 +569,7 @@ async function getMediaBuffer(mediaId) {
 }
 
 // ==========================================
-// 6. MAIN WEBHOOK INTAKE
+// 6. MAIN WEBHOOK INTAKE (HANDLES BOTH /webhook AND /api/webhook)
 // ==========================================
 function handleWebhookVerification(req, res) {
   const mode = req.query['hub.mode'];
@@ -973,6 +961,7 @@ app.post('/api/tenant/voice/preview', async (req, res) => {
   }
 });
 
+// Dedicated Real-Time Simulation Endpoint for Frontend Demo Testing
 app.post('/api/tenant/conversations/simulate-inquiry', tenantMiddleware, async (req, res) => {
   const { customerId, text } = req.body;
   if (!text) {
@@ -1119,13 +1108,13 @@ if (!process.env.VERCEL) {
       const tenantSales = db.attributionLedger.filter(t => t.tenantId === tenant.id);
       const totalRevenue = tenantSales.reduce((sum, entry) => sum + entry.amount, 0);
       const report = 
-  `📈 *${tenant.brandSignature || tenant.businessName} REVENUE REPORT*
-  ━━━━━━━━━━━━━━━━━━━━━
-  💰 *DIRECT REVENUE GENERATED:*
-  • Total Sales: KSh ${totalRevenue.toLocaleString()}
-  • Closed Deals: ${tenantSales.length}
-  • Attribution Source: 100% Conversational AI Agent
-  ━━━━━━━━━━━━━━━━━━━━━`;
+`📈 *${tenant.brandSignature || tenant.businessName} REVENUE REPORT*
+━━━━━━━━━━━━━━━━━━━━━
+💰 *DIRECT REVENUE GENERATED:*
+• Total Sales: KSh ${totalRevenue.toLocaleString()}
+• Closed Deals: ${tenantSales.length}
+• Attribution Source: 100% Conversational AI Agent
+━━━━━━━━━━━━━━━━━━━━━`;
       await sendWhatsAppText(tenant, tenant.escalationPhone, report);
     }
   });
