@@ -6,9 +6,9 @@ const axios = require('axios');
 const FormData = require('form-data');
 const cron = require('node-cron');
 
-const puterToken = (process.env.PUTER_AUTH_TOKEN || "").trim();
+const hfApiKey = (process.env.HUGGINGFACE_API_KEY || process.env.HF_TOKEN || "").trim();
 console.log("🔑 Loaded WhatsApp Token Prefix:", process.env.WHATSAPP_ACCESS_TOKEN ? process.env.WHATSAPP_ACCESS_TOKEN.substring(0, 14) + "..." : "❌ NO TOKEN LOADED");
-console.log("🦙 Loaded Puter Auth Token Prefix:", puterToken ? puterToken.substring(0, 14) + "..." : "❌ NO PUTER TOKEN LOADED");
+console.log("🦙 Loaded Hugging Face Meta Llama Key Prefix:", hfApiKey ? hfApiKey.substring(0, 10) + "..." : "❌ NO HF KEY LOADED");
 
 const app = express();
 app.use(express.json());
@@ -31,7 +31,6 @@ const DEFAULT_SANDBOX_PASSKEY = "bfb279f9aa9bdbcf158e97dd71a467cd2e0c893059b10f7
 // ==========================================
 // 1. MULTI-TENANT PERSISTENT DATABASE STORE
 // ==========================================
-// In Vercel serverless, /tmp is writable if running in an ephemeral container
 const DB_FILE = process.env.VERCEL ? path.join('/tmp', 'multi_tenant_store.json') : path.join(__dirname, 'multi_tenant_store.json');
 
 function initializeStore() {
@@ -218,7 +217,7 @@ async function executeDarajaSTK(tenant, phoneNumber, amount, itemRef, isRetry = 
 
     const eatDate = new Date(Date.now() + (3 * 60 * 60 * 1000));
     const pad = (n) => String(n).padStart(2, '0');
-    const timestamp = `${eatDate.getUTCFullYear()}${pad(eatDate.getUTCMonth() + 1)}${pad(eatDate.getUTCDate())}${pad(eatDate.getUTCHours())}${pad(eatDate.getUTCMinutes())}${pad(eatDate.getUTCSeconds())}`;
+    const timestamp = `${eatDate.getUTCFullYear()}${pad(eatDate.getUTCMonth() + 1)}${pad(eatDate.getUTCDate())}${pad(eatDate.getUTCHours())}${pad(eatDate.getUTCHminutes ? eatDate.getUTCHminutes() : eatDate.getUTCMinutes())}${pad(eatDate.getUTCSeconds())}`;
 
     const password = Buffer.from(`${shortcode}${passkey}${timestamp}`).toString('base64');
 
@@ -287,14 +286,14 @@ async function triggerTenantSTKPush(tenant, phoneNumber, amount, itemRef) {
 }
 
 // ==========================================
-// 3. META LLAMA CONCIERGE ENGINE (PUTER)
+// 3. META LLAMA 3.3 70B CONCIERGE (HUGGING FACE)
 // ==========================================
 function buildTenantSystemInstruction(tenant, profile) {
   return `
 You are the dedicated female AI sales concierge for **${tenant.businessName}**${
     tenant.brandSignature ? ` (Brand Signature: *${tenant.brandSignature}*)` : ''
   }, an elite ${tenant.industry} house in Nairobi.
-Powered by: Meta Llama Intelligence on Luvon Q Conversational Commerce Engine.
+Powered by: Official Meta Llama 3.3 70B Intelligence on Luvon Q Conversational Commerce Engine.
 
 Current Customer Stage: ${(profile.stage || 'QUALIFICATION').toUpperCase()}
 Customer Context: ${JSON.stringify(profile)}
@@ -329,9 +328,9 @@ If no action is triggered, output conversational prose.
 }
 
 async function generateLlamaSalesResponse(tenant, profile, userPromptText) {
-  const apiKey = (process.env.PUTER_AUTH_TOKEN || "").trim();
+  const apiKey = (process.env.HUGGINGFACE_API_KEY || process.env.HF_TOKEN || "").trim();
   if (!apiKey) {
-    console.warn("⚠️ PUTER_AUTH_TOKEN is not configured in environment.");
+    console.warn("⚠️ HUGGINGFACE_API_KEY is not configured in environment.");
     return `Karibu ${tenant.businessName}! We have Air Force 1 White (KSh 2,500) and salon styling services available today. How can I help you book or order?`;
   }
 
@@ -352,18 +351,17 @@ async function generateLlamaSalesResponse(tenant, profile, userPromptText) {
     content: userPromptText
   });
 
-  // Official Meta Llama models supported on Puter
-  const models = [
-    'meta-llama/llama-3.1-70b-instruct',
-    'meta-llama/llama-3.1-8b-instruct',
-    'meta-llama/llama-3.2-3b-instruct'
+  const model = 'meta-llama/Llama-3.3-70B-Instruct';
+  const endpoints = [
+    'https://router.huggingface.co/novita/v1/chat/completions',
+    'https://api-inference.huggingface.co/models/meta-llama/Llama-3.3-70B-Instruct/v1/chat/completions'
   ];
 
-  for (const model of models) {
+  for (const endpoint of endpoints) {
     try {
-      console.log(`🦙 Invoking Meta Llama model: [${model}] via Puter...`);
+      console.log(`🦙 Invoking official Meta Llama model: [${model}] via Hugging Face (${endpoint.includes('router') ? 'Router' : 'Direct'})...`);
       const response = await axios.post(
-        'https://api.puter.com/puterai/openai/v1/chat/completions',
+        endpoint,
         {
           model: model,
           messages: messages,
@@ -385,8 +383,8 @@ async function generateLlamaSalesResponse(tenant, profile, userPromptText) {
         return candidateText.trim();
       }
     } catch (err) {
-      const errDetail = err.response?.data?.error?.message || err.message;
-      console.error(`❌ Meta Llama [${model}] Failed:`, errDetail);
+      const errDetail = err.response?.data?.error || err.response?.data || err.message;
+      console.error(`❌ Meta Llama on [${endpoint}] Failed:`, JSON.stringify(errDetail));
     }
   }
 
