@@ -6,9 +6,9 @@ const axios = require('axios');
 const FormData = require('form-data');
 const cron = require('node-cron');
 
-const llamaApiKey = (process.env.OPENROUTER_API_KEY || process.env.LLAMA_API_KEY || "").trim();
+const puterToken = (process.env.PUTER_AUTH_TOKEN || "").trim();
 console.log("🔑 Loaded WhatsApp Token Prefix:", process.env.WHATSAPP_ACCESS_TOKEN ? process.env.WHATSAPP_ACCESS_TOKEN.substring(0, 14) + "..." : "❌ NO TOKEN LOADED");
-console.log("🦙 Loaded Meta Llama Key Prefix:", llamaApiKey ? llamaApiKey.substring(0, 14) + "..." : "❌ NO LLAMA KEY LOADED");
+console.log("🦙 Loaded Puter Auth Token Prefix:", puterToken ? puterToken.substring(0, 14) + "..." : "❌ NO PUTER TOKEN LOADED");
 
 const app = express();
 app.use(express.json());
@@ -287,7 +287,7 @@ async function triggerTenantSTKPush(tenant, phoneNumber, amount, itemRef) {
 }
 
 // ==========================================
-// 3. META LLAMA CONCIERGE ENGINE (OPENROUTER)
+// 3. META LLAMA CONCIERGE ENGINE (PUTER)
 // ==========================================
 function buildTenantSystemInstruction(tenant, profile) {
   return `
@@ -329,9 +329,9 @@ If no action is triggered, output conversational prose.
 }
 
 async function generateLlamaSalesResponse(tenant, profile, userPromptText) {
-  const apiKey = (process.env.OPENROUTER_API_KEY || process.env.LLAMA_API_KEY || "").trim();
+  const apiKey = (process.env.PUTER_AUTH_TOKEN || "").trim();
   if (!apiKey) {
-    console.warn("⚠️ OPENROUTER_API_KEY is not configured in environment.");
+    console.warn("⚠️ PUTER_AUTH_TOKEN is not configured in environment.");
     return `Karibu ${tenant.businessName}! We have Air Force 1 White (KSh 2,500) and salon styling services available today. How can I help you book or order?`;
   }
 
@@ -352,17 +352,18 @@ async function generateLlamaSalesResponse(tenant, profile, userPromptText) {
     content: userPromptText
   });
 
-  // Active verified free endpoints on OpenRouter
+  // Official Meta Llama models supported on Puter
   const models = [
-    'openrouter/free',
-    'nvidia/nemotron-3-super-120b-a12b:free'
+    'meta-llama/llama-3.1-70b-instruct',
+    'meta-llama/llama-3.1-8b-instruct',
+    'meta-llama/llama-3.2-3b-instruct'
   ];
 
   for (const model of models) {
     try {
-      console.log(`🦙 Invoking Meta Llama model: [${model}] via OpenRouter...`);
+      console.log(`🦙 Invoking Meta Llama model: [${model}] via Puter...`);
       const response = await axios.post(
-        'https://openrouter.ai/api/v1/chat/completions',
+        'https://api.puter.com/puterai/openai/v1/chat/completions',
         {
           model: model,
           messages: messages,
@@ -372,9 +373,7 @@ async function generateLlamaSalesResponse(tenant, profile, userPromptText) {
         {
           headers: {
             'Authorization': `Bearer ${apiKey}`,
-            'Content-Type': 'application/json',
-            'HTTP-Referer': 'https://luvon-engine.onrender.com',
-            'X-Title': 'Luvon Q Luxury Concierge'
+            'Content-Type': 'application/json'
           },
           timeout: 25000
         }
