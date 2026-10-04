@@ -6,9 +6,9 @@ const axios = require('axios');
 const FormData = require('form-data');
 const cron = require('node-cron');
 
-const llamaApiKey = (process.env.GROQ_API_KEY || process.env.LLAMA_API_KEY || "").trim();
+const llamaApiKey = (process.env.OPENROUTER_API_KEY || process.env.LLAMA_API_KEY || "").trim();
 console.log("🔑 Loaded WhatsApp Token Prefix:", process.env.WHATSAPP_ACCESS_TOKEN ? process.env.WHATSAPP_ACCESS_TOKEN.substring(0, 14) + "..." : "❌ NO TOKEN LOADED");
-console.log("🦙 Loaded Meta Llama Groq Key Prefix:", llamaApiKey ? llamaApiKey.substring(0, 14) + "..." : "❌ NO GROQ KEY LOADED");
+console.log("🦙 Loaded Meta Llama Key Prefix:", llamaApiKey ? llamaApiKey.substring(0, 14) + "..." : "❌ NO LLAMA KEY LOADED");
 
 const app = express();
 app.use(express.json());
@@ -48,7 +48,7 @@ function initializeStore() {
     try {
       loadedStore = JSON.parse(fs.readFileSync(seedFile, 'utf8'));
     } catch (e) {
-      console.warn("⚠️ Reinitializing database store from seed.");
+      console.warn("⚠️️ Reinitializing database store from seed.");
     }
   }
 
@@ -227,7 +227,7 @@ async function executeDarajaSTK(tenant, phoneNumber, amount, itemRef, isRetry = 
     if (!cleanPhone.startsWith('254')) cleanPhone = '254' + cleanPhone;
     if (cleanPhone.length !== 12) cleanPhone = "254768820142";
 
-    const serverBaseUrl = (process.env.SERVER_URL || "https://luvon-q-production.up.railway.app").replace(/\/$/, "");
+    const serverBaseUrl = (process.env.SERVER_URL || "https://luvon-engine.onrender.com").replace(/\/$/, "");
     const serverCallback = `${serverBaseUrl}/api/stk-callback`;
 
     const payload = {
@@ -287,14 +287,14 @@ async function triggerTenantSTKPush(tenant, phoneNumber, amount, itemRef) {
 }
 
 // ==========================================
-// 3. META LLAMA 3.3 CONCIERGE ENGINE (GROQ)
+// 3. META LLAMA 3.3 CONCIERGE ENGINE (OPENROUTER)
 // ==========================================
 function buildTenantSystemInstruction(tenant, profile) {
   return `
 You are the dedicated female AI sales concierge for **${tenant.businessName}**${
     tenant.brandSignature ? ` (Brand Signature: *${tenant.brandSignature}*)` : ''
   }, an elite ${tenant.industry} house in Nairobi.
-Powered by: Meta Llama 3.3 Intelligence on Groq LPU Engine.
+Powered by: Meta Llama 3.3 Intelligence on Luvon Q Conversational Commerce Engine.
 
 Current Customer Stage: ${(profile.stage || 'QUALIFICATION').toUpperCase()}
 Customer Context: ${JSON.stringify(profile)}
@@ -329,9 +329,9 @@ If no action is triggered, output conversational prose.
 }
 
 async function generateLlamaSalesResponse(tenant, profile, userPromptText) {
-  const apiKey = (process.env.GROQ_API_KEY || process.env.LLAMA_API_KEY || "").trim();
+  const apiKey = (process.env.OPENROUTER_API_KEY || process.env.LLAMA_API_KEY || "").trim();
   if (!apiKey) {
-    console.warn("⚠️ GROQ_API_KEY is not configured.");
+    console.warn("⚠️ OPENROUTER_API_KEY is not configured in environment.");
     return `Karibu ${tenant.businessName}! We have Air Force 1 White (KSh 2,500) and salon styling services available today. How can I help you book or order?`;
   }
 
@@ -352,19 +352,17 @@ async function generateLlamaSalesResponse(tenant, profile, userPromptText) {
     content: userPromptText
   });
 
-  // Active production Meta Llama models on Groq
+  // Official free Meta Llama endpoints on OpenRouter
   const models = [
-    'llama-3.3-70b-versatile',
-    'llama-3.1-8b-instant',
-    'llama3-70b-8192',
-    'llama3-8b-8192'
+    'meta-llama/llama-3.3-70b-instruct:free',
+    'meta-llama/llama-3.1-8b-instruct:free'
   ];
 
   for (const model of models) {
     try {
-      console.log(`🦙 Invoking Meta Llama model: [${model}] via Groq...`);
+      console.log(`🦙 Invoking Meta Llama model: [${model}] via OpenRouter...`);
       const response = await axios.post(
-        'https://api.groq.com/openai/v1/chat/completions',
+        'https://openrouter.ai/api/v1/chat/completions',
         {
           model: model,
           messages: messages,
@@ -374,9 +372,11 @@ async function generateLlamaSalesResponse(tenant, profile, userPromptText) {
         {
           headers: {
             'Authorization': `Bearer ${apiKey}`,
-            'Content-Type': 'application/json'
+            'Content-Type': 'application/json',
+            'HTTP-Referer': 'https://luvon-engine.onrender.com',
+            'X-Title': 'Luvon Q Luxury Concierge'
           },
-          timeout: 20000
+          timeout: 25000
         }
       );
 
