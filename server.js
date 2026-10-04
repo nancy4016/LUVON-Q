@@ -352,12 +352,10 @@ async function generateLlamaSalesResponse(tenant, profile, userPromptText) {
     content: userPromptText
   });
 
-  // Active free endpoints on OpenRouter
+  // Active verified free endpoints on OpenRouter
   const models = [
-    'meta-llama/llama-3.2-3b-instruct:free',
-    'meta-llama/llama-3.2-1b-instruct:free',
-    'deepseek/deepseek-r1:free',
-    'google/gemini-2.0-flash-exp:free'
+    'openrouter/free',
+    'nvidia/nemotron-3-super-120b-a12b:free'
   ];
 
   for (const model of models) {
