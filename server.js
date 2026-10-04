@@ -48,7 +48,7 @@ function initializeStore() {
     try {
       loadedStore = JSON.parse(fs.readFileSync(seedFile, 'utf8'));
     } catch (e) {
-      console.warn("⚠️️ Reinitializing database store from seed.");
+      console.warn("⚠️ Reinitializing database store from seed.");
     }
   }
 
@@ -287,14 +287,14 @@ async function triggerTenantSTKPush(tenant, phoneNumber, amount, itemRef) {
 }
 
 // ==========================================
-// 3. META LLAMA 3.3 CONCIERGE ENGINE (OPENROUTER)
+// 3. META LLAMA CONCIERGE ENGINE (OPENROUTER)
 // ==========================================
 function buildTenantSystemInstruction(tenant, profile) {
   return `
 You are the dedicated female AI sales concierge for **${tenant.businessName}**${
     tenant.brandSignature ? ` (Brand Signature: *${tenant.brandSignature}*)` : ''
   }, an elite ${tenant.industry} house in Nairobi.
-Powered by: Meta Llama 3.3 Intelligence on Luvon Q Conversational Commerce Engine.
+Powered by: Meta Llama Intelligence on Luvon Q Conversational Commerce Engine.
 
 Current Customer Stage: ${(profile.stage || 'QUALIFICATION').toUpperCase()}
 Customer Context: ${JSON.stringify(profile)}
@@ -352,10 +352,12 @@ async function generateLlamaSalesResponse(tenant, profile, userPromptText) {
     content: userPromptText
   });
 
-  // Official free Meta Llama endpoints on OpenRouter
+  // Active free endpoints on OpenRouter
   const models = [
-    'meta-llama/llama-3.3-70b-instruct:free',
-    'meta-llama/llama-3.1-8b-instruct:free'
+    'meta-llama/llama-3.2-3b-instruct:free',
+    'meta-llama/llama-3.2-1b-instruct:free',
+    'deepseek/deepseek-r1:free',
+    'google/gemini-2.0-flash-exp:free'
   ];
 
   for (const model of models) {
