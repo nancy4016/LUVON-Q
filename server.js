@@ -6,9 +6,9 @@ const axios = require('axios');
 const FormData = require('form-data');
 const cron = require('node-cron');
 
-const cerebrasApiKey = (process.env.CEREBRAS_API_KEY || process.env.LLAMA_API_KEY || "csk-c9x3t36tkcrpdyj3j9ddn3t6cppv925rynwv4f4jtw4d4d3e").trim();
+const llamaApiKey = (process.env.GROQ_API_KEY || process.env.LLAMA_API_KEY || "").trim();
 console.log("🔑 Loaded WhatsApp Token Prefix:", process.env.WHATSAPP_ACCESS_TOKEN ? process.env.WHATSAPP_ACCESS_TOKEN.substring(0, 14) + "..." : "❌ NO TOKEN LOADED");
-console.log("⚡ Loaded Cerebras Meta Llama Key Prefix:", cerebrasApiKey ? cerebrasApiKey.substring(0, 10) + "..." : "❌ NO CEREBRAS KEY LOADED");
+console.log("🦙 Loaded Meta Llama Groq Key Prefix:", llamaApiKey ? llamaApiKey.substring(0, 14) + "..." : "❌ NO GROQ KEY LOADED");
 
 const app = express();
 app.use(express.json());
@@ -31,6 +31,7 @@ const DEFAULT_SANDBOX_PASSKEY = "bfb279f9aa9bdbcf158e97dd71a467cd2e0c893059b10f7
 // ==========================================
 // 1. MULTI-TENANT PERSISTENT DATABASE STORE
 // ==========================================
+// In Vercel serverless, /tmp is writable if running in an ephemeral container
 const DB_FILE = process.env.VERCEL ? path.join('/tmp', 'multi_tenant_store.json') : path.join(__dirname, 'multi_tenant_store.json');
 
 function initializeStore() {
@@ -286,14 +287,14 @@ async function triggerTenantSTKPush(tenant, phoneNumber, amount, itemRef) {
 }
 
 // ==========================================
-// 3. CEREBRAS META LLAMA 3.3 CONCIERGE ENGINE
+// 3. META LLAMA 3.3 CONCIERGE ENGINE (GROQ)
 // ==========================================
 function buildTenantSystemInstruction(tenant, profile) {
   return `
 You are the dedicated female AI sales concierge for **${tenant.businessName}**${
     tenant.brandSignature ? ` (Brand Signature: *${tenant.brandSignature}*)` : ''
   }, an elite ${tenant.industry} house in Nairobi.
-Powered by: Meta Llama 3.3 Intelligence on Cerebras Ultra-Fast Cloud.
+Powered by: Meta Llama 3.3 Intelligence on Groq LPU Engine.
 
 Current Customer Stage: ${(profile.stage || 'QUALIFICATION').toUpperCase()}
 Customer Context: ${JSON.stringify(profile)}
@@ -328,9 +329,9 @@ If no action is triggered, output conversational prose.
 }
 
 async function generateLlamaSalesResponse(tenant, profile, userPromptText) {
-  const apiKey = (process.env.CEREBRAS_API_KEY || process.env.LLAMA_API_KEY || "csk-c9x3t36tkcrpdyj3j9ddn3t6cppv925rynwv4f4jtw4d4d3e").trim();
+  const apiKey = (process.env.GROQ_API_KEY || process.env.LLAMA_API_KEY || "").trim();
   if (!apiKey) {
-    console.warn("⚠️ CEREBRAS_API_KEY is not set in environment.");
+    console.warn("⚠️ GROQ_API_KEY is not configured.");
     return `Karibu ${tenant.businessName}! We have Air Force 1 White (KSh 2,500) and salon styling services available today. How can I help you book or order?`;
   }
 
@@ -351,14 +352,19 @@ async function generateLlamaSalesResponse(tenant, profile, userPromptText) {
     content: userPromptText
   });
 
-  // Cerebras official Meta Llama model IDs
-  const models = ['llama3.3-70b', 'llama3.1-8b'];
+  // Active production Meta Llama models on Groq
+  const models = [
+    'llama-3.3-70b-versatile',
+    'llama-3.1-8b-instant',
+    'llama3-70b-8192',
+    'llama3-8b-8192'
+  ];
 
   for (const model of models) {
     try {
-      console.log(`⚡ Invoking Meta Llama model: [${model}] via Cerebras Cloud...`);
+      console.log(`🦙 Invoking Meta Llama model: [${model}] via Groq...`);
       const response = await axios.post(
-        'https://api.cerebras.ai/v1/chat/completions',
+        'https://api.groq.com/openai/v1/chat/completions',
         {
           model: model,
           messages: messages,
@@ -376,12 +382,12 @@ async function generateLlamaSalesResponse(tenant, profile, userPromptText) {
 
       const candidateText = response.data?.choices?.[0]?.message?.content;
       if (candidateText && candidateText.trim()) {
-        console.log(`✨ Meta Llama reply generated: "${candidateText.trim().substring(0, 50)}..."`);
+        console.log(`✨ Meta Llama [${model}] reply generated: "${candidateText.trim().substring(0, 50)}..."`);
         return candidateText.trim();
       }
     } catch (err) {
       const errDetail = err.response?.data?.error?.message || err.message;
-      console.error(`❌ Cerebras Meta Llama [${model}] Failed:`, errDetail);
+      console.error(`❌ Meta Llama [${model}] Failed:`, errDetail);
     }
   }
 
@@ -511,7 +517,7 @@ async function sendWhatsAppText(tenant, toPhone, text) {
         }
       }
     );
-    console.log(`📤 Text reply delivered to +${cleanPhone}: "${String(text).trim().substring(0, 45)}..."`);
+    console.log(`📤 Text reply delivered to +${cleanPhone}: "${String(text).trim().substring(0, 45)}..." (ID: ${res.data?.messages?.[0]?.id})`);
     return res.data;
   } catch (err) {
     console.error('❌ Meta Outbound Send Error:', JSON.stringify(err.response?.data || err.message));
@@ -771,7 +777,7 @@ app.post('/api/stk-callback', async (req, res) => {
         amount,
         item: purchasedItem,
         receipt,
-        channel: 'Meta_Llama_AI_Agent',
+        channel: 'WhatsApp_AI_Agent',
         timestamp: new Date().toISOString()
       });
 
@@ -906,7 +912,6 @@ app.post('/api/tenant/voice/preview', async (req, res) => {
   }
 });
 
-// Dedicated Real-Time Simulation Endpoint for Frontend Demo Testing
 app.post('/api/tenant/conversations/simulate-inquiry', tenantMiddleware, async (req, res) => {
   const { customerId, text } = req.body;
   if (!text) {
@@ -929,7 +934,6 @@ app.post('/api/tenant/conversations/simulate-inquiry', tenantMiddleware, async (
       success: true,
       userText: text,
       botReply,
-      modelUsed: "Meta Llama 3.3 70B (Cerebras)",
       conversationHistory: profile.conversationHistory
     });
   } catch (err) {
@@ -1027,7 +1031,18 @@ app.post('/api/tenant/conversations/toggle-pause', tenantMiddleware, (req, res) 
 });
 
 // ==========================================
-// 9. CRON SCHEDULER
+// 9. ROOT & SPA ROUTE FALLBACKS
+// ==========================================
+app.get('/', (req, res) => {
+  const indexPath = path.join(__dirname, 'index.html');
+  if (fs.existsSync(indexPath)) {
+    return res.sendFile(indexPath);
+  }
+  res.send("Luvon Q API is running.");
+});
+
+// ==========================================
+// 10. CRON SCHEDULER (Only runs if not on serverless)
 // ==========================================
 if (!process.env.VERCEL) {
   cron.schedule('0 * * * *', async () => {
@@ -1053,22 +1068,24 @@ if (!process.env.VERCEL) {
       const tenantSales = db.attributionLedger.filter(t => t.tenantId === tenant.id);
       const totalRevenue = tenantSales.reduce((sum, entry) => sum + entry.amount, 0);
       const report = 
-`📈 *${tenant.brandSignature || tenant.businessName} REVENUE REPORT*
-━━━━━━━━━━━━━━━━━━━━━
-💰 *DIRECT REVENUE GENERATED:*
-• Total Sales: KSh ${totalRevenue.toLocaleString()}
-• Closed Deals: ${tenantSales.length}
-• Attribution Source: 100% Conversational Meta Llama AI Agent
-━━━━━━━━━━━━━━━━━━━━━`;
+  `📈 *${tenant.brandSignature || tenant.businessName} REVENUE REPORT*
+  ━━━━━━━━━━━━━━━━━━━━━
+  💰 *DIRECT REVENUE GENERATED:*
+  • Total Sales: KSh ${totalRevenue.toLocaleString()}
+  • Closed Deals: ${tenantSales.length}
+  • Attribution Source: 100% Conversational AI Agent
+  ━━━━━━━━━━━━━━━━━━━━━`;
       await sendWhatsAppText(tenant, tenant.escalationPhone, report);
     }
   });
 }
 
 // ==========================================
-// 10. SERVER LISTENER
+// 11. EXPORT FOR VERCEL & LOCAL LISTENER
 // ==========================================
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`🚀 Luvon Q Meta Llama Multi-Tenant Engine running on port ${PORT}`));
+if (process.env.NODE_ENV !== 'production' || !process.env.VERCEL) {
+  app.listen(PORT, () => console.log(`🚀 Luvon Q Orélune Multi-Tenant Engine running on port ${PORT}`));
+}
 
 module.exports = app;
