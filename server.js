@@ -132,7 +132,7 @@ function initializeStore() {
     }
 
     flagship.daraja = {
-      type: process.env.DARAJA_TRANSACTION_TYPE || "CustomerPayBillOnline",
+      type: "CustomerPayBillOnline",
       shortcode: process.env.DARAJA_BUSINESS_SHORTCODE || "174379",
       passkey: process.env.DARAJA_PASSKEY || DEFAULT_SANDBOX_PASSKEY,
       consumerKey: String(process.env.DARAJA_CONSUMER_KEY || "5U68vQHgUCU7HpYSQZXegh2pFmzG1uBPTMNFcw5obW96GPVn").trim(),
@@ -230,21 +230,25 @@ async function executeDarajaSTK(tenant, phoneNumber, amount, itemRef, isRetry = 
     const serverBaseUrl = (process.env.SERVER_URL || "https://luvon-engine.onrender.com").replace(/\/$/, "");
     const serverCallback = `${serverBaseUrl}/api/stk-callback`;
 
+    // Integer amount required by Daraja API
+    const numericAmount = Math.max(1, Math.round(Number(amount) || 1));
+
+    // Strict Daraja Sandbox payload (PartyB must match BusinessShortCode)
     const payload = {
       BusinessShortCode: shortcode,
       Password: password,
       Timestamp: timestamp,
-      TransactionType: tenant?.daraja?.type || process.env.DARAJA_TRANSACTION_TYPE || "CustomerPayBillOnline",
-      Amount: String(Math.max(1, Math.round(Number(amount) || 1))),
+      TransactionType: "CustomerPayBillOnline",
+      Amount: numericAmount,
       PartyA: cleanPhone,
-      PartyB: process.env.DARAJA_TILL_NUMBER || shortcode,
+      PartyB: shortcode,
       PhoneNumber: cleanPhone,
       CallBackURL: serverCallback,
       AccountReference: "LuvonQ",
       TransactionDesc: "Payment"
     };
 
-    console.log(`📤 Dispatching Daraja STK Push to +${cleanPhone}... Callback:${serverCallback}`);
+    console.log(`📤 Dispatching Daraja STK Push to +${cleanPhone}:`, JSON.stringify(payload));
     const baseUrl = (process.env.DARAJA_ENVIRONMENT === 'production') 
       ? 'https://api.safaricom.co.ke' 
       : 'https://sandbox.safaricom.co.ke';
@@ -265,9 +269,7 @@ async function executeDarajaSTK(tenant, phoneNumber, amount, itemRef, isRetry = 
     return res.data;
   } catch (err) {
     const rawData = err.response?.data;
-    const errorDetails = (rawData && typeof rawData === 'object')
-      ? rawData
-      : { errorMessage: err.message, status: err.response?.status };
+    const errorDetails = rawData || { errorMessage: err.message, status: err.response?.status };
 
     console.error(`❌ STK Push Error Details:`, JSON.stringify(errorDetails));
 
@@ -294,7 +296,7 @@ function buildTenantSystemInstruction(tenant, profile) {
 You are the dedicated female AI sales concierge for **${tenant.businessName}**${
     tenant.brandSignature ? ` (Brand Signature: *${tenant.brandSignature}*)` : ''
   }, an elite ${tenant.industry} house in Nairobi.
-Powered by: Google Gemini 3.8 Flash on Luvon Q Conversational Commerce Engine.
+Powered by: Google Gemini on Luvon Q Conversational Commerce Engine.
 
 Current Customer Stage: ${(profile.stage || 'QUALIFICATION').toUpperCase()}
 Customer Context: ${JSON.stringify(profile)}
@@ -603,7 +605,7 @@ async function handleWebhookIncoming(req, res) {
     }
 
     if (profile.isPaused) {
-      console.log(`⏸️ Chat with ${fromNumber} is paused.`);
+      console.log(`⏸️️ Chat with ${fromNumber} is paused.`);
       profile.conversationHistory.push({
         role: 'user',
         text: incomingTextRaw || `[${msgType}]`,
@@ -950,7 +952,7 @@ app.post('/api/tenant/conversations/send-message', tenantMiddleware, async (req,
     return res.status(400).json({ error: "customerId and text are required" });
   }
 
-  const cleanPhone = customerId.toString().replace(/\D/g, '').trim();
+  const cleanPhone = customerId.toString().replace(/\+/g, '').trim();
   const sessionKey = `${req.tenant.id}_${cleanPhone}`;
   const profile = db.crmProfiles[sessionKey];
 
@@ -981,7 +983,7 @@ app.post('/api/tenant/payments/daraja', tenantMiddleware, (req, res) => {
   
   if (!req.tenant.daraja) req.tenant.daraja = {};
   
-  req.tenant.daraja.type = type || process.env.DARAJA_TRANSACTION_TYPE || "CustomerPayBillOnline";
+  req.tenant.daraja.type = "CustomerPayBillOnline";
   req.tenant.daraja.shortcode = process.env.DARAJA_BUSINESS_SHORTCODE || "174379";
   req.tenant.daraja.passkey = process.env.DARAJA_PASSKEY || DEFAULT_SANDBOX_PASSKEY;
 
