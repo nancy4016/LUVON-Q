@@ -8,7 +8,6 @@
   <!-- Tailwind CSS via CDN -->
   <script src="https://cdn.tailwindcss.com"></script>
   
-  <!-- Tailwind JavaScript Theme Configuration -->
   <script>
     tailwind.config = {
       theme: {
@@ -33,13 +32,27 @@
     }
   </script>
 
-  <!-- Google Fonts & Reliable Lucide CDN -->
+  <!-- Google Fonts -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Playfair+Display:ital,wght@0,600;0,700;1,400&display=swap" rel="stylesheet">
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/lucide/0.344.0/umd/lucide.min.js"></script>
   
-  <!-- External Custom Stylesheet -->
+  <!-- Rock-solid Lucide CDN with Instant Fallback -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/lucide/0.344.0/umd/lucide.min.js"></script>
+  <script>
+    if (!window.lucide) {
+      document.write('<script src="https://cdn.jsdelivr.net/npm/lucide@0.344.0/dist/umd/lucide.min.js"><\/script>');
+    }
+  </script>
+
+  <!-- Inline SVG Icon Sizing Safeguard -->
+  <style>
+    svg.lucide {
+      display: inline-block !important;
+      vertical-align: middle !important;
+    }
+  </style>
+
   <link rel="stylesheet" href="styles.css" />
 </head>
 <body class="bg-slate-50 text-slate-800 min-h-screen flex flex-col md:flex-row overflow-x-hidden">
@@ -52,13 +65,11 @@
     </button>
   </header>
 
-  <!-- Mobile Dark Backdrop Overlay -->
   <div id="sidebarBackdrop" onclick="toggleMobileMenu()" class="fixed inset-0 bg-slate-900/50 z-40 hidden md:hidden backdrop-blur-sm transition-opacity"></div>
 
   <!-- Unified Sidebar Navigation Drawer -->
   <aside id="sidebarNav" class="fixed top-0 left-0 bottom-0 z-50 w-72 bg-white/95 backdrop-blur-md border-r border-brand-200/50 flex flex-col justify-between p-6 -translate-x-full md:translate-x-0 transition-transform duration-300 ease-in-out md:static md:w-64 flex-shrink-0">
     <div class="space-y-8">
-      <!-- Sidebar Header / Logo -->
       <div class="flex items-center justify-between">
         <img src="Luvon q logo.png" alt="Luvon Q Logo" class="h-12 w-auto object-contain" />
         <button type="button" onclick="toggleMobileMenu()" class="md:hidden text-slate-400 hover:text-slate-600 p-1 cursor-pointer">
@@ -66,7 +77,6 @@
         </button>
       </div>
 
-      <!-- Navigation Links -->
       <nav class="space-y-1">
         <a href="index.html" class="nav-link flex items-center gap-3 px-3 py-2.5 rounded-lg bg-brand-100 text-brand-900 font-semibold transition-all text-sm">
           <i data-lucide="layout-dashboard" class="w-4 h-4"></i> Overview
@@ -86,7 +96,6 @@
       </nav>
     </div>
 
-    <!-- Bottom Auth Access -->
     <div class="pt-6 border-t border-brand-200/60">
       <button id="portalSignInBtn" onclick="openSignInModal()" class="w-full p-3 bg-brand-600 text-white rounded-xl flex items-center justify-center gap-2 font-medium text-sm shadow-md hover:bg-brand-700 transition-all cursor-pointer">
         <i data-lucide="log-in" class="w-4 h-4"></i>
@@ -109,7 +118,6 @@
 
   <!-- Main Content Area -->
   <main class="flex-1 w-full p-4 md:p-8 overflow-y-auto space-y-8">
-    <!-- Top Header Bar -->
     <header class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-brand-200 pb-6">
       <div>
         <h1 class="text-2xl font-serif font-bold text-brand-900">Executive Dashboard</h1>
@@ -128,7 +136,6 @@
       <div class="absolute top-0 right-0 w-full h-full bg-gradient-to-l from-brand-600/20 via-transparent to-transparent pointer-events-none"></div>
 
       <div class="grid lg:grid-cols-12 gap-6 p-8 lg:p-12 items-center relative z-10">
-        <!-- Hero Text Details -->
         <div class="lg:col-span-7 space-y-6">
           <div class="inline-flex items-center gap-2 px-3 py-1 bg-brand-600/20 border border-brand-500/30 rounded-full text-brand-100 text-xs tracking-wider uppercase font-semibold">
             <span class="w-2 h-2 rounded-full bg-brand-500 animate-pulse"></span> Conversational OS
@@ -152,12 +159,10 @@
           </div>
         </div>
 
-        <!-- Interactive Hero Slider Frame -->
         <div class="lg:col-span-5 relative">
           <div class="bg-white/5 border border-white/10 rounded-2xl p-4 backdrop-blur-md shadow-2xl">
             <div class="relative h-64 sm:h-72 rounded-xl overflow-hidden group">
               <img id="carousel-img" src="https://images.unsplash.com/photo-1549298916-b41d501d3772?auto=format&fit=crop&w=800&q=80" alt="Luxury Product Showcase" class="w-full h-full object-cover transition-all duration-700 transform group-hover:scale-105" />
-              
               <div class="absolute inset-0 bg-gradient-to-t from-brand-900/90 via-brand-900/20 to-transparent"></div>
               
               <div class="absolute bottom-4 left-4 right-4 text-white">
@@ -238,123 +243,33 @@
             </tr>
           </thead>
           <tbody id="inventory-table-body" class="divide-y divide-brand-200/60">
-            <!-- Dynamic items rendered via app.js -->
           </tbody>
         </table>
       </div>
     </section>
   </main>
 
-  <!-- Email/Password & Registration Auth Modal -->
-  <div id="authModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center hidden p-4">
-    <div class="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6 relative border border-brand-100 animate-in fade-in zoom-in duration-200">
-      
-      <!-- Close Button -->
-      <button type="button" onclick="closeSignInModal()" class="absolute top-4 right-4 text-slate-400 hover:text-slate-600 transition-colors cursor-pointer">
-        <i data-lucide="x" class="w-5 h-5"></i>
-      </button>
-
-      <!-- Modal Header -->
-      <div class="text-center mb-4">
-        <img src="Luvon q logo.png" alt="Luvon Q Logo" class="h-12 mx-auto mb-2 object-contain" />
-        <h2 class="text-xl font-serif font-bold text-slate-900" id="authModalTitle">Sign in to Orélune OS</h2>
-        <p class="text-xs text-slate-500 mt-1">Access developer sandboxes, M-Pesa test triggers & voice integration</p>
-      </div>
-
-      <!-- Mode Switcher Tabs -->
-      <div class="flex border-b border-slate-100 mb-5 text-xs font-semibold">
-        <button id="tabSignIn" type="button" onclick="switchAuthTab('signin')" class="flex-1 py-2 text-center text-brand-600 border-b-2 border-brand-600 transition-all cursor-pointer">
-          Sign In
-        </button>
-        <button id="tabSignUp" type="button" onclick="switchAuthTab('signup')" class="flex-1 py-2 text-center text-slate-400 hover:text-slate-600 border-b-2 border-transparent transition-all cursor-pointer">
-          Create Account
-        </button>
-      </div>
-
-      <!-- Authentication Form -->
-      <form id="loginForm" onsubmit="handleCustomerAuth(event)" class="space-y-3.5">
-        <!-- Full Name (Only visible during Sign Up) -->
-        <div id="nameFieldGroup" class="hidden">
-          <label for="fullName" class="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1">Full Name / Business Name</label>
-          <input 
-            type="text" 
-            id="fullName" 
-            placeholder="Luvon Q Flagship" 
-            class="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-brand-600/20 focus:border-brand-600 transition-all"
-          />
-        </div>
-
-        <!-- Email Field -->
-        <div>
-          <label for="email" class="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1">Email Address</label>
-          <input 
-            type="email" 
-            id="email" 
-            required 
-            placeholder="developer@studio.com" 
-            class="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-brand-600/20 focus:border-brand-600 transition-all"
-          />
-        </div>
-
-        <!-- Password Field -->
-        <div>
-          <label for="password" class="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1">Password</label>
-          <input 
-            type="password" 
-            id="password" 
-            required 
-            placeholder="••••••••" 
-            class="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-brand-600/20 focus:border-brand-600 transition-all"
-          />
-        </div>
-
-        <!-- Sign-In Options (Remember / Forgot Password) -->
-        <div id="signInOptions" class="flex items-center justify-between text-xs pt-1">
-          <label class="flex items-center gap-2 text-slate-600 cursor-pointer">
-            <input type="checkbox" class="rounded border-slate-300 text-brand-600 focus:ring-brand-600" />
-            <span>Remember me</span>
-          </label>
-          <a href="#" class="text-brand-600 hover:underline font-medium">Forgot password?</a>
-        </div>
-
-        <!-- Submit Button -->
-        <button 
-          type="submit" 
-          id="authSubmitBtn"
-          class="w-full py-3 bg-brand-600 hover:bg-brand-700 text-white rounded-xl font-medium text-sm transition-all shadow-md shadow-brand-600/20 cursor-pointer mt-2"
-        >
-          Authenticate Session
-        </button>
-      </form>
-    </div>
-  </div>
-
-  <!-- Shared API Bridge & Page Script -->
-  <script src="api.js"></script>
-  <script src="app.js"></script>
   <script>
     function toggleMobileMenu() {
       const nav = document.getElementById("sidebarNav");
       const backdrop = document.getElementById("sidebarBackdrop");
       if (!nav || !backdrop) return;
-      const isClosed = nav.classList.contains("-translate-x-full");
-      if (isClosed) {
-        nav.classList.remove("-translate-x-full");
-        backdrop.classList.remove("hidden");
-      } else {
-        nav.classList.add("-translate-x-full");
-        backdrop.classList.add("hidden");
+      nav.classList.toggle("-translate-x-full");
+      backdrop.classList.toggle("hidden");
+    }
+
+    function renderAllIcons() {
+      if (window.lucide && typeof window.lucide.createIcons === 'function') {
+        window.lucide.createIcons();
       }
     }
 
-    document.addEventListener("DOMContentLoaded", () => {
-      if (window.lucide) {
-        lucide.createIcons();
-      }
-      setTimeout(() => {
-        if (window.lucide) lucide.createIcons();
-      }, 500);
-    });
+    document.addEventListener("DOMContentLoaded", renderAllIcons);
+    window.addEventListener("load", renderAllIcons);
+    setTimeout(renderAllIcons, 500);
   </script>
+
+  <script src="api.js"></script>
+  <script src="app.js"></script>
 </body>
 </html>
