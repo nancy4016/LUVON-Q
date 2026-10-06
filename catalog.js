@@ -37,10 +37,11 @@ function renderCatalog(items) {
     tbody.innerHTML = `
       <tr>
         <td colspan="6" class="p-6 text-center text-slate-400 font-medium">
-          No inventory items found. Click "+ Add Product" to create one.
+          No inventory items found. Click "+ Add New Product" to create one.
         </td>
       </tr>
     `;
+    if (window.lucide) lucide.createIcons();
     return;
   }
 
@@ -71,11 +72,31 @@ function renderCatalog(items) {
       </td>
     </tr>
   `).join('');
+
+  // Re-initialize Lucide icons on newly rendered DOM elements
+  if (window.lucide) {
+    lucide.createIcons();
+  }
 }
 
 function deleteProductLocal(id) {
   catalogItems = catalogItems.filter(item => String(item.id) !== String(id));
   renderCatalog(catalogItems);
+}
+
+function toggleMobileMenu() {
+  const sidebar = document.getElementById('sidebarNav');
+  const backdrop = document.getElementById('sidebarBackdrop');
+  if (!sidebar) return;
+
+  const isClosed = sidebar.classList.contains('-translate-x-full');
+  if (isClosed) {
+    sidebar.classList.remove('-translate-x-full');
+    backdrop?.classList.remove('hidden');
+  } else {
+    sidebar.classList.add('-translate-x-full');
+    backdrop?.classList.add('hidden');
+  }
 }
 
 // ==========================================
@@ -93,8 +114,12 @@ document.addEventListener("DOMContentLoaded", () => {
   const form = document.getElementById("product-form");
 
   const toggleModal = (show) => {
-    if (show) modal?.classList.remove("hidden");
-    else modal?.classList.add("hidden");
+    if (show) {
+      modal?.classList.remove("hidden");
+      if (window.lucide) lucide.createIcons();
+    } else {
+      modal?.classList.add("hidden");
+    }
   };
 
   openBtn?.addEventListener("click", () => toggleModal(true));
@@ -103,11 +128,11 @@ document.addEventListener("DOMContentLoaded", () => {
 
   form?.addEventListener("submit", async (e) => {
     e.preventDefault();
-    const name = document.getElementById("prod-name").value;
+    const name = document.getElementById("prod-name").value.trim();
     const price = Number(document.getElementById("prod-price").value);
     const stock = Number(document.getElementById("prod-stock").value);
     const category = document.getElementById("prod-category").value;
-    const imageUrl = document.getElementById("prod-image")?.value || null;
+    const imageUrl = document.getElementById("prod-image")?.value?.trim() || null;
 
     const payload = {
       name,

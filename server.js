@@ -215,6 +215,7 @@ async function executeDarajaSTK(tenant, phoneNumber, amount, itemRef, isRetry = 
     const rawToken = await getTenantDarajaToken(tenant, isRetry);
     const token = String(rawToken).trim();
 
+    // Generate East Africa Time (UTC+3) 14-digit timestamp YYYYMMDDHHmmss
     const eatDate = new Date(Date.now() + (3 * 60 * 60 * 1000));
     const pad = (n) => String(n).padStart(2, '0');
     const timestamp = `${eatDate.getUTCFullYear()}${pad(eatDate.getUTCMonth() + 1)}${pad(eatDate.getUTCDate())}${pad(eatDate.getUTCHours())}${pad(eatDate.getUTCMinutes())}${pad(eatDate.getUTCSeconds())}`;
@@ -243,7 +244,7 @@ async function executeDarajaSTK(tenant, phoneNumber, amount, itemRef, isRetry = 
       TransactionDesc: "Payment"
     };
 
-    console.log(`📤 Dispatching Daraja STK Push to +${cleanPhone}...`);
+    console.log(`📤 Dispatching Daraja STK Push to +${cleanPhone}... Callback:${serverCallback}`);
     const baseUrl = (process.env.DARAJA_ENVIRONMENT === 'production') 
       ? 'https://api.safaricom.co.ke' 
       : 'https://sandbox.safaricom.co.ke';
@@ -286,14 +287,14 @@ async function triggerTenantSTKPush(tenant, phoneNumber, amount, itemRef) {
 }
 
 // ==========================================
-// 3. GOOGLE GEMINI SALES CONCIERGE ENGINE
+// 3. GOOGLE GEMINI 3.8 FLASH SALES CONCIERGE
 // ==========================================
 function buildTenantSystemInstruction(tenant, profile) {
   return `
 You are the dedicated female AI sales concierge for **${tenant.businessName}**${
     tenant.brandSignature ? ` (Brand Signature: *${tenant.brandSignature}*)` : ''
   }, an elite ${tenant.industry} house in Nairobi.
-Powered by: Google Gemini on Luvon Q Conversational Commerce Engine.
+Powered by: Google Gemini 3.8 Flash on Luvon Q Conversational Commerce Engine.
 
 Current Customer Stage: ${(profile.stage || 'QUALIFICATION').toUpperCase()}
 Customer Context: ${JSON.stringify(profile)}
@@ -327,14 +328,13 @@ If no action is triggered, output conversational prose.
 `.trim();
 }
 
-async function generateLlamaSalesResponse(tenant, profile, userPromptText) {
+async function generateGeminiSalesResponse(tenant, profile, userPromptText) {
   const apiKey = (process.env.GEMINI_API_KEY || "").trim();
   if (!apiKey) {
     console.warn("⚠️ GEMINI_API_KEY is not configured in environment.");
     return `Karibu ${tenant.businessName}! We have Air Force 1 White (KSh 2,500) and salon styling services available today. How can I help you book or order?`;
   }
 
-  // Build message history according to Gemini contents schema
   const contents = [];
   const history = profile.conversationHistory || [];
 
@@ -361,7 +361,8 @@ async function generateLlamaSalesResponse(tenant, profile, userPromptText) {
     }
   };
 
-  const models = ['gemini-2.5-flash', 'gemini-1.5-flash'];
+  // Primary: Gemini 3.8 Flash | Fallback: Gemini 3.5 Flash Lite
+  const models = ['gemini-3.8-flash', 'gemini-3.5-flash-lite'];
 
   for (const model of models) {
     try {
@@ -493,7 +494,10 @@ async function markMessageAsRead(messageId) {
 
 async function sendWhatsAppText(tenant, toPhone, text) {
   if (!toPhone || !text) return;
-  const cleanPhone = toPhone.toString().replace(/\+/g, '').trim();
+  let cleanPhone = toPhone.toString().replace(/\D/g, '').trim();
+  if (cleanPhone.startsWith('0')) cleanPhone = '254' + cleanPhone.slice(1);
+  if (!cleanPhone.startsWith('254')) cleanPhone = '254' + cleanPhone;
+
   const phoneId = process.env.WHATSAPP_PHONE_NUMBER_ID || tenant.whatsappPhoneId || "1279716021891578";
 
   try {
@@ -522,7 +526,10 @@ async function sendWhatsAppText(tenant, toPhone, text) {
 
 async function sendWhatsAppImage(tenant, toPhone, imageUrl, caption) {
   if (!toPhone || !imageUrl) return;
-  const cleanPhone = toPhone.toString().replace(/\+/g, '').trim();
+  let cleanPhone = toPhone.toString().replace(/\D/g, '').trim();
+  if (cleanPhone.startsWith('0')) cleanPhone = '254' + cleanPhone.slice(1);
+  if (!cleanPhone.startsWith('254')) cleanPhone = '254' + cleanPhone;
+
   const phoneId = process.env.WHATSAPP_PHONE_NUMBER_ID || tenant.whatsappPhoneId || "1279716021891578";
 
   try {
@@ -611,7 +618,7 @@ async function handleWebhookIncoming(req, res) {
     let loggedUserText = incomingTextRaw || `[Sent ${msgType}]`;
 
     console.log(`🤖 Generating Gemini sales response...`);
-    let responseText = await generateLlamaSalesResponse(tenant, profile, loggedUserText);
+    let responseText = await generateGeminiSalesResponse(tenant, profile, loggedUserText);
 
     if (!responseText) {
       responseText = `Karibu ${tenant.businessName}! How can I help you today?`;
@@ -917,7 +924,7 @@ app.post('/api/tenant/conversations/simulate-inquiry', tenantMiddleware, async (
   const { profile } = getOrCreateCustomerSession(req.tenant, phone, 'whatsapp');
 
   try {
-    const botReply = await generateLlamaSalesResponse(req.tenant, profile, text);
+    const botReply = await generateGeminiSalesResponse(req.tenant, profile, text);
 
     profile.conversationHistory.push(
       { role: 'user', text, timestamp: new Date().toISOString() },
@@ -943,7 +950,7 @@ app.post('/api/tenant/conversations/send-message', tenantMiddleware, async (req,
     return res.status(400).json({ error: "customerId and text are required" });
   }
 
-  const cleanPhone = customerId.toString().replace(/\+/g, '').trim();
+  const cleanPhone = customerId.toString().replace(/\D/g, '').trim();
   const sessionKey = `${req.tenant.id}_${cleanPhone}`;
   const profile = db.crmProfiles[sessionKey];
 
@@ -958,9 +965,10 @@ app.post('/api/tenant/conversations/send-message', tenantMiddleware, async (req,
   }
 
   try {
-    await sendWhatsAppText(req.tenant, cleanPhone, text);
-    res.json({ success: true, message: "Outbound message delivered via Meta WhatsApp API" });
+    const sendResult = await sendWhatsAppText(req.tenant, cleanPhone, text);
+    res.json({ success: true, message: "Outbound message delivered via Meta WhatsApp API", details: sendResult });
   } catch (err) {
+    console.error("❌ Outbound manual send error:", err.response?.data || err.message);
     res.status(500).json({ 
       error: "Meta API delivery failed", 
       details: err.response?.data || err.message 

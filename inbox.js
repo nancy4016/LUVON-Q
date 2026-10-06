@@ -4,6 +4,7 @@
 let conversations = [];
 let activeConvId = null;
 let isSending = false;
+let lastMessageCount = 0;
 
 const BASE_ORIGIN = (typeof window !== 'undefined' && window.location.origin && window.location.origin.includes('http'))
   ? window.location.origin
@@ -43,40 +44,35 @@ async function fetchLiveConversations() {
         };
       });
 
-      // Default select active or first thread
       if (!activeConvId || !conversations.some(c => c.id === activeConvId)) {
         activeConvId = conversations[0].id;
       }
     } else {
-      // If server store is empty, create a starter test customer thread so you can talk to the bot immediately
       if (conversations.length === 0) {
         conversations = [{
           id: "254768820142",
           customerId: "254768820142",
-          customerName: "Test Customer (+254768820142)",
+          customerName: "Customer +254768820142",
           customerPhone: "+254768820142",
           channel: "whatsapp",
           stage: "QUALIFICATION",
           isPaused: false,
-          messages: [
-            {
-              role: "user",
-              text: "Niaje, do you have Air Force 1 White in stock?",
-              timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-            },
-            {
-              role: "assistant",
-              text: "Niaje! Yes, we have 4 pairs of Air Force 1 White available for KSh 2,500. Would you like to order a pair?",
-              timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-            }
-          ]
+          messages: []
         }];
         activeConvId = "254768820142";
       }
     }
 
     renderThreads();
-    renderChatStream();
+
+    const activeConv = conversations.find(c => c.id === activeConvId);
+    const currentCount = activeConv ? activeConv.messages.length : 0;
+    
+    // Only re-render the chat window if new messages have arrived
+    if (currentCount !== lastMessageCount) {
+      lastMessageCount = currentCount;
+      renderChatStream();
+    }
   } catch (err) {
     console.error('❌ Failed to fetch conversations:', err.message);
   }
@@ -129,7 +125,6 @@ function renderChatStream() {
     return;
   }
 
-  // Update Top Bar Details
   const nameEl = document.getElementById("active-name");
   const phoneEl = document.getElementById("active-phone");
   const avatarEl = document.getElementById("active-avatar");
@@ -149,7 +144,6 @@ function renderChatStream() {
     stageBadge.textContent = conv.stage;
   }
 
-  // Update AI State Toggle Button
   const toggleBtn = document.getElementById("ai-toggle-btn");
   const toggleLabel = document.getElementById("ai-toggle-label");
   if (toggleBtn && toggleLabel) {
@@ -162,7 +156,6 @@ function renderChatStream() {
     }
   }
 
-  // Render Chat Messages
   if (stream) {
     stream.innerHTML = conv.messages.map(m => {
       const isUser = m.role === 'user';
@@ -178,10 +171,14 @@ function renderChatStream() {
 
     stream.scrollTop = stream.scrollHeight;
   }
+
+  if (window.lucide) lucide.createIcons();
 }
 
 function selectConversation(id) {
   activeConvId = id;
+  const activeConv = conversations.find(c => c.id === activeConvId);
+  lastMessageCount = activeConv ? activeConv.messages.length : 0;
   renderThreads();
   renderChatStream();
 }
@@ -222,12 +219,11 @@ async function handleSendMessage() {
 
   let conv = conversations.find(c => c.id === activeConvId);
 
-  // If no conversation exists, select the first or create a default test one
   if (!conv) {
     conv = {
       id: "254768820142",
       customerId: "254768820142",
-      customerName: "Test Customer (+254768820142)",
+      customerName: "Customer +254768820142",
       customerPhone: "+254768820142",
       channel: 'whatsapp',
       stage: 'QUALIFICATION',
@@ -242,17 +238,17 @@ async function handleSendMessage() {
   input.value = "";
   isSending = true;
 
-  // Append outgoing bubble to UI
   conv.messages.push({
     role: "assistant",
     text: messageText,
     timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
   });
+  lastMessageCount = conv.messages.length;
   renderChatStream();
   renderThreads();
 
   try {
-    await fetch(`${BACKEND_URL}/conversations/send-message`, {
+    const res = await fetch(`${BACKEND_URL}/conversations/send-message`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -263,6 +259,11 @@ async function handleSendMessage() {
         text: messageText
       })
     });
+    const result = await res.json();
+    if (!res.ok) {
+      console.error("❌ Outbound error:", result);
+      alert(`Outbound error: ${result.error || 'Check Meta token status'}`);
+    }
   } catch (err) {
     console.error("❌ Send notice:", err.message);
   } finally {
@@ -271,7 +272,7 @@ async function handleSendMessage() {
 }
 
 // ==========================================
-// 4. TEST BOT SIMULATOR (SEE BOT IN ACTION)
+// 4. TEST BOT SIMULATOR
 // ==========================================
 async function simulateCustomerInquiry() {
   const sampleInquiries = [
@@ -291,16 +292,15 @@ async function simulateCustomerInquiry() {
     activeConvId = conv.id;
   }
 
-  // 1. Add User Message
   conv.messages.push({
     role: "user",
     text: userText,
     timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
   });
+  lastMessageCount = conv.messages.length;
   renderChatStream();
   renderThreads();
 
-  // 2. Trigger Webhook to simulate live WhatsApp incoming message
   try {
     await fetch(`${BASE_ORIGIN}/api/webhook`, {
       method: 'POST',
@@ -322,10 +322,32 @@ async function simulateCustomerInquiry() {
       })
     });
 
-    // Refresh after 2 seconds to see the bot reply
     setTimeout(fetchLiveConversations, 2500);
   } catch (err) {
     console.error("Simulation failed:", err.message);
+  }
+}
+
+// Trigger STK Push Button from Inbox
+async function triggerInboxSTKPush() {
+  const conv = conversations.find(c => c.id === activeConvId);
+  const targetPhone = conv ? conv.customerId : "254768820142";
+  const phone = prompt("Enter phone number to receive M-Pesa STK push:", targetPhone);
+  if (!phone) return;
+
+  try {
+    const res = await fetch(`${BACKEND_URL}/payments/test-stk`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-tenant-id': TENANT_ID
+      },
+      body: JSON.stringify({ testPhone: phone })
+    });
+    const data = await res.json();
+    alert(data.message || (data.success ? "STK prompt sent to your phone!" : "Failed to trigger push"));
+  } catch (err) {
+    alert("STK Trigger Error: " + err.message);
   }
 }
 
@@ -337,15 +359,12 @@ document.addEventListener("DOMContentLoaded", () => {
 
   fetchLiveConversations();
 
-  // Poll for incoming WhatsApp messages every 4 seconds
   setInterval(() => {
     if (!isSending) fetchLiveConversations();
   }, 4000);
 
   const toggleBtn = document.getElementById("ai-toggle-btn");
-  if (toggleBtn) {
-    toggleBtn.addEventListener("click", toggleAIPauseState);
-  }
+  if (toggleBtn) toggleBtn.addEventListener("click", toggleAIPauseState);
 
   const chatForm = document.getElementById("chat-form");
   if (chatForm) {
@@ -363,5 +382,11 @@ document.addEventListener("DOMContentLoaded", () => {
         handleSendMessage();
       }
     });
+  }
+
+  // Hook STK Push button in Inbox footer
+  const stkBtn = document.querySelector("button[onclick*='STK'], .stk-push-btn") || document.getElementById("inbox-stk-btn");
+  if (stkBtn) {
+    stkBtn.onclick = triggerInboxSTKPush;
   }
 });
