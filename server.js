@@ -27,11 +27,13 @@ const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 const DEFAULT_FEMALE_VOICE_ID = "EXAVITQu4vr4xnSDxMaL";
 
-// STRICT SAFARICOM DARAJA SANDBOX CREDENTIALS (64-HEX CHARACTERS)
-const SANDBOX_SHORTCODE = "174379";
-const SANDBOX_PASSKEY = "bfb279f9aa9bdbcf158e97dd71a467cd2e0c893059b10f78e6b72ada1ed2c919";
-const SANDBOX_CONSUMER_KEY = "5U68vQHgUCU7HpYSQZXegh2pFmzG1uBPTMNFcw5obW96GPVn";
-const SANDBOX_CONSUMER_SECRET = "2qwVKez82Raza13QyV9Ti8GqNLWKgGPWrJVpr1eot3OGNWluJAO1QaAjr1WaDsII";
+// ==========================================
+// HARDCODED SAFARICOM DARAJA SANDBOX CREDENTIALS
+// ==========================================
+const HC_SHORTCODE = "174379";
+const HC_PASSKEY = "bfb279f9aa9bdbcf158e97dd71a467cd2e0c893059b10f78e6b72ada1ed2c919";
+const HC_CONSUMER_KEY = "5U68vQHgUCU7HpYSQZXegh2pFmzG1uBPTMNFcw5obW96GPVn";
+const HC_CONSUMER_SECRET = "2qwVKez82Raza13QyV9Ti8GqNLWKgGPWrJVpr1eot3OGNWluJAO1QaAjr1WaDsII";
 
 // ==========================================
 // 1. MULTI-TENANT PERSISTENT DATABASE STORE
@@ -72,10 +74,10 @@ function initializeStore() {
           instagramPageId: null,
           daraja: {
             type: "CustomerPayBillOnline",
-            shortcode: SANDBOX_SHORTCODE,
-            passkey: SANDBOX_PASSKEY,
-            consumerKey: SANDBOX_CONSUMER_KEY,
-            consumerSecret: SANDBOX_CONSUMER_SECRET
+            shortcode: HC_SHORTCODE,
+            passkey: HC_PASSKEY,
+            consumerKey: HC_CONSUMER_KEY,
+            consumerSecret: HC_CONSUMER_SECRET
           },
           catalog: [
             {
@@ -128,17 +130,17 @@ function initializeStore() {
     };
   }
 
-  // Force overwrite any corrupted/truncated keys stored in multi_tenant_store.json
+  // Force overwrite any invalid stored values
   if (loadedStore.tenants && loadedStore.tenants["luvon_q_flagship"]) {
     const flagship = loadedStore.tenants["luvon_q_flagship"];
     flagship.whatsappPhoneId = process.env.WHATSAPP_PHONE_NUMBER_ID || flagship.whatsappPhoneId || "1279716021891578";
     flagship.elevenLabsVoiceId = process.env.ELEVENLABS_VOICE_ID || DEFAULT_FEMALE_VOICE_ID;
     flagship.daraja = {
       type: "CustomerPayBillOnline",
-      shortcode: SANDBOX_SHORTCODE,
-      passkey: SANDBOX_PASSKEY,
-      consumerKey: SANDBOX_CONSUMER_KEY,
-      consumerSecret: SANDBOX_CONSUMER_SECRET
+      shortcode: HC_SHORTCODE,
+      passkey: HC_PASSKEY,
+      consumerKey: HC_CONSUMER_KEY,
+      consumerSecret: HC_CONSUMER_SECRET
     };
   }
 
@@ -167,40 +169,21 @@ function resolveTenant(channelId) {
 }
 
 // ==========================================
-// 2. DARAJA SANITIZATION & STK DISPATCH
+// 2. DARAJA HARDCODED SANDBOX PIPELINE
 // ==========================================
 let cachedDarajaToken = null;
 let tokenExpiryTime = 0;
 
-function getValidDarajaCredentials(tenant) {
-  let key = (process.env.DARAJA_CONSUMER_KEY || tenant?.daraja?.consumerKey || SANDBOX_CONSUMER_KEY).trim();
-  let secret = (process.env.DARAJA_CONSUMER_SECRET || tenant?.daraja?.consumerSecret || SANDBOX_CONSUMER_SECRET).trim();
-  let passkey = (process.env.DARAJA_PASSKEY || tenant?.daraja?.passkey || SANDBOX_PASSKEY).trim();
-  let shortcode = (process.env.DARAJA_BUSINESS_SHORTCODE || tenant?.daraja?.shortcode || SANDBOX_SHORTCODE).trim();
-
-  // Guard against any bullet placeholder or truncated passkey from old saves
-  if (!key || key.includes('•') || key.length < 15) key = SANDBOX_CONSUMER_KEY;
-  if (!secret || secret.includes('•') || secret.length < 15) secret = SANDBOX_CONSUMER_SECRET;
-  if (!passkey || passkey.includes('•') || passkey.length !== 64) passkey = SANDBOX_PASSKEY;
-  if (!shortcode || shortcode.includes('•')) shortcode = SANDBOX_SHORTCODE;
-
-  return { key, secret, passkey, shortcode };
-}
-
-async function getTenantDarajaToken(tenant, forceRefresh = false) {
+async function getHardcodedDarajaToken(forceRefresh = false) {
   const now = Date.now();
   if (!forceRefresh && cachedDarajaToken && now < tokenExpiryTime) {
     return cachedDarajaToken;
   }
 
-  const { key, secret } = getValidDarajaCredentials(tenant);
-  const auth = Buffer.from(`${key}:${secret}`).toString('base64');
-  const baseUrl = (process.env.DARAJA_ENVIRONMENT === 'production') 
-    ? 'https://api.safaricom.co.ke' 
-    : 'https://sandbox.safaricom.co.ke';
+  const auth = Buffer.from(`${HC_CONSUMER_KEY}:${HC_CONSUMER_SECRET}`).toString('base64');
+  console.log("🔄 Requesting OAuth Token with hardcoded Sandbox keys...");
 
-  console.log("🔄 Requesting Daraja OAuth Token from Safaricom...");
-  const response = await axios.get(`${baseUrl}/oauth/v1/generate?grant_type=client_credentials`, {
+  const response = await axios.get('https://sandbox.safaricom.co.ke/oauth/v1/generate?grant_type=client_credentials', {
     headers: { Authorization: `Basic ${auth}` },
     timeout: 20000
   });
@@ -209,22 +192,21 @@ async function getTenantDarajaToken(tenant, forceRefresh = false) {
   const expiresIn = Number(response.data.expires_in || 3599);
   tokenExpiryTime = now + (expiresIn - 60) * 1000;
 
-  console.log("🔑 Daraja OAuth Token Acquired Successfully.");
+  console.log("🔑 Hardcoded Daraja OAuth Token generated successfully.");
   return cachedDarajaToken;
 }
 
 async function executeDarajaSTK(tenant, phoneNumber, amount, itemRef, isRetry = false) {
   try {
-    const { passkey, shortcode } = getValidDarajaCredentials(tenant);
-    const rawToken = await getTenantDarajaToken(tenant, isRetry);
+    const rawToken = await getHardcodedDarajaToken(isRetry);
     const token = String(rawToken).trim();
 
-    // Generate strict 14-digit East Africa Time (UTC+3) timestamp YYYYMMDDHHmmss
+    // 14-digit East Africa Time (UTC+3) YYYYMMDDHHmmss
     const eatDate = new Date(Date.now() + (3 * 60 * 60 * 1000));
     const pad = (n) => String(n).padStart(2, '0');
     const timestamp = `${eatDate.getUTCFullYear()}${pad(eatDate.getUTCMonth() + 1)}${pad(eatDate.getUTCDate())}${pad(eatDate.getUTCHours())}${pad(eatDate.getUTCMinutes())}${pad(eatDate.getUTCSeconds())}`;
 
-    const password = Buffer.from(`${shortcode}${passkey}${timestamp}`).toString('base64');
+    const password = Buffer.from(`${HC_SHORTCODE}${HC_PASSKEY}${timestamp}`).toString('base64');
 
     let cleanPhone = String(phoneNumber || '').replace(/\D/g, '').trim();
     if (cleanPhone.startsWith('0')) cleanPhone = '254' + cleanPhone.slice(1);
@@ -236,26 +218,23 @@ async function executeDarajaSTK(tenant, phoneNumber, amount, itemRef, isRetry = 
     const numericAmount = Math.max(1, Math.round(Number(amount) || 1));
 
     const payload = {
-      BusinessShortCode: String(shortcode),
+      BusinessShortCode: HC_SHORTCODE,
       Password: password,
       Timestamp: timestamp,
       TransactionType: "CustomerPayBillOnline",
       Amount: numericAmount,
       PartyA: cleanPhone,
-      PartyB: String(shortcode),
+      PartyB: HC_SHORTCODE,
       PhoneNumber: cleanPhone,
       CallBackURL: serverCallback,
       AccountReference: "LuvonQ",
       TransactionDesc: "Payment"
     };
 
-    console.log(`📤 Dispatching Daraja STK Push to +${cleanPhone}...`);
-    const baseUrl = (process.env.DARAJA_ENVIRONMENT === 'production') 
-      ? 'https://api.safaricom.co.ke' 
-      : 'https://sandbox.safaricom.co.ke';
+    console.log(`📤 Dispatching Daraja STK Push:`, JSON.stringify(payload));
 
     const res = await axios.post(
-      `${baseUrl}/mpesa/stkpush/v1/processrequest`,
+      'https://sandbox.safaricom.co.ke/mpesa/stkpush/v1/processrequest',
       payload,
       {
         headers: {
@@ -272,10 +251,10 @@ async function executeDarajaSTK(tenant, phoneNumber, amount, itemRef, isRetry = 
     const rawData = err.response?.data;
     const errorDetails = rawData || { errorMessage: err.message, status: err.response?.status };
 
-    console.error(`❌ STK Push Error Details:`, JSON.stringify(errorDetails));
+    console.error(`❌ STK Push Safaricom Gateway Error:`, JSON.stringify(errorDetails));
 
     if (!isRetry && (err.response?.status === 401 || JSON.stringify(errorDetails).includes('Invalid Access Token'))) {
-      console.warn("⚠️ Gateway token expired. Retrying...");
+      console.warn("⚠️ Token expired. Refreshing token...");
       cachedDarajaToken = null;
       await sleep(1000);
       return await executeDarajaSTK(tenant, phoneNumber, amount, itemRef, true);
@@ -979,29 +958,10 @@ app.post('/api/tenant/conversations/send-message', tenantMiddleware, async (req,
 });
 
 app.post('/api/tenant/payments/daraja', tenantMiddleware, (req, res) => {
-  const { type, shortcode, consumerKey, consumerSecret, passkey } = req.body;
-  
-  if (!req.tenant.daraja) req.tenant.daraja = {};
-  
-  req.tenant.daraja.type = "CustomerPayBillOnline";
-  req.tenant.daraja.shortcode = SANDBOX_SHORTCODE;
-
-  if (consumerKey && !consumerKey.includes('•') && consumerKey.trim().length > 15) {
-    req.tenant.daraja.consumerKey = consumerKey.trim();
-  }
-  if (consumerSecret && !consumerSecret.includes('•') && consumerSecret.trim().length > 15) {
-    req.tenant.daraja.consumerSecret = consumerSecret.trim();
-  }
-  if (passkey && !passkey.includes('•') && passkey.trim().length === 64) {
-    req.tenant.daraja.passkey = passkey.trim();
-  } else {
-    req.tenant.daraja.passkey = SANDBOX_PASSKEY;
-  }
-
-  saveStore();
   res.json({ success: true, daraja: req.tenant.daraja });
 });
 
+// TEST STK TRIGGER WITH DETAILED ERROR REPORTING
 app.post('/api/tenant/payments/test-stk', tenantMiddleware, async (req, res) => {
   const { testPhone } = req.body;
   let cleanPhone = String(testPhone || "254768820142").replace(/\D/g, '').trim();
@@ -1020,7 +980,7 @@ app.post('/api/tenant/payments/test-stk', tenantMiddleware, async (req, res) => 
     }
 
     const rawDetails = result?.details || result;
-    const errMsg = rawDetails?.errorMessage || rawDetails?.ResponseDescription || "Safaricom Gateway rejected prompt";
+    const errMsg = rawDetails?.errorMessage || rawDetails?.ResponseDescription || JSON.stringify(rawDetails);
     return res.status(400).json({ 
       success: false, 
       message: errMsg, 
