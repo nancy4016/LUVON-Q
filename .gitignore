@@ -1,3 +1,5 @@
 node_modules/
 .env
 multi_tenant_store.json
+.vercel
+.env*
