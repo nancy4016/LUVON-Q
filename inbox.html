@@ -36,11 +36,11 @@
     }
   </script>
 
-  <!-- Google Fonts & Lucide Icons -->
+  <!-- Google Fonts & Reliable Lucide CDN -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Playfair+Display:ital,wght@0,600;0,700;1,400&display=swap" rel="stylesheet">
-  <script src="https://unpkg.com/lucide@latest"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/lucide/0.344.0/umd/lucide.min.js"></script>
   
   <style>
     /* Custom Scrollbar for Luxury Aesthetic */
@@ -377,11 +377,13 @@
     </div>
   </div>
 
-  <!-- In-Line Controller Script with Modern Dialogs -->
+  <!-- Shared API Bridge & In-Line Controller -->
+  <script src="api.js"></script>
   <script>
     let conversations = [];
     let activeConvId = "254768820142";
     let isSending = false;
+    let lastMessageCount = 0;
 
     const BASE_ORIGIN = (window.location.origin && window.location.origin.includes('http'))
       ? window.location.origin
@@ -483,7 +485,13 @@
       }
 
       renderThreads();
-      renderChatStream();
+
+      const activeConv = conversations.find(c => c.id === activeConvId);
+      const currentCount = activeConv ? activeConv.messages.length : 0;
+      if (currentCount !== lastMessageCount) {
+        lastMessageCount = currentCount;
+        renderChatStream();
+      }
     }
 
     function renderThreads() {
@@ -564,10 +572,14 @@
 
         stream.scrollTop = stream.scrollHeight;
       }
+
+      if (window.lucide) lucide.createIcons();
     }
 
     function selectConversation(id) {
       activeConvId = id;
+      const activeConv = conversations.find(c => c.id === activeConvId);
+      lastMessageCount = activeConv ? activeConv.messages.length : 0;
       renderThreads();
       renderChatStream();
     }
@@ -620,11 +632,12 @@
         text: messageText,
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
       });
+      lastMessageCount = conv.messages.length;
       renderChatStream();
       renderThreads();
 
       try {
-        await fetch(`${BACKEND_URL}/conversations/send-message`, {
+        const res = await fetch(`${BACKEND_URL}/conversations/send-message`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -635,6 +648,12 @@
             text: messageText
           })
         });
+        const data = await res.json();
+        if (!res.ok) {
+          showToast(`Outbound Notice: ${data.error || 'Failed'}`, 'error');
+        } else {
+          showToast(`Message delivered to +${conv.customerId}`, 'success');
+        }
       } catch (err) {
         console.error("Outbound send notice:", err.message);
       } finally {
@@ -642,7 +661,6 @@
       }
     }
 
-    // Modal Control Functions (Replacing native alert/prompt)
     function openTestInquiryModal() {
       document.getElementById("testInquiryModal")?.classList.remove("hidden");
       if (window.lucide) lucide.createIcons();
@@ -672,12 +690,12 @@
         activeConvId = conv.id;
       }
 
-      // Add user message to UI immediately
       conv.messages.push({
         role: "user",
         text: text,
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
       });
+      lastMessageCount = conv.messages.length;
       renderChatStream();
       renderThreads();
 
@@ -773,7 +791,6 @@
       }
     }
 
-    // Expose directly to window
     window.openTestInquiryModal = openTestInquiryModal;
     window.closeTestInquiryModal = closeTestInquiryModal;
     window.setSimText = setSimText;
@@ -794,6 +811,9 @@
       setInterval(() => {
         if (!isSending) fetchLiveConversations();
       }, 4000);
+      setTimeout(() => {
+        if (window.lucide) lucide.createIcons();
+      }, 600);
     });
   </script>
 </body>
