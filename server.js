@@ -67,10 +67,10 @@ function initializeStore() {
           instagramPageId: null,
           daraja: {
             type: "CustomerPayBillOnline",
-            shortcode: process.env.DARAJA_BUSINESS_SHORTCODE || "174379",
-            passkey: process.env.DARAJA_PASSKEY || DEFAULT_SANDBOX_PASSKEY,
-            consumerKey: String(process.env.DARAJA_CONSUMER_KEY || "5U68vQHgUCU7HpYSQZXegh2pFmzG1uBPTMNFcw5obW96GPVn").trim(),
-            consumerSecret: String(process.env.DARAJA_CONSUMER_SECRET || "2qwVKez82Raza13QyV9Ti8GqNLWKgGPWrJVpr1eot3OGNWluJAO1QaAjr1WaDsII").trim()
+            shortcode: "174379",
+            passkey: DEFAULT_SANDBOX_PASSKEY,
+            consumerKey: "5U68vQHgUCU7HpYSQZXegh2pFmzG1uBPTMNFcw5obW96GPVn",
+            consumerSecret: "2qwVKez82Raza13QyV9Ti8GqNLWKgGPWrJVpr1eot3OGNWluJAO1QaAjr1WaDsII"
           },
           catalog: [
             {
@@ -123,20 +123,17 @@ function initializeStore() {
     };
   }
 
+  // Ensure flagship tenant has verified credentials
   if (loadedStore.tenants && loadedStore.tenants["luvon_q_flagship"]) {
     const flagship = loadedStore.tenants["luvon_q_flagship"];
     flagship.whatsappPhoneId = process.env.WHATSAPP_PHONE_NUMBER_ID || flagship.whatsappPhoneId || "1279716021891578";
-
-    if (!flagship.elevenLabsVoiceId || flagship.elevenLabsVoiceId === "JBFqnCBsd6RMkjVDRZzb") {
-      flagship.elevenLabsVoiceId = process.env.ELEVENLABS_VOICE_ID || DEFAULT_FEMALE_VOICE_ID;
-    }
-
+    flagship.elevenLabsVoiceId = process.env.ELEVENLABS_VOICE_ID || DEFAULT_FEMALE_VOICE_ID;
     flagship.daraja = {
       type: "CustomerPayBillOnline",
-      shortcode: process.env.DARAJA_BUSINESS_SHORTCODE || "174379",
-      passkey: process.env.DARAJA_PASSKEY || DEFAULT_SANDBOX_PASSKEY,
-      consumerKey: String(process.env.DARAJA_CONSUMER_KEY || "5U68vQHgUCU7HpYSQZXegh2pFmzG1uBPTMNFcw5obW96GPVn").trim(),
-      consumerSecret: String(process.env.DARAJA_CONSUMER_SECRET || "2qwVKez82Raza13QyV9Ti8GqNLWKgGPWrJVpr1eot3OGNWluJAO1QaAjr1WaDsII").trim()
+      shortcode: "174379",
+      passkey: DEFAULT_SANDBOX_PASSKEY,
+      consumerKey: "5U68vQHgUCU7HpYSQZXegh2pFmzG1uBPTMNFcw5obW96GPVn",
+      consumerSecret: "2qwVKez82Raza13QyV9Ti8GqNLWKgGPWrJVpr1eot3OGNWluJAO1QaAjr1WaDsII"
     };
   }
 
@@ -165,7 +162,7 @@ function resolveTenant(channelId) {
 }
 
 // ==========================================
-// 2. DARAJA TOKEN CACHE & RESILIENT STK PUSH
+// 2. DARAJA AUTH & ROBUST STK PUSH
 // ==========================================
 let cachedDarajaToken = null;
 let tokenExpiryTime = 0;
@@ -173,12 +170,14 @@ let tokenExpiryTime = 0;
 function getValidDarajaCredentials(tenant) {
   let key = (process.env.DARAJA_CONSUMER_KEY || tenant?.daraja?.consumerKey || "5U68vQHgUCU7HpYSQZXegh2pFmzG1uBPTMNFcw5obW96GPVn").trim();
   let secret = (process.env.DARAJA_CONSUMER_SECRET || tenant?.daraja?.consumerSecret || "2qwVKez82Raza13QyV9Ti8GqNLWKgGPWrJVpr1eot3OGNWluJAO1QaAjr1WaDsII").trim();
+  let passkey = (process.env.DARAJA_PASSKEY || tenant?.daraja?.passkey || DEFAULT_SANDBOX_PASSKEY).trim();
+  let shortcode = (process.env.DARAJA_BUSINESS_SHORTCODE || tenant?.daraja?.shortcode || "174379").trim();
 
-  if (!key || key.includes('•')) key = "5U68vQHgUCU7HpYSQZXegh2pFmzG1uBPTMNFcw5obW96GPVn";
-  if (!secret || secret.includes('•')) secret = "2qwVKez82Raza13QyV9Ti8GqNLWKgGPWrJVpr1eot3OGNWluJAO1QaAjr1WaDsII";
-
-  const passkey = process.env.DARAJA_PASSKEY || tenant?.daraja?.passkey || DEFAULT_SANDBOX_PASSKEY;
-  const shortcode = process.env.DARAJA_BUSINESS_SHORTCODE || tenant?.daraja?.shortcode || "174379";
+  // Strip placeholder or corrupted bullet strings
+  if (!key || key.includes('•') || key.length < 10) key = "5U68vQHgUCU7HpYSQZXegh2pFmzG1uBPTMNFcw5obW96GPVn";
+  if (!secret || secret.includes('•') || secret.length < 10) secret = "2qwVKez82Raza13QyV9Ti8GqNLWKgGPWrJVpr1eot3OGNWluJAO1QaAjr1WaDsII";
+  if (!passkey || passkey.includes('•') || passkey.length < 40) passkey = DEFAULT_SANDBOX_PASSKEY;
+  if (!shortcode || shortcode.includes('•')) shortcode = "174379";
 
   return { key, secret, passkey, shortcode };
 }
@@ -222,7 +221,7 @@ async function executeDarajaSTK(tenant, phoneNumber, amount, itemRef, isRetry = 
 
     const password = Buffer.from(`${shortcode}${passkey}${timestamp}`).toString('base64');
 
-    // Format phone to 2547XXXXXXXX or 2541XXXXXXXX
+    // Clean phone number to 2547XXXXXXXX or 2541XXXXXXXX
     let cleanPhone = String(phoneNumber || '').replace(/\D/g, '').trim();
     if (cleanPhone.startsWith('0')) cleanPhone = '254' + cleanPhone.slice(1);
     if (!cleanPhone.startsWith('254')) cleanPhone = '254' + cleanPhone;
@@ -233,22 +232,22 @@ async function executeDarajaSTK(tenant, phoneNumber, amount, itemRef, isRetry = 
 
     const numericAmount = Math.max(1, Math.round(Number(amount) || 1));
 
-    // Strict Daraja Sandbox STK Push payload
+    // PayBill Online schema compliant with Safaricom Daraja Sandbox
     const payload = {
-      BusinessShortCode: String(shortcode).trim(),
+      BusinessShortCode: String(shortcode),
       Password: password,
       Timestamp: timestamp,
       TransactionType: "CustomerPayBillOnline",
       Amount: numericAmount,
       PartyA: cleanPhone,
-      PartyB: String(shortcode).trim(),
+      PartyB: String(shortcode),
       PhoneNumber: cleanPhone,
       CallBackURL: serverCallback,
       AccountReference: "LuvonQ",
       TransactionDesc: "Payment"
     };
 
-    console.log(`📤 Dispatching Daraja STK Push to +${cleanPhone}:`, JSON.stringify(payload));
+    console.log(`📤 Dispatching Daraja STK Push to +${cleanPhone}...`);
     const baseUrl = (process.env.DARAJA_ENVIRONMENT === 'production') 
       ? 'https://api.safaricom.co.ke' 
       : 'https://sandbox.safaricom.co.ke';
@@ -978,19 +977,24 @@ app.post('/api/tenant/conversations/send-message', tenantMiddleware, async (req,
 });
 
 app.post('/api/tenant/payments/daraja', tenantMiddleware, (req, res) => {
-  const { type, shortcode, consumerKey, consumerSecret } = req.body;
+  const { type, shortcode, consumerKey, consumerSecret, passkey } = req.body;
   
   if (!req.tenant.daraja) req.tenant.daraja = {};
   
   req.tenant.daraja.type = "CustomerPayBillOnline";
-  req.tenant.daraja.shortcode = process.env.DARAJA_BUSINESS_SHORTCODE || "174379";
-  req.tenant.daraja.passkey = process.env.DARAJA_PASSKEY || DEFAULT_SANDBOX_PASSKEY;
+  req.tenant.daraja.shortcode = "174379";
 
-  if (consumerKey && !consumerKey.includes('•')) {
+  // Only update if genuine non-truncated, non-bullet string passed
+  if (consumerKey && !consumerKey.includes('•') && consumerKey.trim().length > 15) {
     req.tenant.daraja.consumerKey = consumerKey.trim();
   }
-  if (consumerSecret && !consumerSecret.includes('•')) {
+  if (consumerSecret && !consumerSecret.includes('•') && consumerSecret.trim().length > 15) {
     req.tenant.daraja.consumerSecret = consumerSecret.trim();
+  }
+  if (passkey && !passkey.includes('•') && passkey.trim().length >= 40) {
+    req.tenant.daraja.passkey = passkey.trim();
+  } else {
+    req.tenant.daraja.passkey = DEFAULT_SANDBOX_PASSKEY;
   }
 
   saveStore();
@@ -1063,7 +1067,7 @@ app.get('/', (req, res) => {
 });
 
 // ==========================================
-// 10. CRON SCHEDULER (Only runs if not on serverless)
+// 10. CRON SCHEDULER
 // ==========================================
 if (!process.env.VERCEL) {
   cron.schedule('0 * * * *', async () => {

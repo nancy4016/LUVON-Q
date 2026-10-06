@@ -37,15 +37,9 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Playfair+Display:ital,wght@0,600;0,700;1,400&display=swap" rel="stylesheet">
   
-  <!-- Rock-solid Lucide CDN with Instant Fallback -->
+  <!-- Official Verified Lucide Bundle (Clean, non-parser-blocking) -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/lucide/0.344.0/umd/lucide.min.js"></script>
-  <script>
-    if (!window.lucide) {
-      document.write('<script src="https://cdn.jsdelivr.net/npm/lucide@0.344.0/dist/umd/lucide.min.js"><\/script>');
-    }
-  </script>
 
-  <!-- Inline SVG Icon Sizing Safeguard -->
   <style>
     svg.lucide {
       display: inline-block !important;
@@ -155,7 +149,7 @@
             <div>
               <label class="block text-xs font-semibold text-brand-900 mb-1.5">Consumer Key</label>
               <div class="relative">
-                <input type="password" id="daraja-key" placeholder="Enter Consumer Key or leave for .env default" class="w-full pl-4 pr-10 py-2.5 text-xs bg-brand-50 border border-brand-200 rounded-xl focus:outline-none focus:border-brand-600 font-mono" />
+                <input type="text" id="daraja-key" value="5U68vQHgUCU7HpYSQZXegh2pFmzG1uBPTMNFcw5obW96GPVn" class="w-full pl-4 pr-10 py-2.5 text-xs bg-brand-50 border border-brand-200 rounded-xl focus:outline-none focus:border-brand-600 font-mono" />
                 <button type="button" onclick="toggleFieldVisibility('daraja-key', this)" class="absolute right-3 top-2.5 text-slate-400 hover:text-slate-600 focus:outline-none cursor-pointer">
                   <i data-lucide="eye" class="w-4 h-4"></i>
                 </button>
@@ -165,7 +159,7 @@
             <div>
               <label class="block text-xs font-semibold text-brand-900 mb-1.5">Consumer Secret</label>
               <div class="relative">
-                <input type="password" id="daraja-secret" placeholder="Enter Consumer Secret or leave for .env default" class="w-full pl-4 pr-10 py-2.5 text-xs bg-brand-50 border border-brand-200 rounded-xl focus:outline-none focus:border-brand-600 font-mono" />
+                <input type="text" id="daraja-secret" value="2qwVKez82Raza13QyV9Ti8GqNLWKgGPWrJVpr1eot3OGNWluJAO1QaAjr1WaDsII" class="w-full pl-4 pr-10 py-2.5 text-xs bg-brand-50 border border-brand-200 rounded-xl focus:outline-none focus:border-brand-600 font-mono" />
                 <button type="button" onclick="toggleFieldVisibility('daraja-secret', this)" class="absolute right-3 top-2.5 text-slate-400 hover:text-slate-600 focus:outline-none cursor-pointer">
                   <i data-lucide="eye" class="w-4 h-4"></i>
                 </button>
@@ -175,7 +169,7 @@
             <div>
               <label class="block text-xs font-semibold text-brand-900 mb-1.5">Online Passkey</label>
               <div class="relative">
-                <input type="password" id="daraja-passkey" value="bfb279f9aa9bdbcf158e97dd71a467cd2e0c893059b10f78e6b72ada1ed2c919" class="w-full pl-4 pr-10 py-2.5 text-xs bg-brand-50 border border-brand-200 rounded-xl focus:outline-none focus:border-brand-600 font-mono" />
+                <input type="text" id="daraja-passkey" value="bfb279f9aa9bdbcf158e97dd71a467cd2e0c893059b10f78e6b72ada1ed2c919" class="w-full pl-4 pr-10 py-2.5 text-xs bg-brand-50 border border-brand-200 rounded-xl focus:outline-none focus:border-brand-600 font-mono" />
                 <button type="button" onclick="toggleFieldVisibility('daraja-passkey', this)" class="absolute right-3 top-2.5 text-slate-400 hover:text-slate-600 focus:outline-none cursor-pointer">
                   <i data-lucide="eye" class="w-4 h-4"></i>
                 </button>
@@ -245,16 +239,11 @@
       backdrop.classList.toggle("hidden");
     }
 
-    // Force icon execution immediately
-    function renderAllIcons() {
+    document.addEventListener("DOMContentLoaded", () => {
       if (window.lucide && typeof window.lucide.createIcons === 'function') {
         window.lucide.createIcons();
       }
-    }
-
-    document.addEventListener("DOMContentLoaded", renderAllIcons);
-    window.addEventListener("load", renderAllIcons);
-    setTimeout(renderAllIcons, 500);
+    });
   </script>
 
   <script src="api.js"></script>
