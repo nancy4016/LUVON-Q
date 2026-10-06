@@ -6,9 +6,9 @@ const axios = require('axios');
 const FormData = require('form-data');
 const cron = require('node-cron');
 
-const hfApiKey = (process.env.HUGGINGFACE_API_KEY || process.env.HF_TOKEN || "").trim();
+const geminiApiKey = (process.env.GEMINI_API_KEY || "").trim();
 console.log("🔑 Loaded WhatsApp Token Prefix:", process.env.WHATSAPP_ACCESS_TOKEN ? process.env.WHATSAPP_ACCESS_TOKEN.substring(0, 14) + "..." : "❌ NO TOKEN LOADED");
-console.log("🦙 Loaded Hugging Face Meta Llama Key Prefix:", hfApiKey ? hfApiKey.substring(0, 10) + "..." : "❌ NO HF KEY LOADED");
+console.log("✨ Loaded Gemini Key Prefix:", geminiApiKey ? geminiApiKey.substring(0, 10) + "..." : "❌ NO GEMINI KEY LOADED");
 
 const app = express();
 app.use(express.json());
@@ -217,7 +217,7 @@ async function executeDarajaSTK(tenant, phoneNumber, amount, itemRef, isRetry = 
 
     const eatDate = new Date(Date.now() + (3 * 60 * 60 * 1000));
     const pad = (n) => String(n).padStart(2, '0');
-    const timestamp = `${eatDate.getUTCFullYear()}${pad(eatDate.getUTCMonth() + 1)}${pad(eatDate.getUTCDate())}${pad(eatDate.getUTCHours())}${pad(eatDate.getUTCHminutes ? eatDate.getUTCHminutes() : eatDate.getUTCMinutes())}${pad(eatDate.getUTCSeconds())}`;
+    const timestamp = `${eatDate.getUTCFullYear()}${pad(eatDate.getUTCMonth() + 1)}${pad(eatDate.getUTCDate())}${pad(eatDate.getUTCHours())}${pad(eatDate.getUTCMinutes())}${pad(eatDate.getUTCSeconds())}`;
 
     const password = Buffer.from(`${shortcode}${passkey}${timestamp}`).toString('base64');
 
@@ -286,14 +286,14 @@ async function triggerTenantSTKPush(tenant, phoneNumber, amount, itemRef) {
 }
 
 // ==========================================
-// 3. META LLAMA 3.3 70B CONCIERGE (HUGGING FACE)
+// 3. GOOGLE GEMINI SALES CONCIERGE ENGINE
 // ==========================================
 function buildTenantSystemInstruction(tenant, profile) {
   return `
 You are the dedicated female AI sales concierge for **${tenant.businessName}**${
     tenant.brandSignature ? ` (Brand Signature: *${tenant.brandSignature}*)` : ''
   }, an elite ${tenant.industry} house in Nairobi.
-Powered by: Official Meta Llama 3.3 70B Intelligence on Luvon Q Conversational Commerce Engine.
+Powered by: Google Gemini on Luvon Q Conversational Commerce Engine.
 
 Current Customer Stage: ${(profile.stage || 'QUALIFICATION').toUpperCase()}
 Customer Context: ${JSON.stringify(profile)}
@@ -328,63 +328,61 @@ If no action is triggered, output conversational prose.
 }
 
 async function generateLlamaSalesResponse(tenant, profile, userPromptText) {
-  const apiKey = (process.env.HUGGINGFACE_API_KEY || process.env.HF_TOKEN || "").trim();
+  const apiKey = (process.env.GEMINI_API_KEY || "").trim();
   if (!apiKey) {
-    console.warn("⚠️ HUGGINGFACE_API_KEY is not configured in environment.");
+    console.warn("⚠️ GEMINI_API_KEY is not configured in environment.");
     return `Karibu ${tenant.businessName}! We have Air Force 1 White (KSh 2,500) and salon styling services available today. How can I help you book or order?`;
   }
 
-  const messages = [
-    { role: 'system', content: buildTenantSystemInstruction(tenant, profile) }
-  ];
-
+  // Build message history according to Gemini contents schema
+  const contents = [];
   const history = profile.conversationHistory || [];
+
   for (const turn of history.slice(-10)) {
-    messages.push({
-      role: turn.role === 'model' || turn.role === 'assistant' ? 'assistant' : 'user',
-      content: turn.text || ""
+    contents.push({
+      role: turn.role === 'model' || turn.role === 'assistant' ? 'model' : 'user',
+      parts: [{ text: turn.text || "" }]
     });
   }
 
-  messages.push({
+  contents.push({
     role: 'user',
-    content: userPromptText
+    parts: [{ text: userPromptText }]
   });
 
-  const model = 'meta-llama/Llama-3.3-70B-Instruct';
-  const endpoints = [
-    'https://router.huggingface.co/novita/v1/chat/completions',
-    'https://api-inference.huggingface.co/models/meta-llama/Llama-3.3-70B-Instruct/v1/chat/completions'
-  ];
+  const payload = {
+    system_instruction: {
+      parts: [{ text: buildTenantSystemInstruction(tenant, profile) }]
+    },
+    contents: contents,
+    generationConfig: {
+      temperature: 0.7,
+      maxOutputTokens: 600
+    }
+  };
 
-  for (const endpoint of endpoints) {
+  const models = ['gemini-2.5-flash', 'gemini-1.5-flash'];
+
+  for (const model of models) {
     try {
-      console.log(`🦙 Invoking official Meta Llama model: [${model}] via Hugging Face (${endpoint.includes('router') ? 'Router' : 'Direct'})...`);
+      console.log(`✨ Invoking Google Gemini model: [${model}]...`);
       const response = await axios.post(
-        endpoint,
+        `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
+        payload,
         {
-          model: model,
-          messages: messages,
-          temperature: 0.7,
-          max_tokens: 600
-        },
-        {
-          headers: {
-            'Authorization': `Bearer ${apiKey}`,
-            'Content-Type': 'application/json'
-          },
+          headers: { 'Content-Type': 'application/json' },
           timeout: 25000
         }
       );
 
-      const candidateText = response.data?.choices?.[0]?.message?.content;
+      const candidateText = response.data?.candidates?.[0]?.content?.parts?.[0]?.text;
       if (candidateText && candidateText.trim()) {
-        console.log(`✨ Meta Llama [${model}] reply generated: "${candidateText.trim().substring(0, 50)}..."`);
+        console.log(`✨ Gemini [${model}] reply generated: "${candidateText.trim().substring(0, 50)}..."`);
         return candidateText.trim();
       }
     } catch (err) {
-      const errDetail = err.response?.data?.error || err.response?.data || err.message;
-      console.error(`❌ Meta Llama on [${endpoint}] Failed:`, JSON.stringify(errDetail));
+      const errDetail = err.response?.data?.error?.message || err.message;
+      console.error(`❌ Gemini [${model}] Failed:`, errDetail);
     }
   }
 
@@ -583,7 +581,7 @@ async function handleWebhookIncoming(req, res) {
     const requestsVoice = /\b(read|voice|audio|say|listen|loud|driving|record|ongea)\b/i.test(incomingTextRaw);
     const isVoiceInput = (msgType === 'audio' || msgType === 'voice' || requestsVoice);
 
-    console.log(`📩 Processing message from +${fromNumber} via Meta Llama (Type: ${msgType})`);
+    console.log(`📩 Processing message from +${fromNumber} (Type: ${msgType})`);
 
     const { profile } = getOrCreateCustomerSession(tenant, fromNumber, 'whatsapp');
 
@@ -612,7 +610,7 @@ async function handleWebhookIncoming(req, res) {
 
     let loggedUserText = incomingTextRaw || `[Sent ${msgType}]`;
 
-    console.log(`🤖 Generating Meta Llama sales response...`);
+    console.log(`🤖 Generating Gemini sales response...`);
     let responseText = await generateLlamaSalesResponse(tenant, profile, loggedUserText);
 
     if (!responseText) {
