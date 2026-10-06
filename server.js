@@ -26,9 +26,12 @@ app.use((req, res, next) => {
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 const DEFAULT_FEMALE_VOICE_ID = "EXAVITQu4vr4xnSDxMaL";
-const DEFAULT_SANDBOX_PASSKEY = "bfb279f9aa9bdbcf158e97dd71a467cd2e0c893059b10f78e6b72ada1ed2c919";
-const DEFAULT_CONSUMER_KEY = "5U68vQHgUCU7HpYSQZXegh2pFmzG1uBPTMNFcw5obW96GPVn";
-const DEFAULT_CONSUMER_SECRET = "2qwVKez82Raza13QyV9Ti8GqNLWKgGPWrJVpr1eot3OGNWluJAO1QaAjr1WaDsII";
+
+// STRICT SAFARICOM DARAJA SANDBOX CREDENTIALS (64-HEX CHARACTERS)
+const SANDBOX_SHORTCODE = "174379";
+const SANDBOX_PASSKEY = "bfb279f9aa9bdbcf158e97dd71a467cd2e0c893059b10f78e6b72ada1ed2c919";
+const SANDBOX_CONSUMER_KEY = "5U68vQHgUCU7HpYSQZXegh2pFmzG1uBPTMNFcw5obW96GPVn";
+const SANDBOX_CONSUMER_SECRET = "2qwVKez82Raza13QyV9Ti8GqNLWKgGPWrJVpr1eot3OGNWluJAO1QaAjr1WaDsII";
 
 // ==========================================
 // 1. MULTI-TENANT PERSISTENT DATABASE STORE
@@ -69,10 +72,10 @@ function initializeStore() {
           instagramPageId: null,
           daraja: {
             type: "CustomerPayBillOnline",
-            shortcode: "174379",
-            passkey: DEFAULT_SANDBOX_PASSKEY,
-            consumerKey: DEFAULT_CONSUMER_KEY,
-            consumerSecret: DEFAULT_CONSUMER_SECRET
+            shortcode: SANDBOX_SHORTCODE,
+            passkey: SANDBOX_PASSKEY,
+            consumerKey: SANDBOX_CONSUMER_KEY,
+            consumerSecret: SANDBOX_CONSUMER_SECRET
           },
           catalog: [
             {
@@ -125,16 +128,17 @@ function initializeStore() {
     };
   }
 
+  // Force overwrite any corrupted/truncated keys stored in multi_tenant_store.json
   if (loadedStore.tenants && loadedStore.tenants["luvon_q_flagship"]) {
     const flagship = loadedStore.tenants["luvon_q_flagship"];
     flagship.whatsappPhoneId = process.env.WHATSAPP_PHONE_NUMBER_ID || flagship.whatsappPhoneId || "1279716021891578";
     flagship.elevenLabsVoiceId = process.env.ELEVENLABS_VOICE_ID || DEFAULT_FEMALE_VOICE_ID;
     flagship.daraja = {
       type: "CustomerPayBillOnline",
-      shortcode: "174379",
-      passkey: DEFAULT_SANDBOX_PASSKEY,
-      consumerKey: DEFAULT_CONSUMER_KEY,
-      consumerSecret: DEFAULT_CONSUMER_SECRET
+      shortcode: SANDBOX_SHORTCODE,
+      passkey: SANDBOX_PASSKEY,
+      consumerKey: SANDBOX_CONSUMER_KEY,
+      consumerSecret: SANDBOX_CONSUMER_SECRET
     };
   }
 
@@ -169,16 +173,16 @@ let cachedDarajaToken = null;
 let tokenExpiryTime = 0;
 
 function getValidDarajaCredentials(tenant) {
-  let key = (process.env.DARAJA_CONSUMER_KEY || tenant?.daraja?.consumerKey || DEFAULT_CONSUMER_KEY).trim();
-  let secret = (process.env.DARAJA_CONSUMER_SECRET || tenant?.daraja?.consumerSecret || DEFAULT_CONSUMER_SECRET).trim();
-  let passkey = (process.env.DARAJA_PASSKEY || tenant?.daraja?.passkey || DEFAULT_SANDBOX_PASSKEY).trim();
-  let shortcode = (process.env.DARAJA_BUSINESS_SHORTCODE || tenant?.daraja?.shortcode || "174379").trim();
+  let key = (process.env.DARAJA_CONSUMER_KEY || tenant?.daraja?.consumerKey || SANDBOX_CONSUMER_KEY).trim();
+  let secret = (process.env.DARAJA_CONSUMER_SECRET || tenant?.daraja?.consumerSecret || SANDBOX_CONSUMER_SECRET).trim();
+  let passkey = (process.env.DARAJA_PASSKEY || tenant?.daraja?.passkey || SANDBOX_PASSKEY).trim();
+  let shortcode = (process.env.DARAJA_BUSINESS_SHORTCODE || tenant?.daraja?.shortcode || SANDBOX_SHORTCODE).trim();
 
-  // Clean bullet characters, spaces or truncated values
-  if (!key || key.includes('•') || key.length < 15) key = DEFAULT_CONSUMER_KEY;
-  if (!secret || secret.includes('•') || secret.length < 15) secret = DEFAULT_CONSUMER_SECRET;
-  if (!passkey || passkey.includes('•') || passkey.length !== 64) passkey = DEFAULT_SANDBOX_PASSKEY;
-  if (!shortcode || shortcode.includes('•')) shortcode = "174379";
+  // Guard against any bullet placeholder or truncated passkey from old saves
+  if (!key || key.includes('•') || key.length < 15) key = SANDBOX_CONSUMER_KEY;
+  if (!secret || secret.includes('•') || secret.length < 15) secret = SANDBOX_CONSUMER_SECRET;
+  if (!passkey || passkey.includes('•') || passkey.length !== 64) passkey = SANDBOX_PASSKEY;
+  if (!shortcode || shortcode.includes('•')) shortcode = SANDBOX_SHORTCODE;
 
   return { key, secret, passkey, shortcode };
 }
@@ -215,7 +219,7 @@ async function executeDarajaSTK(tenant, phoneNumber, amount, itemRef, isRetry = 
     const rawToken = await getTenantDarajaToken(tenant, isRetry);
     const token = String(rawToken).trim();
 
-    // Accurate 14-digit East Africa Time (UTC+3) timestamp YYYYMMDDHHmmss
+    // Generate strict 14-digit East Africa Time (UTC+3) timestamp YYYYMMDDHHmmss
     const eatDate = new Date(Date.now() + (3 * 60 * 60 * 1000));
     const pad = (n) => String(n).padStart(2, '0');
     const timestamp = `${eatDate.getUTCFullYear()}${pad(eatDate.getUTCMonth() + 1)}${pad(eatDate.getUTCDate())}${pad(eatDate.getUTCHours())}${pad(eatDate.getUTCMinutes())}${pad(eatDate.getUTCSeconds())}`;
@@ -231,7 +235,6 @@ async function executeDarajaSTK(tenant, phoneNumber, amount, itemRef, isRetry = 
     const serverCallback = `${serverBaseUrl}/api/stk-callback`;
     const numericAmount = Math.max(1, Math.round(Number(amount) || 1));
 
-    // Strict PayBill Online schema compliant with Safaricom Daraja Sandbox
     const payload = {
       BusinessShortCode: String(shortcode),
       Password: password,
@@ -246,7 +249,7 @@ async function executeDarajaSTK(tenant, phoneNumber, amount, itemRef, isRetry = 
       TransactionDesc: "Payment"
     };
 
-    console.log(`📤 Dispatching Daraja STK Push to +${cleanPhone}:`, JSON.stringify(payload));
+    console.log(`📤 Dispatching Daraja STK Push to +${cleanPhone}...`);
     const baseUrl = (process.env.DARAJA_ENVIRONMENT === 'production') 
       ? 'https://api.safaricom.co.ke' 
       : 'https://sandbox.safaricom.co.ke';
@@ -981,7 +984,7 @@ app.post('/api/tenant/payments/daraja', tenantMiddleware, (req, res) => {
   if (!req.tenant.daraja) req.tenant.daraja = {};
   
   req.tenant.daraja.type = "CustomerPayBillOnline";
-  req.tenant.daraja.shortcode = "174379";
+  req.tenant.daraja.shortcode = SANDBOX_SHORTCODE;
 
   if (consumerKey && !consumerKey.includes('•') && consumerKey.trim().length > 15) {
     req.tenant.daraja.consumerKey = consumerKey.trim();
@@ -992,7 +995,7 @@ app.post('/api/tenant/payments/daraja', tenantMiddleware, (req, res) => {
   if (passkey && !passkey.includes('•') && passkey.trim().length === 64) {
     req.tenant.daraja.passkey = passkey.trim();
   } else {
-    req.tenant.daraja.passkey = DEFAULT_SANDBOX_PASSKEY;
+    req.tenant.daraja.passkey = SANDBOX_PASSKEY;
   }
 
   saveStore();
