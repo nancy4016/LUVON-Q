@@ -215,13 +215,14 @@ async function executeDarajaSTK(tenant, phoneNumber, amount, itemRef, isRetry = 
     const rawToken = await getTenantDarajaToken(tenant, isRetry);
     const token = String(rawToken).trim();
 
-    // Generate East Africa Time (UTC+3) 14-digit timestamp YYYYMMDDHHmmss
+    // 14-digit East Africa Time (UTC+3) timestamp YYYYMMDDHHmmss
     const eatDate = new Date(Date.now() + (3 * 60 * 60 * 1000));
     const pad = (n) => String(n).padStart(2, '0');
     const timestamp = `${eatDate.getUTCFullYear()}${pad(eatDate.getUTCMonth() + 1)}${pad(eatDate.getUTCDate())}${pad(eatDate.getUTCHours())}${pad(eatDate.getUTCMinutes())}${pad(eatDate.getUTCSeconds())}`;
 
     const password = Buffer.from(`${shortcode}${passkey}${timestamp}`).toString('base64');
 
+    // Format phone to 2547XXXXXXXX or 2541XXXXXXXX
     let cleanPhone = String(phoneNumber || '').replace(/\D/g, '').trim();
     if (cleanPhone.startsWith('0')) cleanPhone = '254' + cleanPhone.slice(1);
     if (!cleanPhone.startsWith('254')) cleanPhone = '254' + cleanPhone;
@@ -230,18 +231,17 @@ async function executeDarajaSTK(tenant, phoneNumber, amount, itemRef, isRetry = 
     const serverBaseUrl = (process.env.SERVER_URL || "https://luvon-engine.onrender.com").replace(/\/$/, "");
     const serverCallback = `${serverBaseUrl}/api/stk-callback`;
 
-    // Integer amount required by Daraja API
     const numericAmount = Math.max(1, Math.round(Number(amount) || 1));
 
-    // Strict Daraja Sandbox payload (PartyB must match BusinessShortCode)
+    // Strict Daraja Sandbox STK Push payload
     const payload = {
-      BusinessShortCode: shortcode,
+      BusinessShortCode: String(shortcode).trim(),
       Password: password,
       Timestamp: timestamp,
       TransactionType: "CustomerPayBillOnline",
       Amount: numericAmount,
       PartyA: cleanPhone,
-      PartyB: shortcode,
+      PartyB: String(shortcode).trim(),
       PhoneNumber: cleanPhone,
       CallBackURL: serverCallback,
       AccountReference: "LuvonQ",
@@ -363,7 +363,6 @@ async function generateGeminiSalesResponse(tenant, profile, userPromptText) {
     }
   };
 
-  // Primary: Gemini 3.8 Flash | Fallback: Gemini 3.5 Flash Lite
   const models = ['gemini-3.8-flash', 'gemini-3.5-flash-lite'];
 
   for (const model of models) {
@@ -605,7 +604,7 @@ async function handleWebhookIncoming(req, res) {
     }
 
     if (profile.isPaused) {
-      console.log(`⏸️️ Chat with ${fromNumber} is paused.`);
+      console.log(`⏸ Chat with ${fromNumber} is paused.`);
       profile.conversationHistory.push({
         role: 'user',
         text: incomingTextRaw || `[${msgType}]`,
@@ -1006,15 +1005,32 @@ app.post('/api/tenant/payments/test-stk', tenantMiddleware, async (req, res) => 
 
   try {
     const result = await triggerTenantSTKPush(req.tenant, cleanPhone, 1, "Test");
+
     if (result && (result.ResponseCode === "0" || result.CheckoutRequestID)) {
-      return res.json({ success: true, message: "STK prompt sent to your phone!", result });
+      return res.json({ 
+        success: true, 
+        message: result.CustomerMessage || "STK prompt sent to your phone! Check handset.", 
+        result 
+      });
     }
 
     const rawDetails = result?.details || result;
     const errMsg = rawDetails?.errorMessage || rawDetails?.ResponseDescription || "Safaricom Gateway rejected prompt";
-    return res.status(400).json({ success: false, message: errMsg, result: rawDetails });
+    return res.status(400).json({ 
+      success: false, 
+      message: errMsg, 
+      errorMessage: errMsg,
+      result: rawDetails 
+    });
   } catch (err) {
-    return res.status(500).json({ success: false, message: err.message });
+    const rawDetails = err.response?.data || { message: err.message };
+    const errMsg = rawDetails?.errorMessage || rawDetails?.ResponseDescription || err.message;
+    return res.status(400).json({ 
+      success: false, 
+      message: errMsg, 
+      errorMessage: errMsg,
+      result: rawDetails 
+    });
   }
 });
 

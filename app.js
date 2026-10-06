@@ -55,10 +55,10 @@ function updateCarousel(index) {
 // ==========================================
 // 2. LIVE BACKEND DATA INTEGRATION
 // ==========================================
-const BASE_ORIGIN = (typeof window !== 'undefined' && window.location.origin && window.location.origin.includes('http'))
+const APP_BASE_ORIGIN = (typeof window !== 'undefined' && window.location.origin && window.location.origin.includes('http'))
   ? window.location.origin
   : 'http://localhost:3000';
-const TENANT_ID = 'luvon_q_flagship';
+const APP_TENANT_ID = 'luvon_q_flagship';
 
 async function loadLiveDashboardData() {
   // 1. Fetch KPI Metrics
@@ -67,8 +67,8 @@ async function loadLiveDashboardData() {
       ? await window.API.getMetrics()
       : (typeof apiCall === 'function')
         ? await apiCall('/metrics')
-        : await (await fetch(`${BASE_ORIGIN}/api/tenant/metrics`, {
-            headers: { 'x-tenant-id': TENANT_ID }
+        : await (await fetch(`${APP_BASE_ORIGIN}/api/tenant/metrics`, {
+            headers: { 'x-tenant-id': APP_TENANT_ID }
           })).json();
 
     const revEl = document.getElementById('totalRevenue') || document.querySelector('[data-metric="revenue"]');
@@ -90,8 +90,8 @@ async function loadLiveDashboardData() {
       ? await window.API.getInventory()
       : (typeof apiCall === 'function')
         ? await apiCall('/inventory')
-        : await (await fetch(`${BASE_ORIGIN}/api/tenant/inventory`, {
-            headers: { 'x-tenant-id': TENANT_ID }
+        : await (await fetch(`${APP_BASE_ORIGIN}/api/tenant/inventory`, {
+            headers: { 'x-tenant-id': APP_TENANT_ID }
           })).json();
 
     renderInventoryTable(inventory);
@@ -130,92 +130,14 @@ function renderInventoryTable(items) {
       </td>
     </tr>
   `).join('');
-}
 
-// ==========================================
-// 3. AUTHENTICATION & SESSION HANDLING
-// ==========================================
-let authMode = 'signin';
-
-function openSignInModal() {
-  const modal = document.getElementById('authModal');
-  if (modal) modal.classList.remove('hidden');
-}
-
-function closeSignInModal() {
-  const modal = document.getElementById('authModal');
-  if (modal) modal.classList.add('hidden');
-}
-
-function switchAuthTab(mode) {
-  authMode = mode;
-  const tabSignIn = document.getElementById('tabSignIn');
-  const tabSignUp = document.getElementById('tabSignUp');
-  const nameField = document.getElementById('nameFieldGroup');
-  const signInOptions = document.getElementById('signInOptions');
-  const title = document.getElementById('authModalTitle');
-  const submitBtn = document.getElementById('authSubmitBtn');
-
-  if (mode === 'signup') {
-    if (tabSignUp) tabSignUp.className = "flex-1 py-2 text-center text-brand-600 border-b-2 border-brand-600 transition-all font-semibold";
-    if (tabSignIn) tabSignIn.className = "flex-1 py-2 text-center text-slate-400 hover:text-slate-600 border-b-2 border-transparent transition-all";
-    if (nameField) nameField.classList.remove('hidden');
-    if (signInOptions) signInOptions.classList.add('hidden');
-    if (title) title.textContent = "Create an Account";
-    if (submitBtn) submitBtn.textContent = "Register & Connect Portal";
-  } else {
-    if (tabSignIn) tabSignIn.className = "flex-1 py-2 text-center text-brand-600 border-b-2 border-brand-600 transition-all font-semibold";
-    if (tabSignUp) tabSignUp.className = "flex-1 py-2 text-center text-slate-400 hover:text-slate-600 border-b-2 border-transparent transition-all";
-    if (nameField) nameField.classList.add('hidden');
-    if (signInOptions) signInOptions.classList.remove('hidden');
-    if (title) title.textContent = "Sign in to Orélune OS";
-    if (submitBtn) submitBtn.textContent = "Authenticate Session";
-  }
-}
-
-function handleCustomerAuth(event) {
-  if (event) event.preventDefault();
-  const emailInput = document.getElementById('email');
-  const nameInput = document.getElementById('fullName');
-  const email = emailInput ? emailInput.value : '';
-  const fullName = nameInput && nameInput.value ? nameInput.value : 'Luvon Q Flagship';
-
-  localStorage.setItem('luvon_authenticated', 'true');
-  localStorage.setItem('luvon_user_email', email);
-  localStorage.setItem('luvon_tenant_name', fullName);
-
-  const tenantNameEl = document.getElementById('tenantName');
-  if (tenantNameEl) tenantNameEl.textContent = fullName;
-
-  updateAuthUI(true);
-  closeSignInModal();
-}
-
-function toggleSignOut() {
-  localStorage.removeItem('luvon_authenticated');
-  localStorage.removeItem('luvon_user_email');
-  localStorage.removeItem('luvon_tenant_name');
-  updateAuthUI(false);
-}
-
-function updateAuthUI(isAuthenticated) {
-  const signInBtn = document.getElementById('portalSignInBtn');
-  const tenantCard = document.getElementById('activeTenantCard');
-
-  if (isAuthenticated) {
-    if (signInBtn) signInBtn.classList.add('hidden');
-    if (tenantCard) tenantCard.classList.remove('hidden');
-    const savedName = localStorage.getItem('luvon_tenant_name');
-    const tenantNameEl = document.getElementById('tenantName');
-    if (savedName && tenantNameEl) tenantNameEl.textContent = savedName;
-  } else {
-    if (signInBtn) signInBtn.classList.remove('hidden');
-    if (tenantCard) tenantCard.classList.add('hidden');
+  if (window.lucide) {
+    lucide.createIcons();
   }
 }
 
 // ==========================================
-// 4. NAVIGATION & MOBILE DRAWER HANDLERS
+// 3. NAVIGATION & MOBILE DRAWER HANDLERS
 // ==========================================
 function toggleMobileMenu() {
   const sidebar = document.getElementById('sidebarNav');
@@ -242,7 +164,7 @@ function highlightActiveRoute() {
 }
 
 // ==========================================
-// 5. GLOBAL INITIALIZATION
+// 4. GLOBAL INITIALIZATION
 // ==========================================
 document.addEventListener("DOMContentLoaded", () => {
   if (window.lucide) lucide.createIcons();
@@ -250,9 +172,6 @@ document.addEventListener("DOMContentLoaded", () => {
   highlightActiveRoute();
   updateCarousel(0);
   loadLiveDashboardData();
-
-  const isLoggedIn = localStorage.getItem('luvon_authenticated') === 'true';
-  updateAuthUI(isLoggedIn);
 
   // Carousel auto-advance
   setInterval(() => {
@@ -270,4 +189,8 @@ document.addEventListener("DOMContentLoaded", () => {
     const nextIndex = (currentSlideIndex + 1) % slides.length;
     updateCarousel(nextIndex);
   });
+
+  setTimeout(() => {
+    if (window.lucide) lucide.createIcons();
+  }, 400);
 });

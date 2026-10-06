@@ -33,11 +33,11 @@
     }
   </script>
 
-  <!-- Google Fonts & Lucide Icons -->
+  <!-- Google Fonts & Reliable Lucide CDN -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Playfair+Display:ital,wght@0,600;0,700;1,400&display=swap" rel="stylesheet">
-  <script src="https://unpkg.com/lucide@latest"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/lucide/0.344.0/umd/lucide.min.js"></script>
   
   <!-- External Custom Stylesheet -->
   <link rel="stylesheet" href="styles.css" />
@@ -47,7 +47,7 @@
   <!-- Mobile Top Navigation Header -->
   <header class="md:hidden bg-white/90 backdrop-blur-md border-b border-slate-200 p-4 flex items-center justify-between sticky top-0 z-30 w-full">
     <img src="Luvon q logo.png" alt="Luvon Q Logo" class="h-10 w-auto object-contain" />
-    <button type="button" onclick="toggleMobileMenu()" class="p-2 text-slate-700 hover:text-brand-600 focus:outline-none">
+    <button type="button" onclick="toggleMobileMenu()" class="p-2 text-slate-700 hover:text-brand-600 focus:outline-none cursor-pointer">
       <i data-lucide="menu" class="w-6 h-6"></i>
     </button>
   </header>
@@ -61,7 +61,7 @@
       <!-- Sidebar Header / Logo -->
       <div class="flex items-center justify-between">
         <img src="Luvon q logo.png" alt="Luvon Q Logo" class="h-12 w-auto object-contain" />
-        <button type="button" onclick="toggleMobileMenu()" class="md:hidden text-slate-400 hover:text-slate-600 p-1">
+        <button type="button" onclick="toggleMobileMenu()" class="md:hidden text-slate-400 hover:text-slate-600 p-1 cursor-pointer">
           <i data-lucide="x" class="w-6 h-6"></i>
         </button>
       </div>
@@ -88,19 +88,19 @@
 
     <!-- Bottom Auth Access -->
     <div class="pt-6 border-t border-brand-200/60">
-      <button id="portalSignInBtn" onclick="openSignInModal()" class="w-full p-3 bg-brand-600 text-white rounded-xl flex items-center justify-center gap-2 font-medium text-sm shadow-md hover:bg-brand-700 transition-all">
+      <button id="portalSignInBtn" onclick="openSignInModal()" class="w-full p-3 bg-brand-600 text-white rounded-xl flex items-center justify-center gap-2 font-medium text-sm shadow-md hover:bg-brand-700 transition-all cursor-pointer">
         <i data-lucide="log-in" class="w-4 h-4"></i>
         <span>Sign In to Portal</span>
       </button>
       <div id="activeTenantCard" class="hidden p-3 bg-brand-50 rounded-xl border border-brand-200 flex items-center justify-between">
         <div class="flex items-center gap-3 overflow-hidden">
-          <div class="w-8 h-8 rounded-lg bg-brand-600 text-white flex items-center justify-center font-bold text-xs flex-shrink-0">NK</div>
+          <div class="w-8 h-8 rounded-lg bg-brand-600 text-white flex items-center justify-center font-bold text-xs flex-shrink-0">LQ</div>
           <div class="overflow-hidden">
-            <p class="text-xs font-semibold text-brand-900 truncate" id="tenantName">Nairobi Kicks Studio</p>
-            <span class="inline-block px-1.5 py-0.5 text-[10px] font-semibold text-emerald-700 bg-emerald-100 rounded">Pro Tier</span>
+            <p class="text-xs font-semibold text-brand-900 truncate" id="tenantName">Luvon Q Flagship</p>
+            <span class="inline-block px-1.5 py-0.5 text-[10px] font-semibold text-emerald-700 bg-emerald-100 rounded">Verified Provider</span>
           </div>
         </div>
-        <button onclick="toggleSignOut()" class="text-slate-400 hover:text-rose-600 p-1">
+        <button onclick="toggleSignOut()" class="text-slate-400 hover:text-rose-600 p-1 cursor-pointer">
           <i data-lucide="log-out" class="w-3.5 h-3.5"></i>
         </button>
       </div>
@@ -150,7 +150,7 @@
               <label class="block text-xs font-semibold text-brand-900 mb-1.5">Consumer Key</label>
               <div class="relative">
                 <input type="password" id="daraja-key" placeholder="Enter Consumer Key or leave for .env default" class="w-full pl-4 pr-10 py-2.5 text-xs bg-brand-50 border border-brand-200 rounded-xl focus:outline-none focus:border-brand-600 font-mono" />
-                <button type="button" onclick="toggleFieldVisibility('daraja-key', this)" class="absolute right-3 top-2.5 text-slate-400 hover:text-slate-600 focus:outline-none">
+                <button type="button" onclick="toggleFieldVisibility('daraja-key', this)" class="absolute right-3 top-2.5 text-slate-400 hover:text-slate-600 focus:outline-none cursor-pointer">
                   <i data-lucide="eye" class="w-4 h-4"></i>
                 </button>
               </div>
@@ -160,7 +160,7 @@
               <label class="block text-xs font-semibold text-brand-900 mb-1.5">Consumer Secret</label>
               <div class="relative">
                 <input type="password" id="daraja-secret" placeholder="Enter Consumer Secret or leave for .env default" class="w-full pl-4 pr-10 py-2.5 text-xs bg-brand-50 border border-brand-200 rounded-xl focus:outline-none focus:border-brand-600 font-mono" />
-                <button type="button" onclick="toggleFieldVisibility('daraja-secret', this)" class="absolute right-3 top-2.5 text-slate-400 hover:text-slate-600 focus:outline-none">
+                <button type="button" onclick="toggleFieldVisibility('daraja-secret', this)" class="absolute right-3 top-2.5 text-slate-400 hover:text-slate-600 focus:outline-none cursor-pointer">
                   <i data-lucide="eye" class="w-4 h-4"></i>
                 </button>
               </div>
@@ -169,8 +169,8 @@
             <div>
               <label class="block text-xs font-semibold text-brand-900 mb-1.5">Online Passkey</label>
               <div class="relative">
-                <input type="password" id="daraja-passkey" value="bfb279f9aa9bdbaca158e97dd71a467cd2e0c893059b10f78e6b72ada1ed2c919" class="w-full pl-4 pr-10 py-2.5 text-xs bg-brand-50 border border-brand-200 rounded-xl focus:outline-none focus:border-brand-600 font-mono" />
-                <button type="button" onclick="toggleFieldVisibility('daraja-passkey', this)" class="absolute right-3 top-2.5 text-slate-400 hover:text-slate-600 focus:outline-none">
+                <input type="password" id="daraja-passkey" value="bfb279f9aa9bdbcf158e97dd71a467cd2e0c893059b10f78e6b72ada1ed2c919" class="w-full pl-4 pr-10 py-2.5 text-xs bg-brand-50 border border-brand-200 rounded-xl focus:outline-none focus:border-brand-600 font-mono" />
+                <button type="button" onclick="toggleFieldVisibility('daraja-passkey', this)" class="absolute right-3 top-2.5 text-slate-400 hover:text-slate-600 focus:outline-none cursor-pointer">
                   <i data-lucide="eye" class="w-4 h-4"></i>
                 </button>
               </div>
@@ -237,10 +237,10 @@
       </div>
 
       <div class="flex border-b border-slate-100 mb-5 text-xs font-semibold">
-        <button id="tabSignIn" type="button" onclick="switchAuthTab('signin')" class="flex-1 py-2 text-center text-brand-600 border-b-2 border-brand-600 transition-all">
+        <button id="tabSignIn" type="button" onclick="switchAuthTab('signin')" class="flex-1 py-2 text-center text-brand-600 border-b-2 border-brand-600 transition-all cursor-pointer">
           Sign In
         </button>
-        <button id="tabSignUp" type="button" onclick="switchAuthTab('signup')" class="flex-1 py-2 text-center text-slate-400 hover:text-slate-600 border-b-2 border-transparent transition-all">
+        <button id="tabSignUp" type="button" onclick="switchAuthTab('signup')" class="flex-1 py-2 text-center text-slate-400 hover:text-slate-600 border-b-2 border-transparent transition-all cursor-pointer">
           Create Account
         </button>
       </div>
@@ -248,7 +248,7 @@
       <form id="loginForm" onsubmit="handleCustomerAuth(event)" class="space-y-3.5">
         <div id="nameFieldGroup" class="hidden">
           <label for="fullName" class="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1">Full Name / Business Name</label>
-          <input type="text" id="fullName" placeholder="Nairobi Kicks Studio" class="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-brand-600/20 focus:border-brand-600 transition-all" />
+          <input type="text" id="fullName" placeholder="Luvon Q Flagship" class="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-brand-600/20 focus:border-brand-600 transition-all" />
         </div>
 
         <div>
@@ -285,6 +285,29 @@
       btn.innerHTML = `<i data-lucide="${isPassword ? 'eye-off' : 'eye'}" class="w-4 h-4"></i>`;
       if (window.lucide) lucide.createIcons();
     }
+
+    function toggleMobileMenu() {
+      const nav = document.getElementById("sidebarNav");
+      const backdrop = document.getElementById("sidebarBackdrop");
+      if (!nav || !backdrop) return;
+      const isClosed = nav.classList.contains("-translate-x-full");
+      if (isClosed) {
+        nav.classList.remove("-translate-x-full");
+        backdrop.classList.remove("hidden");
+      } else {
+        nav.classList.add("-translate-x-full");
+        backdrop.classList.add("hidden");
+      }
+    }
+
+    document.addEventListener("DOMContentLoaded", () => {
+      if (window.lucide) {
+        lucide.createIcons();
+      }
+      setTimeout(() => {
+        if (window.lucide) lucide.createIcons();
+      }, 500);
+    });
   </script>
 
   <!-- Shared API Bridge & Page Script -->
