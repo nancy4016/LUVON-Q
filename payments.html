@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>LUVON Q ORÉLUNE | Daraja M-Pesa Terminal</title>
+  <title>LUVON Q | Daraja M-Pesa Terminal</title>
   
   <!-- Tailwind CSS via CDN -->
   <script src="https://cdn.tailwindcss.com"></script>
@@ -37,13 +37,20 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Playfair+Display:ital,wght@0,600;0,700;1,400&display=swap" rel="stylesheet">
   
-  <!-- Official Verified Lucide Bundle (Clean, non-parser-blocking) -->
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/lucide/0.344.0/umd/lucide.min.js"></script>
+  <!-- Verified Lucide CDN (Direct unpkg distribution) -->
+  <script src="https://unpkg.com/lucide@0.344.0/dist/umd/lucide.js"></script>
 
+  <!-- Explicit SVG Rules to Prevent 0px Collapse -->
   <style>
     svg.lucide {
       display: inline-block !important;
       vertical-align: middle !important;
+      stroke-width: 2 !important;
+    }
+    i[data-lucide] {
+      display: inline-flex !important;
+      align-items: center !important;
+      justify-content: center !important;
     }
   </style>
 
@@ -99,11 +106,11 @@
         <div class="flex items-center gap-3 overflow-hidden">
           <div class="w-8 h-8 rounded-lg bg-brand-600 text-white flex items-center justify-center font-bold text-xs flex-shrink-0">LQ</div>
           <div class="overflow-hidden">
-            <p class="text-xs font-semibold text-brand-900 truncate" id="tenantName">Luvon Q Flagship</p>
-            <span class="inline-block px-1.5 py-0.5 text-[10px] font-semibold text-emerald-700 bg-emerald-100 rounded">Verified Provider</span>
+            <p class="text-xs font-semibold text-brand-900 truncate" id="tenantName">Loading...</p>
+            <span class="inline-block px-1.5 py-0.5 text-[10px] font-semibold text-emerald-700 bg-emerald-100 rounded">Active Merchant</span>
           </div>
         </div>
-        <button onclick="toggleSignOut()" class="text-slate-400 hover:text-rose-600 p-1 cursor-pointer">
+        <button onclick="toggleSignOut()" class="text-slate-400 hover:text-rose-600 p-1 cursor-pointer" title="Sign Out">
           <i data-lucide="log-out" class="w-3.5 h-3.5"></i>
         </button>
       </div>
@@ -195,7 +202,7 @@
               <label class="block text-xs font-semibold text-brand-900 mb-1.5">Phone Number for Test Prompt</label>
               <div class="relative">
                 <i data-lucide="smartphone" class="w-4 h-4 absolute left-3 top-3 text-slate-400"></i>
-                <input type="text" id="test-phone" placeholder="2547XXXXXXXX" value="254768820142" class="w-full pl-10 pr-4 py-2.5 text-xs bg-brand-50 border border-brand-200 rounded-xl focus:outline-none focus:border-brand-600 font-medium" />
+                <input type="text" id="test-phone" placeholder="2547XXXXXXXX" value="254708374149" class="w-full pl-10 pr-4 py-2.5 text-xs bg-brand-50 border border-brand-200 rounded-xl focus:outline-none focus:border-brand-600 font-medium" />
               </div>
             </div>
 
@@ -221,6 +228,8 @@
     </div>
   </main>
 
+  <script src="api.js"></script>
+  <script src="payments.js"></script>
   <script>
     function toggleFieldVisibility(inputId, btn) {
       const input = document.getElementById(inputId);
@@ -228,7 +237,7 @@
       const isPassword = input.type === "password";
       input.type = isPassword ? "text" : "password";
       btn.innerHTML = `<i data-lucide="${isPassword ? 'eye-off' : 'eye'}" class="w-4 h-4"></i>`;
-      if (window.lucide) lucide.createIcons();
+      renderIcons();
     }
 
     function toggleMobileMenu() {
@@ -239,14 +248,16 @@
       backdrop.classList.toggle("hidden");
     }
 
-    document.addEventListener("DOMContentLoaded", () => {
-      if (window.lucide && typeof window.lucide.createIcons === 'function') {
-        window.lucide.createIcons();
+    function renderIcons() {
+      if (typeof lucide !== 'undefined' && lucide.createIcons) {
+        lucide.createIcons();
       }
-    });
-  </script>
+    }
 
-  <script src="api.js"></script>
-  <script src="payments.js"></script>
+    document.addEventListener("DOMContentLoaded", renderIcons);
+    window.addEventListener("load", renderIcons);
+    setTimeout(renderIcons, 250);
+    setTimeout(renderIcons, 600);
+  </script>
 </body>
 </html>
