@@ -34,8 +34,8 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Playfair+Display:ital,wght@0,600;0,700;1,400&display=swap" rel="stylesheet">
   
-  <!-- Rock-solid Lucide CDN (No unpkg timeouts) -->
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/lucide/0.344.0/umd/lucide.min.js"></script>
+  <!-- Direct, Verified Lucide CDN (HTTP 200, No document.write, No 404s) -->
+  <script src="https://cdn.jsdelivr.net/npm/lucide@0.344.0/dist/umd/lucide.min.js"></script>
   
   <style>
     svg.lucide { 
@@ -307,12 +307,12 @@
 
       btn.disabled = true;
       btn.innerHTML = `<i data-lucide="loader-2" class="w-4 h-4 animate-spin"></i> Setting up...`;
-      if (window.lucide) lucide.createIcons();
+      renderIcons();
 
       await window.API.runAIBusinessSetup(input.value.trim());
       btn.disabled = false;
       btn.innerHTML = `<i data-lucide="sparkles" class="w-4 h-4"></i> Setup Store`;
-      if (window.lucide) lucide.createIcons();
+      renderIcons();
     }
 
     async function submitModalOnboarding() {
@@ -322,20 +322,20 @@
 
       btn.disabled = true;
       btn.innerHTML = `<i data-lucide="loader-2" class="w-4 h-4 animate-spin"></i> Building...`;
-      if (window.lucide) lucide.createIcons();
+      renderIcons();
 
       await window.API.runAIBusinessSetup(textarea.value.trim());
     }
 
-    // Force icon execution immediately and on load
     function renderIcons() {
       if (window.lucide && typeof window.lucide.createIcons === 'function') {
         window.lucide.createIcons();
       }
     }
+    
     document.addEventListener("DOMContentLoaded", renderIcons);
     window.addEventListener("load", renderIcons);
-    setTimeout(renderIcons, 300);
+    setTimeout(renderIcons, 250);
   </script>
 </body>
 </html>
