@@ -40,7 +40,7 @@
   <script src="https://unpkg.com/lucide@0.344.0/dist/umd/lucide.js"></script>
   
   <style>
-    svg.lucide {
+    svg.lucide, i[data-lucide] svg {
       display: inline-block !important;
       vertical-align: middle !important;
       stroke-width: 2 !important;
@@ -92,6 +92,9 @@
         </a>
         <a href="payments.html" class="flex items-center gap-3 px-3 py-2.5 rounded-xl text-stone-600 hover:bg-brand-50 hover:text-brand-700 transition-all font-medium text-xs">
           <i data-lucide="credit-card" class="w-4 h-4 text-brand-600"></i> Daraja M-Pesa
+        </a>
+        <a href="settings.html" class="flex items-center gap-3 px-3 py-2.5 rounded-xl text-stone-600 hover:bg-brand-50 hover:text-brand-700 transition-all font-medium text-xs">
+          <i data-lucide="settings" class="w-4 h-4 text-brand-600"></i> Settings
         </a>
       </nav>
     </div>
@@ -364,5 +367,23 @@
 
   <script src="api.js"></script>
   <script src="inbox.js"></script>
+  <script>
+    function toggleMobileMenu() {
+      const nav = document.getElementById("sidebarNav");
+      const backdrop = document.getElementById("sidebarBackdrop");
+      if (!nav || !backdrop) return;
+      nav.classList.toggle("-translate-x-full");
+      backdrop.classList.toggle("hidden");
+    }
+
+    function renderIcons() {
+      if (typeof lucide !== 'undefined' && lucide.createIcons) {
+        lucide.createIcons();
+      }
+    }
+    document.addEventListener("DOMContentLoaded", renderIcons);
+    window.addEventListener("load", renderIcons);
+    setTimeout(renderIcons, 250);
+  </script>
 </body>
 </html>

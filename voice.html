@@ -35,11 +35,11 @@
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Playfair+Display:ital,wght@0,600;0,700;1,400&display=swap" rel="stylesheet">
   
   <script src="https://unpkg.com/lucide@0.344.0/dist/umd/lucide.js"></script>
-  
+
   <style>
-    svg.lucide {
-      display: inline-block !important;
-      vertical-align: middle !important;
+    svg.lucide, i[data-lucide] svg { 
+      display: inline-block !important; 
+      vertical-align: middle !important; 
       stroke-width: 2 !important;
     }
     i[data-lucide] {
@@ -62,7 +62,7 @@
 
   <div id="sidebarBackdrop" onclick="toggleMobileMenu()" class="fixed inset-0 bg-slate-900/50 z-40 hidden md:hidden backdrop-blur-sm transition-opacity"></div>
 
-  <!-- Sidebar Nav Drawer -->
+  <!-- Sidebar Nav -->
   <aside id="sidebarNav" class="fixed top-0 left-0 bottom-0 z-50 w-72 bg-white/95 backdrop-blur-md border-r border-brand-200/50 flex flex-col justify-between p-6 -translate-x-full md:translate-x-0 transition-transform duration-300 ease-in-out md:static md:w-64 flex-shrink-0">
     <div class="space-y-8">
       <div class="flex items-center justify-between">
@@ -88,6 +88,9 @@
         <a href="payments.html" class="nav-link flex items-center gap-3 px-3 py-2.5 rounded-lg text-slate-600 hover:bg-brand-50 hover:text-brand-700 transition-all font-medium text-sm">
           <i data-lucide="credit-card" class="w-4 h-4"></i> Daraja M-Pesa
         </a>
+        <a href="settings.html" class="nav-link flex items-center gap-3 px-3 py-2.5 rounded-lg text-slate-600 hover:bg-brand-50 hover:text-brand-700 transition-all font-medium text-sm">
+          <i data-lucide="settings" class="w-4 h-4"></i> Settings
+        </a>
       </nav>
     </div>
 
@@ -104,7 +107,7 @@
             <span class="inline-block px-1.5 py-0.5 text-[10px] font-semibold text-emerald-700 bg-emerald-100 rounded">Active Merchant</span>
           </div>
         </div>
-        <button onclick="toggleSignOut()" class="text-slate-400 hover:text-rose-600 p-1 cursor-pointer">
+        <button onclick="toggleSignOut()" class="text-slate-400 hover:text-rose-600 p-1 cursor-pointer" title="Sign Out">
           <i data-lucide="log-out" class="w-3.5 h-3.5"></i>
         </button>
       </div>
@@ -112,115 +115,78 @@
   </aside>
 
   <!-- Main Content Area -->
-  <main class="flex-1 w-full p-4 md:p-8 overflow-y-auto space-y-6">    
+  <main class="flex-1 w-full p-4 md:p-8 overflow-y-auto space-y-6">
     <header class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-brand-200 pb-6">
       <div>
-        <h1 class="text-2xl font-serif font-bold text-brand-900">Brand Persona & Audio Studio</h1>
-        <p class="text-xs text-slate-500 mt-1">Configure neural ElevenLabs voice engines & tone archetypes</p>
+        <h1 class="text-2xl font-serif font-bold text-brand-900">Voice & Conversational Persona</h1>
+        <p class="text-xs text-slate-500 mt-1">Calibrate AI sales tone, Swahili-English fluency, and ElevenLabs voice clones</p>
       </div>
-      <button id="save-persona-btn" class="px-5 py-2.5 bg-brand-600 hover:bg-brand-700 text-white rounded-xl text-xs font-semibold shadow transition-all flex items-center gap-2 cursor-pointer">
-        <i data-lucide="save" class="w-4 h-4"></i> Save Settings
+      <button onclick="saveVoiceSettings()" id="saveVoiceBtn" class="px-5 py-2.5 bg-brand-600 hover:bg-brand-700 text-white rounded-xl text-xs font-bold shadow-md transition-all flex items-center gap-2 cursor-pointer self-start sm:self-auto">
+        <i data-lucide="save" class="w-4 h-4"></i> Save Persona
       </button>
     </header>
 
-    <div class="grid lg:grid-cols-12 gap-8">
-      <!-- Left Column: Tone Archetype -->
-      <div class="lg:col-span-7 space-y-6">
-        <div class="bg-white rounded-xl border border-brand-200 p-6 shadow-sm space-y-4">
-          <h3 class="font-serif font-bold text-lg text-brand-900">1. Tone Archetype</h3>
-          <p class="text-xs text-slate-500">Select the linguistic style your AI agent adopts across WhatsApp and Instagram.</p>
-
-          <div class="grid sm:grid-cols-2 gap-4 pt-2">
-            <label class="p-4 rounded-xl border-2 border-brand-600 bg-brand-50/50 cursor-pointer transition-all flex flex-col justify-between space-y-3 relative">
-              <input type="radio" name="tone_archetype" value="luxury_chic" checked class="hidden" />
-              <div class="flex items-center justify-between">
-                <span class="text-xs font-bold text-brand-900 uppercase tracking-wider">Luxury Chic</span>
-                <i data-lucide="check-circle-2" class="w-4 h-4 text-brand-600"></i>
-              </div>
-              <p class="text-[11px] text-slate-600 leading-relaxed">Elegant, polished, and concierge-level vocabulary tailored for high-end clients.</p>
-            </label>
-
-            <label class="p-4 rounded-xl border border-brand-200 bg-white hover:border-brand-500 cursor-pointer transition-all flex flex-col justify-between space-y-3">
-              <input type="radio" name="tone_archetype" value="street_sheng" class="hidden" />
-              <div class="flex items-center justify-between">
-                <span class="text-xs font-bold text-brand-900 uppercase tracking-wider">Nairobi Street Sheng</span>
-                <i data-lucide="circle" class="w-4 h-4 text-slate-300"></i>
-              </div>
-              <p class="text-[11px] text-slate-600 leading-relaxed">Authentic, high-energy Sheng ("Kaende kaende", "Form ni gani") for urban streetwear culture.</p>
-            </label>
-
-            <label class="p-4 rounded-xl border border-brand-200 bg-white hover:border-brand-500 cursor-pointer transition-all flex flex-col justify-between space-y-3">
-              <input type="radio" name="tone_archetype" value="warm_friendly" class="hidden" />
-              <div class="flex items-center justify-between">
-                <span class="text-xs font-bold text-brand-900 uppercase tracking-wider">Warm & Friendly</span>
-                <i data-lucide="circle" class="w-4 h-4 text-slate-300"></i>
-              </div>
-              <p class="text-[11px] text-slate-600 leading-relaxed">Welcoming, empathetic tone ideal for salons, spas, and boutique studios.</p>
-            </label>
-
-            <label class="p-4 rounded-xl border border-brand-200 bg-white hover:border-brand-500 cursor-pointer transition-all flex flex-col justify-between space-y-3">
-              <input type="radio" name="tone_archetype" value="corporate_concise" class="hidden" />
-              <div class="flex items-center justify-between">
-                <span class="text-xs font-bold text-brand-900 uppercase tracking-wider">Corporate Concise</span>
-                <i data-lucide="circle" class="w-4 h-4 text-slate-300"></i>
-              </div>
-              <p class="text-[11px] text-slate-600 leading-relaxed">Direct, swift, highly factual responses optimized for fast booking completion.</p>
-            </label>
-          </div>
-        </div>
-
-        <div class="bg-white rounded-xl border border-brand-200 p-6 shadow-sm space-y-4">
-          <h3 class="font-serif font-bold text-lg text-brand-900">2. Manager Handoff Escalation</h3>
-          <p class="text-xs text-slate-500">WhatsApp number that receives instant alert payloads when a customer asks for a human manager.</p>
-
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <!-- Persona & Tone Form -->
+      <section class="bg-white rounded-2xl border border-brand-200 p-6 shadow-sm space-y-5">
+        <h2 class="text-base font-serif font-bold text-brand-900">Conversational Persona</h2>
+        
+        <div class="space-y-4 text-xs">
           <div>
-            <label class="block text-xs font-semibold text-brand-900 mb-2">Manager WhatsApp Phone Number</label>
-            <div class="relative">
-              <i data-lucide="phone" class="w-4 h-4 absolute left-3 top-3 text-slate-400"></i>
-              <input type="text" id="escalation-phone" placeholder="2547XXXXXXXX" class="w-full pl-10 pr-4 py-2.5 text-xs bg-brand-50 border border-brand-200 rounded-xl focus:outline-none focus:border-brand-600 font-medium" />
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- Right Column: Voice Studio -->
-      <div class="lg:col-span-5 space-y-6">
-        <div class="bg-white rounded-xl border border-brand-200 p-6 shadow-sm space-y-5">
-          <div class="flex items-center justify-between">
-            <h3 class="font-serif font-bold text-lg text-brand-900">3. Neural Voice Engine</h3>
-            <span class="text-[10px] font-bold text-purple-700 bg-purple-100 px-2 py-0.5 rounded">ElevenLabs v2</span>
-          </div>
-
-          <div>
-            <label class="block text-xs font-semibold text-brand-900 mb-2">Select Voice Model</label>
-            <select id="voice-select" class="w-full px-3 py-2.5 text-xs bg-brand-50 border border-brand-200 rounded-xl focus:outline-none focus:border-brand-600 font-medium text-brand-900">
+            <label class="block font-semibold text-slate-700 mb-1">Tone & Communication Style</label>
+            <select id="personaTone" class="w-full px-3.5 py-2.5 bg-brand-50 border border-brand-200 rounded-xl focus:outline-none focus:border-brand-600 font-semibold text-brand-900">
+              <option value="luxury_chic">Luxury Chic (Sophisticated, Poised, Warm High-End)</option>
+              <option value="street_sheng">Street Sheng (Nairobi Urban Sheng + Casual English)</option>
+              <option value="corporate_concise">Corporate Concise (Direct, Professional, Fast ROI)</option>
+              <option value="warm_friendly">Warm & Welcoming (Supportive & Patient)</option>
             </select>
           </div>
 
-          <div class="p-4 bg-brand-900 text-white rounded-xl space-y-3">
-            <div class="flex items-center justify-between">
-              <div class="flex items-center gap-2">
-                <i data-lucide="volume-2" class="w-4 h-4 text-brand-500"></i>
-                <span class="text-xs font-semibold">Voice Sample Preview</span>
-              </div>
-              <span class="text-[10px] text-slate-400 font-mono">00:04</span>
-            </div>
+          <div>
+            <label class="block font-semibold text-slate-700 mb-1">Language Fluency Mode</label>
+            <select id="languagePreference" class="w-full px-3.5 py-2.5 bg-brand-50 border border-brand-200 rounded-xl focus:outline-none focus:border-brand-600 text-slate-800">
+              <option value="mirror_user">Mirror Shopper (Auto-detect Sheng, English, Swahili)</option>
+              <option value="strictly_english">Strictly English</option>
+              <option value="swahili_first">Swahili First</option>
+            </select>
+          </div>
 
-            <p id="sample-text" class="text-xs text-brand-100 font-light italic leading-relaxed">
-              "Karibu! How can I assist you with your booking or order today?"
-            </p>
-
-            <button id="play-sample-btn" class="w-full py-2.5 bg-brand-600 hover:bg-brand-500 text-white rounded-lg text-xs font-semibold shadow transition-all flex items-center justify-center gap-2 cursor-pointer">
-              <i data-lucide="play" class="w-3.5 h-3.5"></i> Play Voice Sample
-            </button>
+          <div>
+            <label class="block font-semibold text-slate-700 mb-1">ElevenLabs Voice Model</label>
+            <select id="elevenLabsVoiceId" class="w-full px-3.5 py-2.5 bg-brand-50 border border-brand-200 rounded-xl focus:outline-none focus:border-brand-600 font-mono text-slate-800">
+              <option value="EXAVITQu4vr4xnSDxMaL">Sarah (Soft & Professional Female)</option>
+              <option value="Xb7hH8MSUJpSbSDYk0k2">Alice (Expressive & Natural Female)</option>
+              <option value="FGY2WhTYpPnrIDTdsKH5">Laura (Warm & Upbeat Female)</option>
+              <option value="cgSgspJ2msm6clMCkdW9">Jessica (Modern Concise Female)</option>
+              <option value="JBFqnCBsd6RMkjVDRZzb">George (British Male)</option>
+            </select>
           </div>
         </div>
-      </div>
+      </section>
+
+      <!-- Live Voice Preview Studio -->
+      <section class="bg-white rounded-2xl border border-brand-200 p-6 shadow-sm space-y-5">
+        <h2 class="text-base font-serif font-bold text-brand-900">ElevenLabs Audio Audition</h2>
+        <p class="text-xs text-slate-500">Test voice rendering before attaching to outbound WhatsApp voice notes.</p>
+        
+        <div class="space-y-3.5 text-xs">
+          <textarea 
+            id="auditionText" 
+            rows="4" 
+            class="w-full p-3 bg-brand-50 border border-brand-200 rounded-xl text-slate-900 focus:outline-none focus:border-brand-600"
+          >Niaje! Welcome to Luvon Q. We have confirmed your reservation and dispatched your payment prompt.</textarea>
+          
+          <button type="button" onclick="handleAudition()" id="auditionBtn" class="w-full py-3 bg-brand-600 hover:bg-brand-700 text-white rounded-xl font-bold text-xs shadow flex items-center justify-center gap-2 cursor-pointer">
+            <i data-lucide="volume-2" class="w-4 h-4"></i> Generate Voice Sample
+          </button>
+
+          <audio id="audioPreview" controls class="w-full mt-3 hidden"></audio>
+        </div>
+      </section>
     </div>
   </main>
 
   <script src="api.js"></script>
-  <script src="voice.js"></script>
   <script>
     function toggleMobileMenu() {
       const nav = document.getElementById("sidebarNav");
@@ -235,6 +201,58 @@
         lucide.createIcons();
       }
     }
+
+    async function handleAudition() {
+      const btn = document.getElementById('auditionBtn');
+      const text = document.getElementById('auditionText').value;
+      const voiceId = document.getElementById('elevenLabsVoiceId').value;
+      const audio = document.getElementById('audioPreview');
+
+      btn.disabled = true;
+      btn.innerHTML = `<i data-lucide="loader-2" class="w-4 h-4 animate-spin"></i> Generating...`;
+      renderIcons();
+
+      try {
+        const res = await fetch('/api/tenant/voice/preview', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ voiceId, text })
+        });
+        if (!res.ok) throw new Error('Preview failed');
+        const blob = await res.blob();
+        audio.src = URL.createObjectURL(blob);
+        audio.classList.remove('hidden');
+        audio.play();
+      } catch (e) {
+        window.API.showToast(e.message, 'error');
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = `<i data-lucide="volume-2" class="w-4 h-4"></i> Generate Voice Sample`;
+        renderIcons();
+      }
+    }
+
+    async function saveVoiceSettings() {
+      const tone = document.getElementById('personaTone').value;
+      const languagePreference = document.getElementById('languagePreference').value;
+      const elevenLabsVoiceId = document.getElementById('elevenLabsVoiceId').value;
+
+      try {
+        const res = await fetch('/api/tenant/settings/personality', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-tenant-id': window.API.getTenantId()
+          },
+          body: JSON.stringify({ tone, languagePreference, elevenLabsVoiceId })
+        });
+        if (!res.ok) throw new Error('Save failed');
+        window.API.showToast('Voice & persona saved!', 'success');
+      } catch (e) {
+        window.API.showToast(e.message, 'error');
+      }
+    }
+
     document.addEventListener("DOMContentLoaded", renderIcons);
     window.addEventListener("load", renderIcons);
     setTimeout(renderIcons, 250);

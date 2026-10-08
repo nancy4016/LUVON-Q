@@ -37,7 +37,7 @@
   <script src="https://unpkg.com/lucide@0.344.0/dist/umd/lucide.js"></script>
 
   <style>
-    svg.lucide {
+    svg.lucide, i[data-lucide] svg {
       display: inline-block !important;
       vertical-align: middle !important;
       stroke-width: 2 !important;
@@ -47,11 +47,14 @@
       align-items: center !important;
       justify-content: center !important;
     }
+    ::-webkit-scrollbar { width: 5px; height: 5px; }
+    ::-webkit-scrollbar-track { background: #fbf9f5; }
+    ::-webkit-scrollbar-thumb { background: #e7e2d8; border-radius: 9999px; }
   </style>
 
   <link rel="stylesheet" href="styles.css" />
 </head>
-<body class="bg-slate-50 text-slate-800 min-h-screen flex flex-col md:flex-row overflow-x-hidden">
+<body class="bg-slate-50 text-slate-800 min-h-screen flex flex-col md:flex-row overflow-x-hidden font-sans">
 
   <!-- Mobile Top Nav -->
   <header class="md:hidden bg-white/90 backdrop-blur-md border-b border-slate-200 p-4 flex items-center justify-between sticky top-0 z-30 w-full">
@@ -89,6 +92,9 @@
         <a href="payments.html" class="nav-link flex items-center gap-3 px-3 py-2.5 rounded-lg text-slate-600 hover:bg-brand-50 hover:text-brand-700 transition-all font-medium text-sm">
           <i data-lucide="credit-card" class="w-4 h-4"></i> Daraja M-Pesa
         </a>
+        <a href="settings.html" class="nav-link flex items-center gap-3 px-3 py-2.5 rounded-lg text-slate-600 hover:bg-brand-50 hover:text-brand-700 transition-all font-medium text-sm">
+          <i data-lucide="settings" class="w-4 h-4"></i> Settings
+        </a>
       </nav>
     </div>
 
@@ -105,7 +111,7 @@
             <span class="inline-block px-1.5 py-0.5 text-[10px] font-semibold text-emerald-700 bg-emerald-100 rounded">Active Merchant</span>
           </div>
         </div>
-        <button onclick="toggleSignOut()" class="text-slate-400 hover:text-rose-600 p-1 cursor-pointer">
+        <button onclick="toggleSignOut()" class="text-slate-400 hover:text-rose-600 p-1 cursor-pointer" title="Sign Out">
           <i data-lucide="log-out" class="w-3.5 h-3.5"></i>
         </button>
       </div>
