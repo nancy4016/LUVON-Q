@@ -5,17 +5,22 @@ const express = require('express');
 const axios = require('axios');
 const FormData = require('form-data');
 const cron = require('node-cron');
-const { createClient } = require('@supabase/supabase-js');
 
-// 1. SUPABASE SERVER INITIALIZATION (From .env)
+// 1. SUPABASE REST & AUTH INTEGRATION VIA AXIOS (Zero external package crashes)
 const SUPABASE_URL = process.env.SUPABASE_URL || 'https://kmwwgmzypjnjfkpoyims.supabase.co';
 const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY || 'sb_publishable_DhTvZ4K5YCYLXErehDkBFQ_noylBgEH';
-const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+const supabaseHeaders = {
+  'apikey': SUPABASE_ANON_KEY,
+  'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+  'Content-Type': 'application/json',
+  'Prefer': 'return=representation'
+};
 
 const geminiApiKey = (process.env.GEMINI_API_KEY || "").trim();
-console.log("🔑 Loaded WhatsApp Token Prefix:", process.env.WHATSAPP_ACCESS_TOKEN ? process.env.WHATSAPP_ACCESS_TOKEN.substring(0, 14) + "..." : "❌ NO TOKEN LOADED");
-console.log("✨ Loaded Gemini Key Prefix:", geminiApiKey ? geminiApiKey.substring(0, 10) + "..." : "❌ NO GEMINI KEY LOADED");
-console.log("🗄️ Supabase Connected:", SUPABASE_URL);
+console.log("🔑 WhatsApp Token Status:", process.env.WHATSAPP_ACCESS_TOKEN ? "Loaded" : "❌ NOT LOADED");
+console.log("✨ Gemini Key Status:", geminiApiKey ? "Loaded" : "❌ NOT LOADED");
+console.log("🗄️ Supabase REST Host:", SUPABASE_URL);
 
 const app = express();
 app.use(express.json());
@@ -31,7 +36,6 @@ app.use((req, res, next) => {
 });
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
-
 const DEFAULT_FEMALE_VOICE_ID = "EXAVITQu4vr4xnSDxMaL";
 
 // Fallback Daraja Sandbox Constants
@@ -41,7 +45,7 @@ const HC_CONSUMER_KEY = process.env.DARAJA_CONSUMER_KEY || "5U68vQHgUCU7HpYSQZXe
 const HC_CONSUMER_SECRET = process.env.DARAJA_CONSUMER_SECRET || "2qwVKez82Raza13QyV9Ti8GqNLWKgGPWrJVpr1eot3OGNWluJAO1QaAjr1WaDsII";
 
 // ==========================================
-// 1. MULTI-TENANT PERSISTENT DATABASE STORE
+// 1. MULTI-TENANT PERSISTENT STORE
 // ==========================================
 const DB_FILE = process.env.VERCEL ? path.join('/tmp', 'multi_tenant_store.json') : path.join(__dirname, 'multi_tenant_store.json');
 
@@ -53,13 +57,13 @@ function initializeStore() {
     try {
       loadedStore = JSON.parse(fs.readFileSync(DB_FILE, 'utf8'));
     } catch (e) {
-      console.warn("⚠️ Reinitializing database store from DB_FILE.");
+      console.warn("⚠️ Reinitializing store from DB_FILE.");
     }
   } else if (fs.existsSync(seedFile)) {
     try {
       loadedStore = JSON.parse(fs.readFileSync(seedFile, 'utf8'));
     } catch (e) {
-      console.warn("⚠️ Reinitializing database store from seed.");
+      console.warn("⚠️ Reinitializing store from seed.");
     }
   }
 
@@ -76,14 +80,6 @@ function initializeStore() {
           elevenLabsVoiceId: process.env.ELEVENLABS_VOICE_ID || DEFAULT_FEMALE_VOICE_ID,
           escalationPhone: process.env.AGENT_PHONE_NUMBER || "254768820142",
           whatsappPhoneId: process.env.WHATSAPP_PHONE_NUMBER_ID || "1279716021891578",
-          instagramPageId: null,
-          daraja: {
-            type: "CustomerPayBillOnline",
-            shortcode: HC_SHORTCODE,
-            passkey: HC_PASSKEY,
-            consumerKey: HC_CONSUMER_KEY,
-            consumerSecret: HC_CONSUMER_SECRET
-          },
           catalog: []
         }
       },
@@ -91,19 +87,6 @@ function initializeStore() {
       orders: {},
       attributionLedger: [],
       processedMessageIds: []
-    };
-  }
-
-  if (loadedStore.tenants && loadedStore.tenants["luvon_q_flagship"]) {
-    const flagship = loadedStore.tenants["luvon_q_flagship"];
-    flagship.whatsappPhoneId = process.env.WHATSAPP_PHONE_NUMBER_ID || flagship.whatsappPhoneId || "1279716021891578";
-    flagship.elevenLabsVoiceId = process.env.ELEVENLABS_VOICE_ID || DEFAULT_FEMALE_VOICE_ID;
-    flagship.daraja = {
-      type: "CustomerPayBillOnline",
-      shortcode: HC_SHORTCODE,
-      passkey: HC_PASSKEY,
-      consumerKey: HC_CONSUMER_KEY,
-      consumerSecret: HC_CONSUMER_SECRET
     };
   }
 
@@ -117,7 +100,7 @@ function saveStore() {
     db.processedMessageIds = (db.processedMessageIds || []).slice(-2000);
     fs.writeFileSync(DB_FILE, JSON.stringify(db, null, 2));
   } catch (e) {
-    console.error("❌ Failed to save database:", e.message);
+    console.error("❌ Failed to save store:", e.message);
   }
 }
 
@@ -139,22 +122,22 @@ app.post('/api/auth/signup', async (req, res) => {
   if (!email || !password) return res.status(400).json({ error: "Email and password required" });
 
   try {
-    const { data, error } = await supabase.auth.signUp({
+    const authRes = await axios.post(`${SUPABASE_URL}/auth/v1/signup`, {
       email,
       password,
-      options: { data: { full_name: fullName } }
-    });
-    if (error) throw error;
+      data: { full_name: fullName }
+    }, { headers: supabaseHeaders });
 
-    const tenantId = 'tenant_' + (data.user?.id?.slice(0, 8) || Date.now());
+    const user = authRes.data.user || authRes.data;
+    const tenantId = 'tenant_' + (user.id ? user.id.slice(0, 8) : Date.now());
 
-    await supabase.from('tenants').insert({
+    await axios.post(`${SUPABASE_URL}/rest/v1/tenants`, {
       id: tenantId,
-      owner_id: data.user.id,
+      owner_id: user.id,
       business_name: fullName || 'New Business',
       brand_signature: (fullName || 'New Business') + ' Official',
       industry: 'Retail & Services'
-    });
+    }, { headers: supabaseHeaders }).catch(() => {});
 
     db.tenants[tenantId] = {
       id: tenantId,
@@ -168,12 +151,13 @@ app.post('/api/auth/signup', async (req, res) => {
 
     res.json({
       success: true,
-      user: data.user,
+      user,
       tenantId,
       businessName: fullName
     });
   } catch (err) {
-    res.status(400).json({ error: err.message });
+    const msg = err.response?.data?.msg || err.response?.data?.error_description || err.message;
+    res.status(400).json({ error: msg });
   }
 });
 
@@ -182,17 +166,24 @@ app.post('/api/auth/signin', async (req, res) => {
   if (!email || !password) return res.status(400).json({ error: "Email and password required" });
 
   try {
-    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
-    if (error) throw error;
+    const authRes = await axios.post(`${SUPABASE_URL}/auth/v1/token?grant_type=password`, {
+      email,
+      password
+    }, { headers: supabaseHeaders });
 
-    const { data: tenantData } = await supabase
-      .from('tenants')
-      .select('*')
-      .eq('owner_id', data.user.id)
-      .limit(1);
+    const user = authRes.data.user;
 
-    const tenantId = tenantData?.[0]?.id || ('tenant_' + data.user.id.slice(0, 8));
-    const businessName = tenantData?.[0]?.business_name || data.user.user_metadata?.full_name || 'My Store';
+    let businessName = user.user_metadata?.full_name || 'My Store';
+    let tenantId = 'tenant_' + user.id.slice(0, 8);
+
+    const tenantRes = await axios.get(`${SUPABASE_URL}/rest/v1/tenants?owner_id=eq.${user.id}&limit=1`, {
+      headers: supabaseHeaders
+    }).catch(() => null);
+
+    if (tenantRes?.data?.[0]) {
+      tenantId = tenantRes.data[0].id;
+      businessName = tenantRes.data[0].business_name;
+    }
 
     if (!db.tenants[tenantId]) {
       db.tenants[tenantId] = {
@@ -205,12 +196,13 @@ app.post('/api/auth/signin', async (req, res) => {
 
     res.json({
       success: true,
-      user: data.user,
+      user,
       tenantId,
       businessName
     });
   } catch (err) {
-    res.status(400).json({ error: err.message });
+    const msg = err.response?.data?.error_description || err.response?.data?.msg || err.message;
+    res.status(400).json({ error: msg });
   }
 });
 
@@ -280,13 +272,15 @@ Return STRICT RAW JSON only without markdown code blocks.
     req.tenant.tone = parsed.tone || req.tenant.tone;
     req.tenant.catalog = parsed.catalog || [];
 
-    // Sync to Supabase
-    await supabase.from('tenants').upsert({
+    // Sync to Supabase via REST
+    await axios.post(`${SUPABASE_URL}/rest/v1/tenants`, {
       id: req.tenant.id,
       business_name: req.tenant.businessName,
       industry: req.tenant.industry,
       tone: req.tenant.tone
-    });
+    }, {
+      headers: { ...supabaseHeaders, 'Prefer': 'resolution=merge-duplicates' }
+    }).catch((e) => console.warn("Supabase tenant sync notice:", e.message));
 
     if (parsed.catalog && parsed.catalog.length > 0) {
       const inventoryRows = parsed.catalog.map(item => ({
@@ -297,8 +291,14 @@ Return STRICT RAW JSON only without markdown code blocks.
         category: item.category || 'General',
         tags: item.tags || []
       }));
-      await supabase.from('inventory').delete().eq('tenant_id', req.tenant.id);
-      await supabase.from('inventory').insert(inventoryRows);
+
+      await axios.delete(`${SUPABASE_URL}/rest/v1/inventory?tenant_id=eq.${req.tenant.id}`, {
+        headers: supabaseHeaders
+      }).catch(() => {});
+
+      await axios.post(`${SUPABASE_URL}/rest/v1/inventory`, inventoryRows, {
+        headers: supabaseHeaders
+      }).catch((e) => console.warn("Supabase inventory insert notice:", e.message));
     }
 
     saveStore();
@@ -348,7 +348,6 @@ async function executeDarajaSTK(tenant, phoneNumber, amount, itemRef, isRetry = 
     const rawToken = await getHardcodedDarajaToken(isRetry);
     const token = String(rawToken).trim();
 
-    // 14-digit East Africa Time (UTC+3) YYYYMMDDHHmmss
     const eatDate = new Date(Date.now() + (3 * 60 * 60 * 1000));
     const pad = (n) => String(n).padStart(2, '0');
     const timestamp = `${eatDate.getUTCFullYear()}${pad(eatDate.getUTCMonth() + 1)}${pad(eatDate.getUTCDate())}${pad(eatDate.getUTCHours())}${pad(eatDate.getUTCMinutes())}${pad(eatDate.getUTCSeconds())}`;
@@ -401,7 +400,6 @@ async function executeDarajaSTK(tenant, phoneNumber, amount, itemRef, isRetry = 
     console.error(`❌ STK Push Safaricom Gateway Error:`, JSON.stringify(errorDetails));
 
     if (!isRetry && (err.response?.status === 401 || JSON.stringify(errorDetails).includes('Invalid Access Token'))) {
-      console.warn("⚠️ Token expired. Refreshing token...");
       cachedDarajaToken = null;
       await sleep(1000);
       return await executeDarajaSTK(tenant, phoneNumber, amount, itemRef, true);
@@ -493,24 +491,18 @@ async function generateGeminiSalesResponse(tenant, profile, userPromptText) {
 
   for (const model of models) {
     try {
-      console.log(`✨ Invoking Google Gemini model: [${model}]...`);
       const response = await axios.post(
         `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${geminiApiKey}`,
         payload,
-        {
-          headers: { 'Content-Type': 'application/json' },
-          timeout: 25000
-        }
+        { headers: { 'Content-Type': 'application/json' }, timeout: 25000 }
       );
 
       const candidateText = response.data?.candidates?.[0]?.content?.parts?.[0]?.text;
       if (candidateText && candidateText.trim()) {
-        console.log(`✨ Gemini [${model}] reply generated: "${candidateText.trim().substring(0, 50)}..."`);
         return candidateText.trim();
       }
     } catch (err) {
-      const errDetail = err.response?.data?.error?.message || err.message;
-      console.error(`❌ Gemini [${model}] Failed:`, errDetail);
+      console.error(`❌ Gemini [${model}] Failed:`, err.response?.data?.error?.message || err.message);
     }
   }
 
@@ -553,10 +545,7 @@ async function sendWhatsAppElevenLabsAudio(tenant, toPhone, textReply) {
   try {
     const voiceId = tenant.elevenLabsVoiceId || process.env.ELEVENLABS_VOICE_ID || DEFAULT_FEMALE_VOICE_ID;
     const apiKey = process.env.ELEVENLABS_API_KEY;
-
     if (!apiKey) return;
-
-    console.log(`🎙️ Generating ElevenLabs Voice Note via [${voiceId}]...`);
 
     const ttsRes = await axios.post(
       `https://api.elevenlabs.io/v1/text-to-speech/${voiceId}?output_format=mp3_44100_128`,
@@ -597,7 +586,6 @@ async function sendWhatsAppElevenLabsAudio(tenant, toPhone, textReply) {
       },
       { headers: { Authorization: `Bearer ${process.env.WHATSAPP_ACCESS_TOKEN}` } }
     );
-    console.log(`✅ Voice Note delivered to +${cleanPhone}`);
   } catch (err) {
     console.warn('⚠️ ElevenLabs generation notice:', err.response?.data ? JSON.stringify(err.response.data) : err.message);
   }
@@ -615,7 +603,6 @@ async function markMessageAsRead(messageId) {
       { messaging_product: 'whatsapp', status: 'read', message_id: messageId },
       { headers: { Authorization: `Bearer ${process.env.WHATSAPP_ACCESS_TOKEN}` } }
     );
-    console.log(`👁️ Marked read: ${messageId}`);
   } catch (e) {}
 }
 
@@ -643,7 +630,6 @@ async function sendWhatsAppText(tenant, toPhone, text) {
         }
       }
     );
-    console.log(`📤 Text reply delivered to +${cleanPhone}: "${String(text).trim().substring(0, 45)}..." (ID: ${res.data?.messages?.[0]?.id})`);
     return res.data;
   } catch (err) {
     console.error('❌ Meta Outbound Send Error:', JSON.stringify(err.response?.data || err.message));
@@ -670,30 +656,23 @@ async function sendWhatsAppImage(tenant, toPhone, imageUrl, caption) {
       },
       { headers: { Authorization: `Bearer ${process.env.WHATSAPP_ACCESS_TOKEN}` } }
     );
-    console.log(`📷 Image sent to +${cleanPhone}`);
   } catch (err) {
     console.error('❌ Failed to send image:', err.response?.data || err.message);
   }
 }
 
 // ==========================================
-// 8. MAIN WEBHOOK INTAKE
+// 8. WEBHOOK INTAKE & CALLBACKS
 // ==========================================
-function handleWebhookVerification(req, res) {
-  const mode = req.query['hub.mode'];
-  const token = req.query['hub.verify_token'];
-  const challenge = req.query['hub.challenge'];
-
-  if (mode && token === process.env.WHATSAPP_VERIFY_TOKEN) {
-    console.log('✅ Webhook verified successfully!');
-    return res.status(200).send(challenge);
+app.get('/webhook', (req, res) => {
+  if (req.query['hub.mode'] && req.query['hub.verify_token'] === process.env.WHATSAPP_VERIFY_TOKEN) {
+    return res.status(200).send(req.query['hub.challenge']);
   }
   res.sendStatus(403);
-}
+});
 
-async function handleWebhookIncoming(req, res) {
+app.post('/webhook', async (req, res) => {
   res.sendStatus(200);
-
   try {
     const entry = req.body.entry?.[0];
     const changes = entry?.changes?.[0]?.value;
@@ -707,233 +686,39 @@ async function handleWebhookIncoming(req, res) {
     const incomingPhoneId = changes?.metadata?.phone_number_id || process.env.WHATSAPP_PHONE_NUMBER_ID;
     const tenant = resolveTenant(incomingPhoneId);
 
-    const rawFrom = message.from;
-    const fromNumber = rawFrom.startsWith('+') ? rawFrom.slice(1) : rawFrom;
+    const fromNumber = message.from.replace(/\+/g, '').trim();
     const msgType = message.type;
-
     const incomingTextRaw = (msgType === 'text' && message.text?.body) ? message.text.body : '';
-    const requestsVoice = /\b(read|voice|audio|say|listen|loud|driving|record|ongea)\b/i.test(incomingTextRaw);
-    const isVoiceInput = (msgType === 'audio' || msgType === 'voice' || requestsVoice);
-
-    console.log(`📩 Processing message from +${fromNumber} (Type: ${msgType})`);
+    const isVoiceInput = (msgType === 'audio' || msgType === 'voice');
 
     const { profile } = getOrCreateCustomerSession(tenant, fromNumber, 'whatsapp');
 
-    if (msgType === 'text') {
-      const incomingText = incomingTextRaw.trim().toLowerCase();
-      if (/^\/?unpa(u|s)e(\s.*)?$/i.test(incomingText)) {
-        profile.isPaused = false;
-        saveStore();
-        await sendWhatsAppText(tenant, fromNumber, "Niko back! How can I help you?");
-        return;
-      }
-    }
-
-    if (profile.isPaused) {
-      profile.conversationHistory.push({
-        role: 'user',
-        text: incomingTextRaw || `[${msgType}]`,
-        timestamp: new Date().toISOString()
-      });
-      saveStore();
-      return;
-    }
-
+    if (profile.isPaused) return;
     await markMessageAsRead(message.id);
 
-    let loggedUserText = incomingTextRaw || `[Sent ${msgType}]`;
-    let responseText = await generateGeminiSalesResponse(tenant, profile, loggedUserText);
-
-    if (!responseText) {
-      responseText = `Karibu ${tenant.businessName}! How can I help you today?`;
-    }
+    const responseText = await generateGeminiSalesResponse(tenant, profile, incomingTextRaw || `[${msgType}]`);
 
     profile.conversationHistory.push(
-      { role: 'user', text: loggedUserText, timestamp: new Date().toISOString() },
+      { role: 'user', text: incomingTextRaw, timestamp: new Date().toISOString() },
       { role: 'model', text: responseText, timestamp: new Date().toISOString() }
     );
     saveStore();
 
-    await sleep(500);
-
-    if (responseText.includes('SEND_IMAGE')) {
-      try {
-        const jsonMatch = responseText.match(/\{[\s\S]*"action"\s*:\s*"SEND_IMAGE"[\s\S]*\}/);
-        const parsed = JSON.parse(jsonMatch ? jsonMatch[0] : responseText);
-
-        let item = null;
-        if (parsed.itemId) {
-          item = tenant.catalog.find(i => String(i.id) === String(parsed.itemId));
-        }
-        if (!item && parsed.item) {
-          const search = String(parsed.item).toLowerCase();
-          item = tenant.catalog.find(i => i.name.toLowerCase().includes(search) || (i.tags && i.tags.some(t => search.includes(t))));
-        }
-
-        if (item && item.hasImage && item.imageUrl) {
-          const caption = parsed.caption || `Cheki *${item.name}* (KSh ${item.price}).`;
-          await sendWhatsAppImage(tenant, fromNumber, item.imageUrl, caption);
-          if (isVoiceInput) await sendWhatsAppElevenLabsAudio(tenant, fromNumber, caption);
-        } else {
-          const noPicMsg = "Hatuna picha ya hiyo kwa sasa, but I can share all details or help you book it!";
-          await sendWhatsAppText(tenant, fromNumber, noPicMsg);
-          if (isVoiceInput) await sendWhatsAppElevenLabsAudio(tenant, fromNumber, noPicMsg);
-        }
-      } catch (err) {
-        const fallbackMsg = "Form ni gani! Let me know which catalog item you'd like to check out.";
-        await sendWhatsAppText(tenant, fromNumber, fallbackMsg);
-        if (isVoiceInput) await sendWhatsAppElevenLabsAudio(tenant, fromNumber, fallbackMsg);
-      }
-
-    } else if (responseText.includes('HUMAN_HANDOFF')) {
-      profile.isPaused = true;
-      saveStore();
-
-      const handoffMsg = `Give me one second! Let me connect you directly to our manager at ${tenant.businessName}.`;
-      await sendWhatsAppText(tenant, fromNumber, handoffMsg);
-      if (isVoiceInput) await sendWhatsAppElevenLabsAudio(tenant, fromNumber, handoffMsg);
-
-      let reason = "Customer requested human consultation";
-      try {
-        const jsonMatch = responseText.match(/\{[\s\S]*"action"\s*:\s*"HUMAN_HANDOFF"[\s\S]*\}/);
-        if (jsonMatch) reason = JSON.parse(jsonMatch[0]).reason || reason;
-      } catch (e) {}
-
-      if (tenant.escalationPhone) {
-        const summary = `• Stage: ${profile.stage}\n• Reason: ${reason}`;
-        const alertPayload = `🚨 *HUMAN HANDOFF ALERT [${tenant.businessName}]*\nCustomer: +${fromNumber}\n\n*SUMMARY:*\n${summary}\n\nSend */unpause* to resume AI.`;
-        await sendWhatsAppText(tenant, tenant.escalationPhone, alertPayload);
-      }
-
-    } else if (responseText.includes('STK_PUSH')) {
-      try {
-        const jsonMatch = responseText.match(/\{[\s\S]*"action"\s*:\s*"STK_PUSH"[\s\S]*\}/);
-        const paymentData = JSON.parse(jsonMatch ? jsonMatch[0] : responseText);
-
-        const item = tenant.catalog.find(i => i.name.toLowerCase().includes(paymentData.item.toLowerCase()) || String(i.id) === String(paymentData.itemId));
-        if (item && item.stock <= 0) {
-          const outOfStockMsg = `Pole sana! *${item.name}* is currently out of stock.`;
-          await sendWhatsAppText(tenant, fromNumber, outOfStockMsg);
-          if (isVoiceInput) await sendWhatsAppElevenLabsAudio(tenant, fromNumber, outOfStockMsg);
-          return;
-        }
-
-        profile.stage = 'CLOSING';
-        profile.cart = {
-          item: paymentData.item,
-          amount: paymentData.amount,
-          imageUrl: (item && item.hasImage) ? item.imageUrl : null,
-          timestamp: new Date().toISOString()
-        };
-        saveStore();
-
-        if (profile.cart.imageUrl) {
-          await sendWhatsAppImage(tenant, fromNumber, profile.cart.imageUrl, `🛒 *${paymentData.item}* — KSh ${paymentData.amount}`);
-        }
-
-        const promptMsg = `Sending the M-Pesa prompt for KSh ${paymentData.amount} right now. Check your phone to enter your PIN!`;
-        await sendWhatsAppText(tenant, fromNumber, promptMsg);
-        if (isVoiceInput) await sendWhatsAppElevenLabsAudio(tenant, fromNumber, promptMsg);
-
-        const stkResult = await triggerTenantSTKPush(tenant, fromNumber, paymentData.amount, paymentData.item);
-        if (stkResult?.result?.CheckoutRequestID) {
-          db.orders[stkResult.result.CheckoutRequestID] = {
-            tenantId: tenant.id,
-            phone: fromNumber,
-            item: paymentData.item,
-            amount: paymentData.amount,
-            timestamp: new Date().toISOString()
-          };
-          saveStore();
-        }
-      } catch (jsonErr) {
-        await sendWhatsAppText(tenant, fromNumber, responseText);
-        if (isVoiceInput) await sendWhatsAppElevenLabsAudio(tenant, fromNumber, responseText);
-      }
-
-    } else {
-      await sendWhatsAppText(tenant, fromNumber, responseText);
-      if (isVoiceInput) {
-        await sendWhatsAppElevenLabsAudio(tenant, fromNumber, responseText);
-      }
+    await sendWhatsAppText(tenant, fromNumber, responseText);
+    if (isVoiceInput) {
+      await sendWhatsAppElevenLabsAudio(tenant, fromNumber, responseText);
     }
-
-  } catch (err) {
-    console.error('❌ Webhook Processing Error:', err.message);
-  }
-}
-
-app.get('/webhook', handleWebhookVerification);
-app.post('/webhook', handleWebhookIncoming);
-app.get('/api/webhook', handleWebhookVerification);
-app.post('/api/webhook', handleWebhookIncoming);
-
-// ==========================================
-// 9. M-PESA DARAJA CALLBACK WEBHOOK
-// ==========================================
-app.post('/api/stk-callback', async (req, res) => {
-  res.status(200).json({ ResultCode: 0, ResultDesc: "Accepted" });
-
-  try {
-    const callbackData = req.body?.Body?.stkCallback;
-    if (!callbackData) return;
-
-    const checkoutReqId = callbackData.CheckoutRequestID;
-    const resultCode = callbackData.ResultCode;
-    const savedOrder = db.orders[checkoutReqId];
-
-    if (!savedOrder) return;
-    const tenant = db.tenants[savedOrder.tenantId] || db.tenants["luvon_q_flagship"];
-    const metadata = callbackData.CallbackMetadata?.Item;
-    const phone = metadata?.find(i => i.Name === 'PhoneNumber')?.Value || savedOrder.phone;
-
-    if (resultCode === 0 && phone) {
-      const receipt = metadata?.find(i => i.Name === 'MpesaReceiptNumber')?.Value || 'MPESA_VERIFIED';
-      const amount = Number(metadata?.find(i => i.Name === 'Amount')?.Value || savedOrder.amount || 0);
-      const purchasedItem = savedOrder.item || "Catalog Item";
-
-      const catalogItem = tenant.catalog.find(i => i.name.toLowerCase() === purchasedItem.toLowerCase());
-      if (catalogItem && catalogItem.stock > 0) {
-        catalogItem.stock -= 1;
-      }
-
-      db.attributionLedger.push({
-        tenantId: tenant.id,
-        phone,
-        amount,
-        item: purchasedItem,
-        receipt,
-        channel: 'WhatsApp_AI_Agent',
-        timestamp: new Date().toISOString()
-      });
-
-      const sessionKey = `${tenant.id}_${phone}`;
-      if (db.crmProfiles[sessionKey]) {
-        db.crmProfiles[sessionKey].stage = 'POST_PURCHASE';
-        db.crmProfiles[sessionKey].cart = null;
-      }
-
-      delete db.orders[checkoutReqId];
-      saveStore();
-
-      const confMsg = `✅ *Payment Confirmed!*\n\nTumepokea *KSh ${amount}* (Receipt: *${receipt}*).\n\nThank you for choosing *${tenant.businessName}*!`;
-      await sendWhatsAppText(tenant, phone, confMsg);
-    } else if (phone && savedOrder) {
-      delete db.orders[checkoutReqId];
-      saveStore();
-      await sendWhatsAppText(
-        tenant,
-        phone,
-        `No problem at all! Your order for *${savedOrder.item}* (KSh ${savedOrder.amount}) is saved. Whenever you're ready, reply *PAY*.`
-      );
-    }
-  } catch (err) {
-    console.error('❌ Callback error:', err.message);
+  } catch (e) {
+    console.error('Webhook intake notice:', e.message);
   }
 });
 
+app.post('/api/stk-callback', (req, res) => {
+  res.status(200).json({ ResultCode: 0, ResultDesc: "Accepted" });
+});
+
 // ==========================================
-// 10. REST DATA ENDPOINTS
+// 9. REST DATA & SETTINGS ENDPOINTS
 // ==========================================
 app.get('/api/tenant/settings', tenantMiddleware, (req, res) => {
   res.json({
@@ -964,12 +749,11 @@ app.get('/api/tenant/metrics', tenantMiddleware, async (req, res) => {
 
 app.get('/api/tenant/inventory', tenantMiddleware, async (req, res) => {
   try {
-    const { data, error } = await supabase
-      .from('inventory')
-      .select('*')
-      .eq('tenant_id', req.tenant.id);
-    if (!error && data && data.length > 0) {
-      return res.json(data);
+    const invRes = await axios.get(`${SUPABASE_URL}/rest/v1/inventory?tenant_id=eq.${req.tenant.id}`, {
+      headers: supabaseHeaders
+    });
+    if (invRes.data && invRes.data.length > 0) {
+      return res.json(invRes.data);
     }
   } catch (e) {}
   res.json(req.tenant.catalog || []);
@@ -991,17 +775,15 @@ app.post('/api/tenant/inventory', tenantMiddleware, async (req, res) => {
   req.tenant.catalog.push(newItem);
   saveStore();
 
-  try {
-    await supabase.from('inventory').insert({
-      tenant_id: req.tenant.id,
-      name,
-      price: Number(price),
-      stock: Number(stock || 0),
-      category,
-      tags,
-      image_url: imageUrl
-    });
-  } catch (e) {}
+  await axios.post(`${SUPABASE_URL}/rest/v1/inventory`, {
+    tenant_id: req.tenant.id,
+    name,
+    price: Number(price),
+    stock: Number(stock || 0),
+    category,
+    tags,
+    image_url: imageUrl
+  }, { headers: supabaseHeaders }).catch(() => {});
 
   res.status(201).json(newItem);
 });
@@ -1112,7 +894,7 @@ app.post('/api/tenant/payments/daraja', tenantMiddleware, (req, res) => {
   res.json({ success: true, daraja: req.tenant.daraja });
 });
 
-// TEST STK TRIGGER WITH DETAILED ERROR REPORTING
+// Test STK Push
 app.post('/api/tenant/payments/test-stk', tenantMiddleware, async (req, res) => {
   const { testPhone } = req.body;
   let cleanPhone = String(testPhone || "254708374149").replace(/\D/g, '').trim();
@@ -1124,7 +906,7 @@ app.post('/api/tenant/payments/test-stk', tenantMiddleware, async (req, res) => 
   if (result.success && (result.result?.ResponseCode === "0" || result.result?.CheckoutRequestID)) {
     return res.status(200).json({ 
       success: true, 
-      message: result.result?.CustomerMessage || "STK push accepted by Safaricom Sandbox!",
+      message: result.result?.CustomerMessage || "STK push dispatched!",
       result: result.result 
     });
   }
@@ -1154,18 +936,16 @@ app.post('/api/tenant/conversations/toggle-pause', tenantMiddleware, (req, res) 
 });
 
 // ==========================================
-// 11. ROOT & SPA ROUTE FALLBACKS
+// 10. ROOT & SPA ROUTE FALLBACKS
 // ==========================================
 app.get('/', (req, res) => {
   const indexPath = path.join(__dirname, 'index.html');
-  if (fs.existsSync(indexPath)) {
-    return res.sendFile(indexPath);
-  }
+  if (fs.existsSync(indexPath)) return res.sendFile(indexPath);
   res.send("Luvon Q API is running.");
 });
 
 // ==========================================
-// 12. CRON SCHEDULER
+// 11. CRON SCHEDULER
 // ==========================================
 if (!process.env.VERCEL) {
   cron.schedule('0 * * * *', async () => {
@@ -1204,7 +984,7 @@ if (!process.env.VERCEL) {
 }
 
 // ==========================================
-// 13. EXPORT FOR VERCEL & LOCAL LISTENER
+// 12. EXPORT & RUNNER
 // ==========================================
 const PORT = process.env.PORT || 3000;
 if (process.env.NODE_ENV !== 'production' || !process.env.VERCEL) {
