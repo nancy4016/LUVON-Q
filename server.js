@@ -9,7 +9,7 @@ const cron = require('node-cron');
 // 1. SUPABASE REST & AUTH INTEGRATION VIA AXIOS
 const SUPABASE_URL = process.env.SUPABASE_URL || 'https://kmwwgmzypjnjfkpoyims.supabase.co';
 const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY || 'sb_publishable_DhTvZ4K5YCYLXErehDkBFQ_noylBgEH';
-const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || SUPABASE_ANON_KEY;
+const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
 const supabaseHeaders = {
   'apikey': SUPABASE_ANON_KEY,
@@ -22,6 +22,7 @@ const geminiApiKey = (process.env.GEMINI_API_KEY || "").trim();
 console.log("🔑 WhatsApp Token Prefix:", process.env.WHATSAPP_ACCESS_TOKEN ? process.env.WHATSAPP_ACCESS_TOKEN.substring(0, 14) + "..." : "❌ NO TOKEN LOADED");
 console.log("✨ Gemini Key Prefix:", geminiApiKey ? geminiApiKey.substring(0, 10) + "..." : "❌ NO GEMINI KEY LOADED");
 console.log("🗄️ Supabase REST Host:", SUPABASE_URL);
+console.log("🛡️ Supabase Service Role Key:", SUPABASE_SERVICE_ROLE_KEY ? "CONFIGURED" : "❌ MISSING (Required for Team Invites)");
 
 const app = express();
 app.use(express.json());
@@ -64,7 +65,7 @@ function initializeStore() {
         "luvon_q_flagship": {
           id: "luvon_q_flagship",
           businessName: "Luvon Q Flagship",
-          brandSignature: "Luvon Q Orélune",
+          brandSignature: "Defining the Gold Standard",
           industry: "Luxury Conversational Commerce",
           tone: "luxury_chic",
           languagePreference: "mirror_user",
@@ -285,51 +286,106 @@ app.get('/api/tenant/team', tenantMiddleware, (req, res) => {
   });
 });
 
-// Team Members: Invite (Sends real email through Supabase Auth + Resend SMTP)
+// Team Members: Invite (Direct Supabase Auth Dispatch + Strict Error Catching)
 app.post('/api/tenant/team/invite', tenantMiddleware, async (req, res) => {
   const { email, role } = req.body;
   if (!email || !email.includes('@')) {
     return res.status(400).json({ error: "A valid email address is required." });
   }
 
+  const cleanEmail = email.trim().toLowerCase();
   if (!req.tenant.teamMembers) req.tenant.teamMembers = [];
   
-  const existing = req.tenant.teamMembers.find(m => m.email.toLowerCase() === email.toLowerCase());
+  const existing = req.tenant.teamMembers.find(m => m.email.toLowerCase() === cleanEmail);
   if (existing) {
-    return res.status(400).json({ error: "This email has already been invited." });
+    return res.status(400).json({ error: "This email already has an active invitation or workspace role." });
   }
 
-  const newMember = {
-    id: 'mem_' + Date.now(),
-    email: email.trim().toLowerCase(),
-    role: role || 'Sales Agent',
-    status: 'Invited',
-    invitedAt: new Date().toISOString()
-  };
-
-  req.tenant.teamMembers.push(newMember);
-  saveStore();
+  // Ensure Service Role Key is available to authorize /auth/v1/invite
+  const keyToUse = SUPABASE_SERVICE_ROLE_KEY || SUPABASE_ANON_KEY;
+  if (!SUPABASE_SERVICE_ROLE_KEY) {
+    console.warn("⚠️ SUPABASE_SERVICE_ROLE_KEY is missing. Attempting with ANON key (may be blocked by Supabase Auth).");
+  }
 
   try {
-    await axios.post(
+    // 1. Dispatch official Supabase Auth invitation email
+    const authInviteRes = await axios.post(
       `${SUPABASE_URL}/auth/v1/invite`,
       { 
-        email: email.trim().toLowerCase(),
-        data: { role: role || 'Sales Agent', tenant_id: req.tenant.id }
+        email: cleanEmail,
+        data: {
+          role: role || 'Sales Agent',
+          tenant_id: req.tenant.id,
+          tenant_name: req.tenant.businessName
+        }
       },
       {
         headers: {
-          'apikey': SUPABASE_SERVICE_ROLE_KEY,
-          'Authorization': `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
+          'apikey': keyToUse,
+          'Authorization': `Bearer ${keyToUse}`,
           'Content-Type': 'application/json'
         }
       }
     );
+
+    // 2. Add as Pending to the workspace record
+    const newMember = {
+      id: authInviteRes.data?.id ? 'mem_' + authInviteRes.data.id.slice(0, 8) : 'mem_' + Date.now(),
+      email: cleanEmail,
+      role: role || 'Sales Agent',
+      status: 'Pending',
+      invitedAt: new Date().toISOString()
+    };
+
+    req.tenant.teamMembers.push(newMember);
+    saveStore();
+
+    return res.json({ success: true, member: newMember, message: `Invitation dispatched to ${cleanEmail}` });
   } catch (authErr) {
-    console.warn("Auth invite dispatch notice:", authErr.response?.data?.msg || authErr.message);
+    const errorDetails = authErr.response?.data?.msg || authErr.response?.data?.error_description || authErr.message;
+    console.error("❌ Supabase Auth Invite Rejected:", errorDetails);
+    
+    // Distinguish service role configuration issues
+    if (authErr.response?.status === 401 || authErr.response?.status === 403) {
+      return res.status(500).json({ 
+        error: "Supabase denied invitation dispatch. SUPABASE_SERVICE_ROLE_KEY must be added to your environment variables on Render." 
+      });
+    }
+
+    return res.status(400).json({ error: `Invite failed: ${errorDetails}` });
+  }
+});
+
+// Team Members: Resend Invitation
+app.post('/api/tenant/team/resend', tenantMiddleware, async (req, res) => {
+  const { memberId } = req.body;
+  const member = (req.tenant.teamMembers || []).find(m => m.id === memberId);
+
+  if (!member) {
+    return res.status(404).json({ error: "Team member not found." });
   }
 
-  res.json({ success: true, member: newMember });
+  const keyToUse = SUPABASE_SERVICE_ROLE_KEY || SUPABASE_ANON_KEY;
+  try {
+    await axios.post(
+      `${SUPABASE_URL}/auth/v1/invite`,
+      { 
+        email: member.email,
+        data: { role: member.role, tenant_id: req.tenant.id }
+      },
+      {
+        headers: {
+          'apikey': keyToUse,
+          'Authorization': `Bearer ${keyToUse}`,
+          'Content-Type': 'application/json'
+        }
+      }
+    );
+    return res.json({ success: true, message: `Invitation resent to ${member.email}` });
+  } catch (err) {
+    const errorDetails = err.response?.data?.msg || err.message;
+    return res.status(400).json({ error: `Could not resend: ${errorDetails}` });
+  }
 });
 
 // Team Members: Remove
@@ -384,9 +440,7 @@ app.post('/api/auth/signup', async (req, res) => {
     const user = authRes.data.user || authRes.data;
     const session = authRes.data.session || null;
 
-    // Check if Supabase requires email verification
     const requiresVerification = !session && (!user.confirmed_at && !user.email_confirmed_at);
-
     const tenantId = 'tenant_' + (user.id ? user.id.slice(0, 8) : Date.now());
 
     await axios.post(`${SUPABASE_URL}/rest/v1/tenants`, {

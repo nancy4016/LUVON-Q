@@ -108,16 +108,24 @@
         return;
       }
 
-      tableBody.innerHTML = members.map(m => `
-        <tr class="hover:bg-brand-50/50 transition-colors">
-          <td class="p-3.5 font-medium text-brand-900">${m.email}</td>
-          <td class="p-3.5 font-semibold text-slate-700">${m.role}</td>
-          <td class="p-3.5"><span class="px-2 py-0.5 text-[10px] font-bold bg-amber-100 text-amber-800 rounded-full">${m.status}</span></td>
-          <td class="p-3.5 text-right">
-            <button onclick="removeMember('${m.id}')" class="text-rose-600 hover:underline font-semibold cursor-pointer">Remove</button>
-          </td>
-        </tr>
-      `).join('');
+      tableBody.innerHTML = members.map(m => {
+        const isPending = m.status === 'Pending' || m.status === 'Invited';
+        const statusBadge = isPending
+          ? `<span class="px-2 py-0.5 text-[10px] font-bold bg-amber-100 text-amber-800 rounded-full border border-amber-300">Pending</span>`
+          : `<span class="px-2 py-0.5 text-[10px] font-bold bg-emerald-100 text-emerald-800 rounded-full border border-emerald-300">Active</span>`;
+
+        return `
+          <tr class="hover:bg-brand-50/50 transition-colors">
+            <td class="p-3.5 font-medium text-brand-900">${m.email}</td>
+            <td class="p-3.5 font-semibold text-slate-700">${m.role}</td>
+            <td class="p-3.5">${statusBadge}</td>
+            <td class="p-3.5 text-right space-x-2">
+              ${isPending ? `<button onclick="resendMemberInvite('${m.id}')" class="text-brand-600 hover:underline font-semibold cursor-pointer">Resend</button>` : ''}
+              <button onclick="removeMember('${m.id}')" class="text-rose-600 hover:underline font-semibold cursor-pointer">Remove</button>
+            </td>
+          </tr>
+        `;
+      }).join('');
 
       if (window.lucide) lucide.createIcons();
     } catch (err) {
@@ -134,7 +142,8 @@
     if (!emailInput || !emailInput.value.trim()) return;
 
     btn.disabled = true;
-    btn.textContent = 'Inviting...';
+    btn.innerHTML = `<i data-lucide="loader-2" class="w-4 h-4 animate-spin"></i> Dispathing...`;
+    if (window.lucide) lucide.createIcons();
 
     try {
       const res = await fetch(`${BASE_URL}/api/tenant/team/invite`, {
@@ -150,9 +159,9 @@
       });
 
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Failed to invite member');
+      if (!res.ok) throw new Error(data.error || 'Failed to dispatch invitation');
 
-      window.API.showToast(`Invitation sent to ${emailInput.value}!`, 'success');
+      window.API.showToast(data.message || `Invitation sent to ${emailInput.value}!`, 'success');
       emailInput.value = '';
       loadTeamMembers();
     } catch (err) {
@@ -161,6 +170,24 @@
       btn.disabled = false;
       btn.innerHTML = `<i data-lucide="user-plus" class="w-4 h-4"></i> Invite Member`;
       if (window.lucide) lucide.createIcons();
+    }
+  }
+
+  async function resendMemberInvite(memberId) {
+    try {
+      const res = await fetch(`${BASE_URL}/api/tenant/team/resend`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-tenant-id': getActiveTenantId()
+        },
+        body: JSON.stringify({ memberId })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to resend');
+      window.API.showToast(data.message || 'Invitation resent successfully!', 'success');
+    } catch (err) {
+      window.API.showToast(err.message, 'error');
     }
   }
 
@@ -226,6 +253,7 @@
   }
 
   window.removeMember = removeMember;
+  window.resendMemberInvite = resendMemberInvite;
   window.openDeleteModal = openDeleteModal;
   window.closeDeleteModal = closeDeleteModal;
   window.executeAccountDeletion = executeAccountDeletion;
