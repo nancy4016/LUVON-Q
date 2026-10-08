@@ -53,63 +53,78 @@ function updateCarousel(index) {
 }
 
 // ==========================================
-// 2. LIVE BACKEND DATA INTEGRATION
+// 2. LIVE MULTI-TENANT BACKEND INTEGRATION
 // ==========================================
-const APP_BASE_ORIGIN = (typeof window !== 'undefined' && window.location.origin && window.location.origin.includes('http'))
+const APP_BASE_ORIGIN = (typeof window !== 'undefined' && window.location.origin && window.location.origin.includes('http') && !window.location.origin.includes('localhost'))
   ? window.location.origin
-  : 'http://localhost:3000';
-const APP_TENANT_ID = 'luvon_q_flagship';
+  : 'https://luvon-engine.onrender.com';
 
 async function loadLiveDashboardData() {
-  // 1. Fetch KPI Metrics
-  try {
-    const metrics = (typeof window.API !== 'undefined' && typeof window.API.getMetrics === 'function')
-      ? await window.API.getMetrics()
-      : (typeof apiCall === 'function')
-        ? await apiCall('/metrics')
-        : await (await fetch(`${APP_BASE_ORIGIN}/api/tenant/metrics`, {
-            headers: { 'x-tenant-id': APP_TENANT_ID }
-          })).json();
+  const activeTenantId = localStorage.getItem('luvon_active_tenant_id');
+  const signedOutBanner = document.getElementById('signedOutBanner');
+  const authenticatedArea = document.getElementById('authenticatedDataArea');
 
-    const revEl = document.getElementById('totalRevenue') || document.querySelector('[data-metric="revenue"]');
-    const closedEl = document.getElementById('dealsClosed') || document.querySelector('[data-metric="deals"]');
-    const chatsEl = document.getElementById('activeCustomers') || document.querySelector('[data-metric="active"]');
-    const itemsEl = document.getElementById('totalCatalogItems') || document.querySelector('[data-metric="items"]');
+  // If user is signed out, lock dashboard and show clean signed-out state
+  if (!activeTenantId) {
+    if (signedOutBanner) signedOutBanner.classList.remove('hidden');
+    if (authenticatedArea) authenticatedArea.classList.add('hidden');
+    if (window.lucide && typeof window.lucide.createIcons === 'function') {
+      window.lucide.createIcons();
+    }
+    return;
+  }
+
+  // User is authenticated: reveal data container and hide signed-out banner
+  if (signedOutBanner) signedOutBanner.classList.add('hidden');
+  if (authenticatedArea) authenticatedArea.classList.remove('hidden');
+
+  // 1. Fetch KPI Metrics for this specific tenant
+  try {
+    const res = await fetch(`${APP_BASE_ORIGIN}/api/tenant/metrics`, {
+      headers: { 'x-tenant-id': activeTenantId }
+    });
+    const metrics = await res.json();
+
+    const revEl = document.getElementById('totalRevenue');
+    const closedEl = document.getElementById('dealsClosed');
+    const chatsEl = document.getElementById('activeCustomers');
+    const itemsEl = document.getElementById('totalCatalogItems');
 
     if (revEl) revEl.textContent = `KSh ${Number(metrics.totalRevenue || 0).toLocaleString()}`;
     if (closedEl) closedEl.textContent = metrics.dealsClosed || 0;
     if (chatsEl) chatsEl.textContent = metrics.activeCustomers || 0;
     if (itemsEl) itemsEl.textContent = metrics.catalogItems || 0;
   } catch (err) {
-    console.warn('⚠️ Could not load live metrics from backend:', err.message);
+    console.warn('⚠️ Could not load metrics:', err.message);
   }
 
-  // 2. Fetch Live Inventory Catalog
+  // 2. Fetch Live Inventory Catalog for this specific tenant
   try {
-    const inventory = (typeof window.API !== 'undefined' && typeof window.API.getInventory === 'function')
-      ? await window.API.getInventory()
-      : (typeof apiCall === 'function')
-        ? await apiCall('/inventory')
-        : await (await fetch(`${APP_BASE_ORIGIN}/api/tenant/inventory`, {
-            headers: { 'x-tenant-id': APP_TENANT_ID }
-          })).json();
-
-    renderInventoryTable(inventory);
+    const res = await fetch(`${APP_BASE_ORIGIN}/api/tenant/inventory`, {
+      headers: { 'x-tenant-id': activeTenantId }
+    });
+    const inventory = await res.json();
+    renderInventoryTable(Array.isArray(inventory) ? inventory : []);
   } catch (err) {
-    console.warn('⚠️ Could not load live inventory from backend:', err.message);
+    console.warn('⚠️ Could not load inventory:', err.message);
   }
 }
 
 function renderInventoryTable(items) {
   const tableBody = document.getElementById("inventory-table-body");
-  if (!tableBody || !Array.isArray(items)) return;
+  if (!tableBody) return;
 
-  if (items.length === 0) {
+  if (!items || items.length === 0) {
     tableBody.innerHTML = `
       <tr>
-        <td colspan="6" class="p-4 text-center text-slate-400">No catalog items found. Add items via the Catalog tab.</td>
+        <td colspan="6" class="p-6 text-center text-slate-400 font-medium">
+          No inventory items found. Use the prompt bar above or click "+ Manage Catalog" to create items.
+        </td>
       </tr>
     `;
+    if (window.lucide && typeof window.lucide.createIcons === 'function') {
+      window.lucide.createIcons();
+    }
     return;
   }
 
@@ -131,8 +146,8 @@ function renderInventoryTable(items) {
     </tr>
   `).join('');
 
-  if (window.lucide) {
-    lucide.createIcons();
+  if (window.lucide && typeof window.lucide.createIcons === 'function') {
+    window.lucide.createIcons();
   }
 }
 
@@ -167,11 +182,13 @@ function highlightActiveRoute() {
 // 4. GLOBAL INITIALIZATION
 // ==========================================
 document.addEventListener("DOMContentLoaded", () => {
-  if (window.lucide) lucide.createIcons();
-
   highlightActiveRoute();
   updateCarousel(0);
   loadLiveDashboardData();
+
+  if (window.lucide && typeof window.lucide.createIcons === 'function') {
+    window.lucide.createIcons();
+  }
 
   // Carousel auto-advance
   setInterval(() => {
@@ -191,6 +208,8 @@ document.addEventListener("DOMContentLoaded", () => {
   });
 
   setTimeout(() => {
-    if (window.lucide) lucide.createIcons();
-  }, 400);
+    if (window.lucide && typeof window.lucide.createIcons === 'function') {
+      window.lucide.createIcons();
+    }
+  }, 300);
 });

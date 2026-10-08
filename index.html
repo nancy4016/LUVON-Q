@@ -34,13 +34,20 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Playfair+Display:ital,wght@0,600;0,700;1,400&display=swap" rel="stylesheet">
   
-  <!-- Direct, Verified Lucide CDN (HTTP 200, No document.write, No 404s) -->
-  <script src="https://cdn.jsdelivr.net/npm/lucide@0.344.0/dist/umd/lucide.min.js"></script>
-  
+  <!-- Rock-Solid Direct Lucide Production Script -->
+  <script src="https://unpkg.com/lucide@0.344.0/dist/umd/lucide.js"></script>
+
+  <!-- Strict SVG Sizing Rules: Prevents icons from collapsing to 0px -->
   <style>
-    svg.lucide { 
+    svg.lucide, i[data-lucide] svg { 
       display: inline-block !important; 
-      vertical-align: middle !important; 
+      vertical-align: middle !important;
+      stroke-width: 2 !important;
+    }
+    i[data-lucide] {
+      display: inline-flex !important;
+      align-items: center !important;
+      justify-content: center !important;
     }
   </style>
   <link rel="stylesheet" href="styles.css" />
@@ -299,6 +306,12 @@
       backdrop.classList.toggle("hidden");
     }
 
+    function renderIcons() {
+      if (typeof lucide !== 'undefined' && lucide.createIcons) {
+        lucide.createIcons();
+      }
+    }
+
     async function handleHomePagePromptSubmit(e) {
       e.preventDefault();
       const input = document.getElementById('homeAiPromptInput');
@@ -327,15 +340,12 @@
       await window.API.runAIBusinessSetup(textarea.value.trim());
     }
 
-    function renderIcons() {
-      if (window.lucide && typeof window.lucide.createIcons === 'function') {
-        window.lucide.createIcons();
-      }
-    }
-    
+    // Call icon rendering multiple times to catch delayed script loads
     document.addEventListener("DOMContentLoaded", renderIcons);
     window.addEventListener("load", renderIcons);
-    setTimeout(renderIcons, 250);
+    setTimeout(renderIcons, 200);
+    setTimeout(renderIcons, 600);
+    setTimeout(renderIcons, 1500);
   </script>
 </body>
 </html>
