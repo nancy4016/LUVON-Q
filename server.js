@@ -9,6 +9,7 @@ const cron = require('node-cron');
 // 1. SUPABASE REST & AUTH INTEGRATION VIA AXIOS
 const SUPABASE_URL = process.env.SUPABASE_URL || 'https://kmwwgmzypjnjfkpoyims.supabase.co';
 const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY || 'sb_publishable_DhTvZ4K5YCYLXErehDkBFQ_noylBgEH';
+const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || SUPABASE_ANON_KEY;
 
 const supabaseHeaders = {
   'apikey': SUPABASE_ANON_KEY,
@@ -70,6 +71,9 @@ function initializeStore() {
           elevenLabsVoiceId: process.env.ELEVENLABS_VOICE_ID || DEFAULT_FEMALE_VOICE_ID,
           escalationPhone: process.env.AGENT_PHONE_NUMBER || "254768820142",
           whatsappPhoneId: process.env.WHATSAPP_PHONE_NUMBER_ID || "1279716021891578",
+          currency: "KSh",
+          orderPrefix: "LQ",
+          enableAlerts: true,
           teamMembers: [],
           catalog: []
         }
@@ -113,6 +117,9 @@ function tenantMiddleware(req, res, next) {
       businessName: "Merchant Store",
       industry: "Retail & Services",
       tone: "luxury_chic",
+      currency: "KSh",
+      orderPrefix: "ORD",
+      enableAlerts: true,
       teamMembers: [],
       catalog: []
     };
@@ -195,7 +202,6 @@ Return STRICT RAW JSON only. Do not wrap in markdown or backticks.
     req.tenant.tone = parsed.tone || req.tenant.tone;
     req.tenant.catalog = parsed.catalog || [];
 
-    // Sync to Supabase via native REST
     await axios.post(`${SUPABASE_URL}/rest/v1/tenants`, {
       id: req.tenant.id,
       business_name: req.tenant.businessName,
@@ -245,6 +251,32 @@ app.post('/api/ai-onboard', tenantMiddleware, handleAIOnboarding);
 // ==========================================
 // 3. SETTINGS & WORKSPACE API ENDPOINTS
 // ==========================================
+// Account & Profile: Update
+app.post('/api/tenant/settings/profile', tenantMiddleware, async (req, res) => {
+  const { businessName, brandSignature, industry, escalationPhone, currency, orderPrefix, enableAlerts } = req.body;
+
+  if (businessName) req.tenant.businessName = businessName;
+  if (brandSignature !== undefined) req.tenant.brandSignature = brandSignature;
+  if (industry) req.tenant.industry = industry;
+  if (escalationPhone !== undefined) req.tenant.escalationPhone = escalationPhone;
+  if (currency) req.tenant.currency = currency;
+  if (orderPrefix) req.tenant.orderPrefix = orderPrefix;
+  if (enableAlerts !== undefined) req.tenant.enableAlerts = Boolean(enableAlerts);
+
+  saveStore();
+
+  await axios.post(`${SUPABASE_URL}/rest/v1/tenants`, {
+    id: req.tenant.id,
+    business_name: req.tenant.businessName,
+    brand_signature: req.tenant.brandSignature,
+    industry: req.tenant.industry
+  }, {
+    headers: { ...supabaseHeaders, 'Prefer': 'resolution=merge-duplicates' }
+  }).catch(() => {});
+
+  res.json({ success: true, tenant: req.tenant });
+});
+
 // Team Members: List
 app.get('/api/tenant/team', tenantMiddleware, (req, res) => {
   res.json({
@@ -253,8 +285,8 @@ app.get('/api/tenant/team', tenantMiddleware, (req, res) => {
   });
 });
 
-// Team Members: Invite
-app.post('/api/tenant/team/invite', tenantMiddleware, (req, res) => {
+// Team Members: Invite (Sends real email through Supabase Auth + Resend SMTP)
+app.post('/api/tenant/team/invite', tenantMiddleware, async (req, res) => {
   const { email, role } = req.body;
   if (!email || !email.includes('@')) {
     return res.status(400).json({ error: "A valid email address is required." });
@@ -278,6 +310,25 @@ app.post('/api/tenant/team/invite', tenantMiddleware, (req, res) => {
   req.tenant.teamMembers.push(newMember);
   saveStore();
 
+  try {
+    await axios.post(
+      `${SUPABASE_URL}/auth/v1/invite`,
+      { 
+        email: email.trim().toLowerCase(),
+        data: { role: role || 'Sales Agent', tenant_id: req.tenant.id }
+      },
+      {
+        headers: {
+          'apikey': SUPABASE_SERVICE_ROLE_KEY,
+          'Authorization': `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
+          'Content-Type': 'application/json'
+        }
+      }
+    );
+  } catch (authErr) {
+    console.warn("Auth invite dispatch notice:", authErr.response?.data?.msg || authErr.message);
+  }
+
   res.json({ success: true, member: newMember });
 });
 
@@ -299,12 +350,10 @@ app.delete('/api/tenant/account', tenantMiddleware, async (req, res) => {
   }
 
   try {
-    // 1. Wipe Supabase tables
     await axios.delete(`${SUPABASE_URL}/rest/v1/inventory?tenant_id=eq.${tenantId}`, { headers: supabaseHeaders }).catch(() => {});
     await axios.delete(`${SUPABASE_URL}/rest/v1/conversations?tenant_id=eq.${tenantId}`, { headers: supabaseHeaders }).catch(() => {});
     await axios.delete(`${SUPABASE_URL}/rest/v1/tenants?id=eq.${tenantId}`, { headers: supabaseHeaders }).catch(() => {});
 
-    // 2. Wipe memory store
     delete db.tenants[tenantId];
     db.attributionLedger = db.attributionLedger.filter(l => l.tenantId !== tenantId);
     Object.keys(db.crmProfiles).forEach(k => {
@@ -333,6 +382,11 @@ app.post('/api/auth/signup', async (req, res) => {
     }, { headers: supabaseHeaders });
 
     const user = authRes.data.user || authRes.data;
+    const session = authRes.data.session || null;
+
+    // Check if Supabase requires email verification
+    const requiresVerification = !session && (!user.confirmed_at && !user.email_confirmed_at);
+
     const tenantId = 'tenant_' + (user.id ? user.id.slice(0, 8) : Date.now());
 
     await axios.post(`${SUPABASE_URL}/rest/v1/tenants`, {
@@ -349,12 +403,21 @@ app.post('/api/auth/signup', async (req, res) => {
       brandSignature: (fullName || 'New Business') + ' Official',
       industry: 'Retail & Services',
       tone: 'luxury_chic',
+      currency: 'KSh',
+      orderPrefix: 'LQ',
+      enableAlerts: true,
       teamMembers: [],
       catalog: []
     };
     saveStore();
 
-    res.json({ success: true, user, tenantId, businessName: fullName });
+    res.json({
+      success: true,
+      requiresVerification,
+      user,
+      tenantId,
+      businessName: fullName
+    });
   } catch (err) {
     const msg = err.response?.data?.msg || err.response?.data?.error_description || err.message;
     res.status(400).json({ error: msg });
@@ -385,7 +448,12 @@ app.post('/api/auth/signin', async (req, res) => {
     }
 
     if (!db.tenants[tenantId]) {
-      db.tenants[tenantId] = { id: tenantId, businessName, teamMembers: [], catalog: [] };
+      db.tenants[tenantId] = {
+        id: tenantId,
+        businessName,
+        teamMembers: [],
+        catalog: []
+      };
       saveStore();
     }
 

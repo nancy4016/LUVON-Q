@@ -1,4 +1,4 @@
-// settings.js - Workspace & Team Logic
+// settings.js - Workspace & Comprehensive Account Logic
 (function () {
   const BASE_URL = (typeof window !== 'undefined' && window.location.origin && window.location.origin.includes('http') && !window.location.origin.includes('localhost'))
     ? window.location.origin
@@ -6,6 +6,83 @@
 
   function getActiveTenantId() {
     return localStorage.getItem('luvon_active_tenant_id') || 'luvon_q_flagship';
+  }
+
+  async function loadWorkspaceSettings() {
+    try {
+      const res = await fetch(`${BASE_URL}/api/tenant/settings`, {
+        headers: { 'x-tenant-id': getActiveTenantId() }
+      });
+      const data = await res.json();
+      if (!data.success || !data.tenant) return;
+
+      const t = data.tenant;
+      const bName = document.getElementById('settingBusinessName');
+      const bSig = document.getElementById('settingBrandSignature');
+      const ind = document.getElementById('settingIndustry');
+      const phone = document.getElementById('settingEscalationPhone');
+      const cur = document.getElementById('settingCurrency');
+      const prefix = document.getElementById('settingOrderPrefix');
+      const alerts = document.getElementById('settingAlertsToggle');
+
+      if (bName) bName.value = t.businessName || '';
+      if (bSig) bSig.value = t.brandSignature || '';
+      if (ind) ind.value = t.industry || '';
+      if (phone) phone.value = t.escalationPhone || '';
+      if (cur) cur.value = t.currency || 'KSh';
+      if (prefix) prefix.value = t.orderPrefix || 'LQ';
+      if (alerts) alerts.checked = t.enableAlerts !== false;
+    } catch (err) {
+      console.warn("Could not load workspace settings:", err.message);
+    }
+  }
+
+  async function saveAllAccountSettings() {
+    const btn = document.getElementById('saveAllTopBtn');
+    if (btn) {
+      btn.disabled = true;
+      btn.textContent = 'Saving...';
+    }
+
+    try {
+      const payload = {
+        businessName: document.getElementById('settingBusinessName')?.value?.trim(),
+        brandSignature: document.getElementById('settingBrandSignature')?.value?.trim(),
+        industry: document.getElementById('settingIndustry')?.value?.trim(),
+        escalationPhone: document.getElementById('settingEscalationPhone')?.value?.trim(),
+        currency: document.getElementById('settingCurrency')?.value,
+        orderPrefix: document.getElementById('settingOrderPrefix')?.value?.trim(),
+        enableAlerts: document.getElementById('settingAlertsToggle')?.checked
+      };
+
+      const res = await fetch(`${BASE_URL}/api/tenant/settings/profile`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-tenant-id': getActiveTenantId()
+        },
+        body: JSON.stringify(payload)
+      });
+
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to update settings');
+
+      if (payload.businessName) {
+        localStorage.setItem('luvon_business_name', payload.businessName);
+        const nameEl = document.getElementById('tenantName');
+        if (nameEl) nameEl.textContent = payload.businessName;
+      }
+
+      window.API.showToast('Workspace settings saved successfully!', 'success');
+    } catch (err) {
+      window.API.showToast(err.message, 'error');
+    } finally {
+      if (btn) {
+        btn.disabled = false;
+        btn.innerHTML = `<i data-lucide="save" class="w-4 h-4"></i> Save All Changes`;
+        if (window.lucide) lucide.createIcons();
+      }
+    }
   }
 
   async function loadTeamMembers() {
@@ -152,8 +229,10 @@
   window.openDeleteModal = openDeleteModal;
   window.closeDeleteModal = closeDeleteModal;
   window.executeAccountDeletion = executeAccountDeletion;
+  window.saveAllAccountSettings = saveAllAccountSettings;
 
   document.addEventListener('DOMContentLoaded', () => {
+    loadWorkspaceSettings();
     loadTeamMembers();
     document.getElementById('invite-member-form')?.addEventListener('submit', handleInviteSubmit);
   });

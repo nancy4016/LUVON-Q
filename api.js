@@ -8,7 +8,6 @@
     return localStorage.getItem('luvon_active_tenant_id') || 'luvon_q_flagship';
   }
 
-  // Modern Toast Notification Engine (No native browser alerts)
   function showNotification(message, type = 'info') {
     let container = document.getElementById('luvon-toast-container');
     if (!container) {
@@ -135,17 +134,26 @@
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Authentication failed');
 
+      // CRITICAL: Check if email verification is required
+      if (currentAuthMode === 'signup' && data.requiresVerification) {
+        closeSignInModal();
+        showNotification(`Confirmation email sent to ${email}. Please verify your email before signing in!`, 'info');
+        switchAuthTab('signin');
+        return;
+      }
+
+      // Authenticated session established
       localStorage.setItem('luvon_active_tenant_id', data.tenantId);
       localStorage.setItem('luvon_business_name', data.businessName || fullName);
 
       closeSignInModal();
       updateAuthUI(data.user, data.businessName);
-      showNotification(`Welcome, ${data.businessName || 'Merchant'}! Session authenticated.`, 'success');
+      showNotification(`Welcome, ${data.businessName || 'Merchant'}!`, 'success');
 
       if (currentAuthMode === 'signup') {
         openOnboardingModal();
       } else {
-        setTimeout(() => window.location.reload(), 800);
+        setTimeout(() => window.location.reload(), 600);
       }
     } catch (err) {
       showNotification(err.message, 'error');
@@ -221,7 +229,7 @@
       if (!res.ok) throw new Error(data.error || 'AI store configuration failed');
 
       localStorage.setItem('luvon_business_name', data.businessName);
-      showNotification(`✨ Store Generated! Business: ${data.businessName} with ${data.catalog?.length || 0} catalog items.`, 'success');
+      showNotification(`Store Generated! Business: ${data.businessName} with ${data.catalog?.length || 0} catalog items.`, 'success');
       
       closeOnboardingModal();
       setTimeout(() => window.location.reload(), 1200);
