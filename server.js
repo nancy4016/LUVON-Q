@@ -134,8 +134,13 @@ function tenantMiddleware(req, res, next) {
 // 2. AI CONVERSATIONAL ENGINE (GEMINI CASCADE & RETRY)
 // ==========================================
 async function callGeminiAPI(systemPrompt, userText) {
-  // Primary: gemini-3.8-flash | Secondary: gemini-3.1-pro-preview
-  const models = ['gemini-3.8-flash', 'gemini-3.1-pro-preview'];
+  // Cascading models: Keep your desired primary models first, with fallbacks attached
+  const models = [
+    'gemini-3.8-flash',
+    'gemini-3.1-pro-preview',
+    'gemini-2.5-flash',
+    'gemini-2.0-flash'
+  ];
 
   for (const model of models) {
     for (let attempt = 0; attempt < 2; attempt++) {
@@ -159,17 +164,17 @@ async function callGeminiAPI(systemPrompt, userText) {
         const errorMsg = err.response?.data?.error?.message || err.message;
         console.warn(`⚠️ Model [${model}] attempt ${attempt + 1} failed: ${errorMsg}`);
         
-        // Handle demand spikes with a brief delay before retry
+        // Handle demand spikes or rate limits with a brief delay before attempt 2
         if (errorMsg.includes('high demand') || err.response?.status === 429 || err.response?.status === 503) {
           await sleep(1500);
         } else {
-          break; // Move to next fallback model if it's not a temporary spike
+          break; // If model doesn't support quota/preview or is invalid, jump to next model immediately
         }
       }
     }
   }
 
-  // Graceful fallback response if all models encounter temporary capacity limits
+  // Graceful conversational response if all model requests hit limits
   return "Niaje! Tuko hapa kukusaidia. System yetu inafanya update kidogo—unatafuta sneakers gani specifically nikusaidie right now?";
 }
 
