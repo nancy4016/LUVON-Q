@@ -71,7 +71,7 @@ function initializeStore() {
           languagePreference: "mirror_user",
           elevenLabsVoiceId: process.env.ELEVENLABS_VOICE_ID || DEFAULT_FEMALE_VOICE_ID,
           escalationPhone: process.env.AGENT_PHONE_NUMBER || "254768820142",
-          whatsappPhoneId: process.env.WHATSAPP_PHONE_NUMBER_ID || "1279716021891578",
+          whatsappPhoneId: process.env.WHATSAPP_PHONE_NUMBER_ID || "1350863544770006",
           currency: "KSh",
           orderPrefix: "LQ",
           enableAlerts: true,
@@ -131,7 +131,7 @@ function tenantMiddleware(req, res, next) {
 }
 
 // ==========================================
-// 2. AI ONBOARDING ENGINE (GEMINI 3.8 FLASH)
+// 2. AI ONBOARDING & CONVERSATIONAL ENGINE (GEMINI)
 // ==========================================
 async function callGeminiAPI(systemPrompt, userText) {
   const models = ['gemini-3.8-flash', 'gemini-3.5-flash-lite', 'gemini-2.5-pro'];
@@ -252,7 +252,6 @@ app.post('/api/ai-onboard', tenantMiddleware, handleAIOnboarding);
 // ==========================================
 // 3. SETTINGS & WORKSPACE API ENDPOINTS
 // ==========================================
-// Account & Profile: Update
 app.post('/api/tenant/settings/profile', tenantMiddleware, async (req, res) => {
   const { businessName, brandSignature, industry, escalationPhone, currency, orderPrefix, enableAlerts } = req.body;
 
@@ -278,7 +277,6 @@ app.post('/api/tenant/settings/profile', tenantMiddleware, async (req, res) => {
   res.json({ success: true, tenant: req.tenant });
 });
 
-// Team Members: List
 app.get('/api/tenant/team', tenantMiddleware, (req, res) => {
   res.json({
     success: true,
@@ -286,7 +284,6 @@ app.get('/api/tenant/team', tenantMiddleware, (req, res) => {
   });
 });
 
-// Team Members: Invite
 app.post('/api/tenant/team/invite', tenantMiddleware, async (req, res) => {
   const { email, role } = req.body;
   if (!email || !email.includes('@')) {
@@ -349,7 +346,6 @@ app.post('/api/tenant/team/invite', tenantMiddleware, async (req, res) => {
   }
 });
 
-// Team Members: Accept / Activate
 app.post('/api/tenant/team/accept', tenantMiddleware, (req, res) => {
   const { email } = req.body;
   if (!email) return res.status(400).json({ error: "Email required" });
@@ -374,7 +370,6 @@ app.post('/api/tenant/team/accept', tenantMiddleware, (req, res) => {
   res.json({ success: true, status: 'Active' });
 });
 
-// Team Members: Resend
 app.post('/api/tenant/team/resend', tenantMiddleware, async (req, res) => {
   const { memberId } = req.body;
   const member = (req.tenant.teamMembers || []).find(m => m.id === memberId);
@@ -410,7 +405,6 @@ app.post('/api/tenant/team/resend', tenantMiddleware, async (req, res) => {
   }
 });
 
-// Team Members: Remove
 app.delete('/api/tenant/team/:memberId', tenantMiddleware, (req, res) => {
   const { memberId } = req.params;
   req.tenant.teamMembers = (req.tenant.teamMembers || []).filter(m => m.id !== memberId);
@@ -418,7 +412,6 @@ app.delete('/api/tenant/team/:memberId', tenantMiddleware, (req, res) => {
   res.json({ success: true });
 });
 
-// Danger Zone: Cascade Account Deletion
 app.delete('/api/tenant/account', tenantMiddleware, async (req, res) => {
   const tenantId = req.tenant.id;
   const { confirmation } = req.body;
@@ -659,7 +652,10 @@ You are the dedicated AI sales concierge for **${req.tenant.businessName}**, an 
 Stage: ${(profile.stage || 'QUALIFICATION').toUpperCase()}
 Catalog: ${JSON.stringify(req.tenant.catalog, null, 2)}
 Tone: ${(req.tenant.tone || 'luxury_chic').toUpperCase()}
-Directives: Concise 1-3 sentences in warm Kenyan concierge voice. Quote prices clearly in KSh.
+Directives:
+1. Mirror the user's language naturally (Sheng, Swahili, Kenyan English, or mixed).
+2. Concise 1-3 sentences. Quote catalog prices clearly in KSh.
+3. If they want to pay or buy, prompt for their Safaricom M-Pesa line.
 `;
     const botReply = await callGeminiAPI(systemPrompt, text);
 
@@ -767,7 +763,7 @@ async function executeDarajaSTK(tenant, phoneNumber, amount, itemRef, isRetry = 
     if (!cleanPhone.startsWith('254')) cleanPhone = '254' + cleanPhone;
     if (cleanPhone.length !== 12) cleanPhone = "254708374149";
 
-    const serverBaseUrl = (process.env.SERVER_URL || "https://luvon-engine.onrender.com").replace(/\/$/, "");
+    const serverBaseUrl = (process.env.SERVER_URL || "https://luvonq.changelens.africa").replace(/\/$/, "");
     const res = await axios.post(
       'https://sandbox.safaricom.co.ke/mpesa/stkpush/v1/processrequest',
       {
@@ -817,7 +813,7 @@ async function sendWhatsAppText(tenant, toPhone, text) {
   let cleanPhone = toPhone.toString().replace(/\D/g, '').trim();
   if (cleanPhone.startsWith('0')) cleanPhone = '254' + cleanPhone.slice(1);
   if (!cleanPhone.startsWith('254')) cleanPhone = '254' + cleanPhone;
-  const phoneId = process.env.WHATSAPP_PHONE_NUMBER_ID || tenant.whatsappPhoneId || "1279716021891578";
+  const phoneId = tenant.whatsappPhoneId || process.env.WHATSAPP_PHONE_NUMBER_ID || "1350863544770006";
 
   const res = await axios.post(
     `https://graph.facebook.com/v20.0/${phoneId}/messages`,
@@ -827,14 +823,96 @@ async function sendWhatsAppText(tenant, toPhone, text) {
   return res.data;
 }
 
+// ==========================================
+// 7. LIVE META WEBHOOK (INBOUND MESSAGES)
+// ==========================================
 app.get('/webhook', (req, res) => {
-  if (req.query['hub.mode'] && req.query['hub.verify_token'] === process.env.WHATSAPP_VERIFY_TOKEN) {
-    return res.status(200).send(req.query['hub.challenge']);
+  const mode = req.query['hub.mode'];
+  const token = req.query['hub.verify_token'];
+  const challenge = req.query['hub.challenge'];
+
+  if (mode && token === process.env.WHATSAPP_VERIFY_TOKEN) {
+    console.log("✅ Webhook verified by Meta handshake.");
+    return res.status(200).send(challenge);
   }
   res.sendStatus(403);
 });
 
-app.post('/webhook', (req, res) => res.sendStatus(200));
+app.post('/webhook', async (req, res) => {
+  // Acknowledge receipt to Meta immediately within 3s to avoid redeliveries
+  res.sendStatus(200);
+
+  try {
+    const body = req.body;
+    if (body.object !== 'whatsapp_business_account') return;
+
+    const entry = body.entry?.[0];
+    const changes = entry?.changes?.[0];
+    const value = changes?.value;
+    const message = value?.messages?.[0];
+
+    if (!message || message.type !== 'text') return;
+
+    const messageId = message.id;
+    if (db.processedMessageIds && db.processedMessageIds.includes(messageId)) {
+      return; // Deduplicate
+    }
+    db.processedMessageIds.push(messageId);
+
+    const fromPhone = message.from;
+    const userText = message.text?.body;
+    const recipientPhoneId = value?.metadata?.phone_number_id;
+
+    console.log(`📩 Inbound WhatsApp [from: ${fromPhone}, phoneId: ${recipientPhoneId}]: "${userText}"`);
+
+    // Match tenant workspace
+    const tenant = resolveTenant(recipientPhoneId);
+    const { profile } = getOrCreateCustomerSession(tenant, fromPhone, 'whatsapp');
+
+    profile.conversationHistory.push({
+      role: 'user',
+      text: userText,
+      timestamp: new Date().toISOString()
+    });
+    profile.lastInteraction = new Date().toISOString();
+    saveStore();
+
+    // If human agent has taken over, do not invoke Gemini
+    if (profile.isPaused) {
+      console.log(`⏸️ Bot paused for ${fromPhone}. Awaiting human agent response.`);
+      return;
+    }
+
+    // Formulate response with Gemini
+    const systemPrompt = `
+You are the elite AI sales concierge for **${tenant.businessName}**, an e-commerce brand in Nairobi.
+Stage: ${(profile.stage || 'QUALIFICATION').toUpperCase()}
+Catalog: ${JSON.stringify(tenant.catalog, null, 2)}
+Tone: ${(tenant.tone || 'luxury_chic').toUpperCase()}
+Directives:
+1. Mirror the user's language naturally (Sheng, Swahili, Kenyan English, or mixed Nairobi style).
+2. Keep responses concise (1-3 sentences maximum). Quote real catalog prices in KSh.
+3. Be warm, helpful, and close deals proactively. When they ask to pay, ask for their M-Pesa line.
+`;
+
+    const botReply = await callGeminiAPI(systemPrompt, userText);
+
+    profile.conversationHistory.push({
+      role: 'model',
+      text: botReply,
+      timestamp: new Date().toISOString()
+    });
+    saveStore();
+
+    // Dispatch message back to customer via WhatsApp
+    await sendWhatsAppText(tenant, fromPhone, botReply);
+    console.log(`🚀 AI Reply dispatched to ${fromPhone}: "${botReply}"`);
+
+  } catch (webhookErr) {
+    console.error("❌ Webhook processing error:", webhookErr.response?.data || webhookErr.message);
+  }
+});
+
 app.post('/api/stk-callback', (req, res) => res.status(200).json({ ResultCode: 0, ResultDesc: "Accepted" }));
 
 app.get('/', (req, res) => {
@@ -843,9 +921,12 @@ app.get('/', (req, res) => {
   res.send("Luvon Q API is running.");
 });
 
-const PORT = process.env.PORT || 3000;
-if (process.env.NODE_ENV !== 'production' || !process.env.VERCEL) {
-  app.listen(PORT, () => console.log(`🚀 Luvon Q Multi-Tenant Engine running on port ${PORT}`));
-}
+// ==========================================
+// 8. SERVER BOOTSTRAP (RENDER PRODUCTION COMPLIANT)
+// ==========================================
+const PORT = process.env.PORT || 10000;
+app.listen(PORT, '0.0.0.0', () => {
+  console.log(`🚀 Luvon Q Multi-Tenant Engine running on port ${PORT} (0.0.0.0)`);
+});
 
 module.exports = app;
