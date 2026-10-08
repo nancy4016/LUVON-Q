@@ -131,33 +131,46 @@ function tenantMiddleware(req, res, next) {
 }
 
 // ==========================================
-// 2. AI ONBOARDING & CONVERSATIONAL ENGINE (GEMINI)
+// 2. AI CONVERSATIONAL ENGINE (GEMINI CASCADE & RETRY)
 // ==========================================
 async function callGeminiAPI(systemPrompt, userText) {
-  const models = ['gemini-3.8-flash', 'gemini-3.5-flash-lite', 'gemini-2.5-pro'];
+  // Primary: gemini-3.8-flash | Secondary: gemini-3.1-pro-preview
+  const models = ['gemini-3.8-flash', 'gemini-3.1-pro-preview'];
 
   for (const model of models) {
-    try {
-      console.log(`✨ Invoking Google Gemini model [${model}]...`);
-      const response = await axios.post(
-        `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${geminiApiKey}`,
-        {
-          system_instruction: { parts: [{ text: systemPrompt }] },
-          contents: [{ role: 'user', parts: [{ text: userText }] }],
-          generationConfig: { maxOutputTokens: 800 }
-        },
-        { headers: { 'Content-Type': 'application/json' }, timeout: 25000 }
-      );
+    for (let attempt = 0; attempt < 2; attempt++) {
+      try {
+        console.log(`✨ Invoking Google Gemini model [${model}] (Attempt ${attempt + 1})...`);
+        const response = await axios.post(
+          `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${geminiApiKey}`,
+          {
+            system_instruction: { parts: [{ text: systemPrompt }] },
+            contents: [{ role: 'user', parts: [{ text: userText }] }],
+            generationConfig: { maxOutputTokens: 800 }
+          },
+          { headers: { 'Content-Type': 'application/json' }, timeout: 25000 }
+        );
 
-      const candidateText = response.data?.candidates?.[0]?.content?.parts?.[0]?.text;
-      if (candidateText && candidateText.trim()) {
-        return candidateText.trim();
+        const candidateText = response.data?.candidates?.[0]?.content?.parts?.[0]?.text;
+        if (candidateText && candidateText.trim()) {
+          return candidateText.trim();
+        }
+      } catch (err) {
+        const errorMsg = err.response?.data?.error?.message || err.message;
+        console.warn(`⚠️ Model [${model}] attempt ${attempt + 1} failed: ${errorMsg}`);
+        
+        // Handle demand spikes with a brief delay before retry
+        if (errorMsg.includes('high demand') || err.response?.status === 429 || err.response?.status === 503) {
+          await sleep(1500);
+        } else {
+          break; // Move to next fallback model if it's not a temporary spike
+        }
       }
-    } catch (err) {
-      console.warn(`⚠️ Model [${model}] failed:`, err.response?.data?.error?.message || err.message);
     }
   }
-  throw new Error("All Gemini models failed to respond.");
+
+  // Graceful fallback response if all models encounter temporary capacity limits
+  return "Niaje! Tuko hapa kukusaidia. System yetu inafanya update kidogo—unatafuta sneakers gani specifically nikusaidie right now?";
 }
 
 async function handleAIOnboarding(req, res) {
@@ -798,7 +811,7 @@ async function triggerTenantSTKPush(tenant, phoneNumber, amount, itemRef) {
 }
 
 function getOrCreateCustomerSession(tenant, customerId, channel = 'whatsapp') {
-  const cleanId = customerId.toString().replace(/\+/g, '').trim();
+  const cleanId = String(customerId || "unknown_customer").replace(/\+/g, '').trim();
   const sessionKey = `${tenant.id}_${cleanId}`;
   let profile = db.crmProfiles[sessionKey];
   if (!profile) {
@@ -810,7 +823,7 @@ function getOrCreateCustomerSession(tenant, customerId, channel = 'whatsapp') {
 }
 
 async function sendWhatsAppText(tenant, toPhone, text) {
-  let cleanPhone = toPhone.toString().replace(/\D/g, '').trim();
+  let cleanPhone = String(toPhone || '').replace(/\D/g, '').trim();
   if (cleanPhone.startsWith('0')) cleanPhone = '254' + cleanPhone.slice(1);
   if (!cleanPhone.startsWith('254')) cleanPhone = '254' + cleanPhone;
   const phoneId = tenant.whatsappPhoneId || process.env.WHATSAPP_PHONE_NUMBER_ID || "1350863544770006";
@@ -839,7 +852,7 @@ app.get('/webhook', (req, res) => {
 });
 
 app.post('/webhook', async (req, res) => {
-  // Acknowledge receipt to Meta immediately within 3s to avoid redeliveries
+  // Acknowledge receipt to Meta immediately within 3s
   res.sendStatus(200);
 
   try {
@@ -851,6 +864,7 @@ app.post('/webhook', async (req, res) => {
     const value = changes?.value;
     const message = value?.messages?.[0];
 
+    // Ignore receipts or non-text messages
     if (!message || message.type !== 'text') return;
 
     const messageId = message.id;
@@ -859,8 +873,14 @@ app.post('/webhook', async (req, res) => {
     }
     db.processedMessageIds.push(messageId);
 
-    const fromPhone = message.from;
-    const userText = message.text?.body;
+    // Resilient sender phone extraction
+    const fromPhone = message.from || value?.contacts?.[0]?.wa_id;
+    if (!fromPhone) {
+      console.warn("⚠️ Received message payload without sender phone number.");
+      return;
+    }
+
+    const userText = message.text?.body || "";
     const recipientPhoneId = value?.metadata?.phone_number_id;
 
     console.log(`📩 Inbound WhatsApp [from: ${fromPhone}, phoneId: ${recipientPhoneId}]: "${userText}"`);
