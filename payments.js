@@ -1,12 +1,15 @@
 (function () {
   document.addEventListener("DOMContentLoaded", async () => {
-    if (window.lucide) lucide.createIcons();
+    if (window.lucide && typeof window.lucide.createIcons === 'function') lucide.createIcons();
 
-    const BASE_ORIGIN = (typeof window !== 'undefined' && window.location.origin && window.location.origin.includes('http'))
+    const BASE_ORIGIN = (typeof window !== 'undefined' && window.location.origin && window.location.origin.includes('http') && !window.location.origin.includes('localhost'))
       ? window.location.origin
-      : 'http://localhost:3000';
+      : 'https://luvon-engine.onrender.com';
     const API_BASE = `${BASE_ORIGIN}/api/tenant`;
-    const TENANT_ID = 'luvon_q_flagship';
+
+    function getActiveTenantId() {
+      return localStorage.getItem('luvon_active_tenant_id') || 'anonymous';
+    }
 
     let selectedType = "CustomerPayBillOnline";
 
@@ -31,24 +34,16 @@
       if (type === "CustomerPayBillOnline") {
         if (btnPaybill) {
           btnPaybill.className = "p-3.5 rounded-xl border-2 border-brand-600 bg-brand-50/50 text-xs font-bold text-brand-900 flex items-center justify-center gap-2 transition-all cursor-pointer";
-          const icon = btnPaybill.querySelector('i, svg');
-          if (icon) icon.className = "w-4 h-4 text-brand-600";
         }
         if (btnBuyGoods) {
           btnBuyGoods.className = "p-3.5 rounded-xl border border-brand-200 bg-white hover:border-brand-500 text-xs font-bold text-slate-600 flex items-center justify-center gap-2 transition-all cursor-pointer";
-          const icon = btnBuyGoods.querySelector('i, svg');
-          if (icon) icon.className = "w-4 h-4 text-slate-400";
         }
       } else {
         if (btnBuyGoods) {
           btnBuyGoods.className = "p-3.5 rounded-xl border-2 border-brand-600 bg-brand-50/50 text-xs font-bold text-brand-900 flex items-center justify-center gap-2 transition-all cursor-pointer";
-          const icon = btnBuyGoods.querySelector('i, svg');
-          if (icon) icon.className = "w-4 h-4 text-brand-600";
         }
         if (btnPaybill) {
           btnPaybill.className = "p-3.5 rounded-xl border border-brand-200 bg-white hover:border-brand-500 text-xs font-bold text-slate-600 flex items-center justify-center gap-2 transition-all cursor-pointer";
-          const icon = btnPaybill.querySelector('i, svg');
-          if (icon) icon.className = "w-4 h-4 text-slate-400";
         }
       }
     }
@@ -59,7 +54,7 @@
     // Pre-load Active Configuration
     try {
       const res = await fetch(`${API_BASE}/settings`, { 
-        headers: { 'x-tenant-id': TENANT_ID } 
+        headers: { 'x-tenant-id': getActiveTenantId() } 
       });
       const data = await res.json();
       if (data.success && data.tenant?.daraja) {
@@ -85,34 +80,28 @@
 
         const payload = {
           type: selectedType,
-          shortcode: shortcode || "174379"
+          shortcode: shortcode || "174379",
+          consumerKey,
+          consumerSecret,
+          passkey
         };
-
-        if (consumerKey && !consumerKey.includes('•')) payload.consumerKey = consumerKey;
-        if (consumerSecret && !consumerSecret.includes('•')) payload.consumerSecret = consumerSecret;
-        if (passkey && !passkey.includes('•')) payload.passkey = passkey;
 
         try {
           saveBtn.classList.add("opacity-60");
           saveBtn.textContent = "Saving...";
 
-          let data;
-          if (typeof window.API !== 'undefined' && typeof window.API.saveDarajaSettings === 'function') {
-            data = await window.API.saveDarajaSettings(payload);
-          } else {
-            const res = await fetch(`${API_BASE}/payments/daraja`, {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-                'x-tenant-id': TENANT_ID
-              },
-              body: JSON.stringify(payload)
-            });
-            data = await res.json();
-          }
+          const res = await fetch(`${API_BASE}/payments/daraja`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'x-tenant-id': getActiveTenantId()
+            },
+            body: JSON.stringify(payload)
+          });
+          const data = await res.json();
 
           if (data.success) {
-            alert(`✅ Daraja settings saved successfully!\nAccount Type: ${selectedType}\nShortcode: ${payload.shortcode}`);
+            alert(`✅ Daraja settings saved successfully!`);
           } else {
             throw new Error(data.message || "Failed to save");
           }
@@ -121,7 +110,7 @@
         } finally {
           saveBtn.classList.remove("opacity-60");
           saveBtn.innerHTML = `<i data-lucide="save" class="w-4 h-4"></i> Save Credentials`;
-          if (window.lucide) lucide.createIcons();
+          if (window.lucide && typeof window.lucide.createIcons === 'function') lucide.createIcons();
         }
       });
     }
@@ -133,24 +122,19 @@
 
         let rawPhone = testPhoneInput ? testPhoneInput.value.trim().replace(/\D/g, '') : '';
         if (!rawPhone) {
-          alert("Please enter a phone number (e.g., 0768820142) for the test prompt.");
+          alert("Please enter a phone number (e.g. 254708374149) for the test prompt.");
           return;
         }
 
         let formattedPhone = rawPhone;
-        if (formattedPhone.startsWith('0')) {
-          formattedPhone = '254' + formattedPhone.substring(1);
-        } else if (formattedPhone.startsWith('7') || formattedPhone.startsWith('1')) {
-          formattedPhone = '254' + formattedPhone;
-        } else if (!formattedPhone.startsWith('254')) {
-          formattedPhone = '254' + formattedPhone;
-        }
+        if (formattedPhone.startsWith('0')) formattedPhone = '254' + formattedPhone.substring(1);
+        if (!formattedPhone.startsWith('254')) formattedPhone = '254' + formattedPhone;
 
         if (testPhoneInput) testPhoneInput.value = formattedPhone;
 
         stkBtn.classList.add("opacity-60");
         stkBtn.innerHTML = `<i data-lucide="loader-2" class="w-4 h-4 animate-spin"></i> Triggering Prompt...`;
-        if (window.lucide) lucide.createIcons();
+        if (window.lucide && typeof window.lucide.createIcons === 'function') lucide.createIcons();
 
         if (statusBox) statusBox.classList.remove("hidden");
         if (statusBadge) {
@@ -166,14 +150,14 @@
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
-              'x-tenant-id': TENANT_ID
+              'x-tenant-id': getActiveTenantId()
             },
             body: JSON.stringify({ testPhone: formattedPhone })
           });
           
           const resData = await res.json().catch(() => null);
 
-          if (res.ok && resData?.success && (resData.result?.ResponseCode === "0" || resData.result?.CheckoutRequestID)) {
+          if (res.ok && resData?.success) {
             if (statusBadge) {
               statusBadge.className = "text-[9px] font-bold px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-800";
               statusBadge.textContent = "SUCCESS (200 OK)";
@@ -182,7 +166,7 @@
               statusText.textContent = `[CheckoutRequestID: ${resData.result?.CheckoutRequestID || 'N/A'}]\n${resData.result?.CustomerMessage || 'Prompt delivered to handset. Enter your M-Pesa PIN!'}`;
             }
           } else {
-            const errMsg = resData?.message || resData?.errorMessage || resData?.result?.errorMessage || resData?.result?.ResponseDescription || `Gateway rejection (HTTP ${res.status})`;
+            const errMsg = resData?.message || resData?.errorMessage || `Gateway rejection (HTTP ${res.status})`;
             throw new Error(errMsg);
           }
         } catch (err) {
@@ -196,7 +180,7 @@
         } finally {
           stkBtn.classList.remove("opacity-60");
           stkBtn.innerHTML = `<i data-lucide="send" class="w-4 h-4"></i> Trigger Test STK Push`;
-          if (window.lucide) lucide.createIcons();
+          if (window.lucide && typeof window.lucide.createIcons === 'function') lucide.createIcons();
         }
       });
     }

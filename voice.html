@@ -3,12 +3,9 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>LUVON Q ORÉLUNE | Voice & Persona Studio</title>
+  <title>LUVON Q | Voice & Persona Studio</title>
   
-  <!-- Tailwind CSS via CDN -->
   <script src="https://cdn.tailwindcss.com"></script>
-  
-  <!-- Tailwind JavaScript Theme Configuration -->
   <script>
     tailwind.config = {
       theme: {
@@ -33,40 +30,48 @@
     }
   </script>
 
-  <!-- Google Fonts & Lucide Icons -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Playfair+Display:ital,wght@0,600;0,700;1,400&display=swap" rel="stylesheet">
-  <script src="https://unpkg.com/lucide@latest"></script>
   
-  <!-- External Custom Stylesheet -->
+  <script src="https://unpkg.com/lucide@0.344.0/dist/umd/lucide.js"></script>
+  
+  <style>
+    svg.lucide {
+      display: inline-block !important;
+      vertical-align: middle !important;
+      stroke-width: 2 !important;
+    }
+    i[data-lucide] {
+      display: inline-flex !important;
+      align-items: center !important;
+      justify-content: center !important;
+    }
+  </style>
   <link rel="stylesheet" href="styles.css" />
 </head>
 <body class="bg-slate-50 text-slate-800 min-h-screen flex flex-col md:flex-row overflow-x-hidden">
 
-  <!-- Mobile Top Navigation Header -->
+  <!-- Mobile Top Nav -->
   <header class="md:hidden bg-white/90 backdrop-blur-md border-b border-slate-200 p-4 flex items-center justify-between sticky top-0 z-30 w-full">
     <img src="Luvon q logo.png" alt="Luvon Q Logo" class="h-10 w-auto object-contain" />
-    <button type="button" onclick="toggleMobileMenu()" class="p-2 text-slate-700 hover:text-brand-600 focus:outline-none">
+    <button type="button" onclick="toggleMobileMenu()" class="p-2 text-slate-700 hover:text-brand-600 focus:outline-none cursor-pointer">
       <i data-lucide="menu" class="w-6 h-6"></i>
     </button>
   </header>
 
-  <!-- Mobile Dark Backdrop Overlay -->
   <div id="sidebarBackdrop" onclick="toggleMobileMenu()" class="fixed inset-0 bg-slate-900/50 z-40 hidden md:hidden backdrop-blur-sm transition-opacity"></div>
 
-  <!-- Unified Sidebar Navigation Drawer -->
+  <!-- Sidebar Nav Drawer -->
   <aside id="sidebarNav" class="fixed top-0 left-0 bottom-0 z-50 w-72 bg-white/95 backdrop-blur-md border-r border-brand-200/50 flex flex-col justify-between p-6 -translate-x-full md:translate-x-0 transition-transform duration-300 ease-in-out md:static md:w-64 flex-shrink-0">
     <div class="space-y-8">
-      <!-- Sidebar Header / Logo -->
       <div class="flex items-center justify-between">
         <img src="Luvon q logo.png" alt="Luvon Q Logo" class="h-12 w-auto object-contain" />
-        <button type="button" onclick="toggleMobileMenu()" class="md:hidden text-slate-400 hover:text-slate-600 p-1">
+        <button type="button" onclick="toggleMobileMenu()" class="md:hidden text-slate-400 hover:text-slate-600 p-1 cursor-pointer">
           <i data-lucide="x" class="w-6 h-6"></i>
         </button>
       </div>
 
-      <!-- Navigation Links -->
       <nav class="space-y-1">
         <a href="index.html" class="nav-link flex items-center gap-3 px-3 py-2.5 rounded-lg text-slate-600 hover:bg-brand-50 hover:text-brand-700 transition-all font-medium text-sm">
           <i data-lucide="layout-dashboard" class="w-4 h-4"></i> Overview
@@ -86,21 +91,20 @@
       </nav>
     </div>
 
-    <!-- Bottom Auth Access -->
     <div class="pt-6 border-t border-brand-200/60">
-      <button id="portalSignInBtn" onclick="openSignInModal()" class="w-full p-3 bg-brand-600 text-white rounded-xl flex items-center justify-center gap-2 font-medium text-sm shadow-md hover:bg-brand-700 transition-all">
+      <button id="portalSignInBtn" onclick="openSignInModal()" class="w-full p-3 bg-brand-600 text-white rounded-xl flex items-center justify-center gap-2 font-medium text-sm shadow-md hover:bg-brand-700 transition-all cursor-pointer">
         <i data-lucide="log-in" class="w-4 h-4"></i>
         <span>Sign In to Portal</span>
       </button>
       <div id="activeTenantCard" class="hidden p-3 bg-brand-50 rounded-xl border border-brand-200 flex items-center justify-between">
         <div class="flex items-center gap-3 overflow-hidden">
-          <div class="w-8 h-8 rounded-lg bg-brand-600 text-white flex items-center justify-center font-bold text-xs flex-shrink-0">NK</div>
+          <div class="w-8 h-8 rounded-lg bg-brand-600 text-white flex items-center justify-center font-bold text-xs flex-shrink-0">LQ</div>
           <div class="overflow-hidden">
-            <p class="text-xs font-semibold text-brand-900 truncate" id="tenantName">Nairobi Kicks Studio</p>
-            <span class="inline-block px-1.5 py-0.5 text-[10px] font-semibold text-emerald-700 bg-emerald-100 rounded">Pro Tier</span>
+            <p class="text-xs font-semibold text-brand-900 truncate" id="tenantName">Loading...</p>
+            <span class="inline-block px-1.5 py-0.5 text-[10px] font-semibold text-emerald-700 bg-emerald-100 rounded">Active Merchant</span>
           </div>
         </div>
-        <button onclick="toggleSignOut()" class="text-slate-400 hover:text-rose-600 p-1">
+        <button onclick="toggleSignOut()" class="text-slate-400 hover:text-rose-600 p-1 cursor-pointer">
           <i data-lucide="log-out" class="w-3.5 h-3.5"></i>
         </button>
       </div>
@@ -109,7 +113,6 @@
 
   <!-- Main Content Area -->
   <main class="flex-1 w-full p-4 md:p-8 overflow-y-auto space-y-6">    
-    <!-- Header Bar -->
     <header class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-brand-200 pb-6">
       <div>
         <h1 class="text-2xl font-serif font-bold text-brand-900">Brand Persona & Audio Studio</h1>
@@ -120,27 +123,23 @@
       </button>
     </header>
 
-    <!-- Persona & Tone Configuration Grid -->
     <div class="grid lg:grid-cols-12 gap-8">
-      
-      <!-- Left Column: Tone Archetype Radio Cards -->
+      <!-- Left Column: Tone Archetype -->
       <div class="lg:col-span-7 space-y-6">
         <div class="bg-white rounded-xl border border-brand-200 p-6 shadow-sm space-y-4">
           <h3 class="font-serif font-bold text-lg text-brand-900">1. Tone Archetype</h3>
-          <p class="text-xs text-slate-500">Select the linguistic style your AI agent adopts across social channels.</p>
+          <p class="text-xs text-slate-500">Select the linguistic style your AI agent adopts across WhatsApp and Instagram.</p>
 
           <div class="grid sm:grid-cols-2 gap-4 pt-2">
-            <!-- Archetype Option 1 -->
             <label class="p-4 rounded-xl border-2 border-brand-600 bg-brand-50/50 cursor-pointer transition-all flex flex-col justify-between space-y-3 relative">
               <input type="radio" name="tone_archetype" value="luxury_chic" checked class="hidden" />
               <div class="flex items-center justify-between">
                 <span class="text-xs font-bold text-brand-900 uppercase tracking-wider">Luxury Chic</span>
                 <i data-lucide="check-circle-2" class="w-4 h-4 text-brand-600"></i>
               </div>
-              <p class="text-[11px] text-slate-600 leading-relaxed">Elegant, polished, and concierge-level vocabulary tailored for high-end boutique clients.</p>
+              <p class="text-[11px] text-slate-600 leading-relaxed">Elegant, polished, and concierge-level vocabulary tailored for high-end clients.</p>
             </label>
 
-            <!-- Archetype Option 2 -->
             <label class="p-4 rounded-xl border border-brand-200 bg-white hover:border-brand-500 cursor-pointer transition-all flex flex-col justify-between space-y-3">
               <input type="radio" name="tone_archetype" value="street_sheng" class="hidden" />
               <div class="flex items-center justify-between">
@@ -150,29 +149,26 @@
               <p class="text-[11px] text-slate-600 leading-relaxed">Authentic, high-energy Sheng ("Kaende kaende", "Form ni gani") for urban streetwear culture.</p>
             </label>
 
-            <!-- Archetype Option 3 -->
             <label class="p-4 rounded-xl border border-brand-200 bg-white hover:border-brand-500 cursor-pointer transition-all flex flex-col justify-between space-y-3">
               <input type="radio" name="tone_archetype" value="warm_friendly" class="hidden" />
               <div class="flex items-center justify-between">
                 <span class="text-xs font-bold text-brand-900 uppercase tracking-wider">Warm & Friendly</span>
                 <i data-lucide="circle" class="w-4 h-4 text-slate-300"></i>
               </div>
-              <p class="text-[11px] text-slate-600 leading-relaxed">Welcoming, empathetic tone ideal for salons, spas, and wellness studios.</p>
+              <p class="text-[11px] text-slate-600 leading-relaxed">Welcoming, empathetic tone ideal for salons, spas, and boutique studios.</p>
             </label>
 
-            <!-- Archetype Option 4 -->
             <label class="p-4 rounded-xl border border-brand-200 bg-white hover:border-brand-500 cursor-pointer transition-all flex flex-col justify-between space-y-3">
               <input type="radio" name="tone_archetype" value="corporate_concise" class="hidden" />
               <div class="flex items-center justify-between">
                 <span class="text-xs font-bold text-brand-900 uppercase tracking-wider">Corporate Concise</span>
                 <i data-lucide="circle" class="w-4 h-4 text-slate-300"></i>
               </div>
-              <p class="text-[11px] text-slate-600 leading-relaxed">Direct, swift, highly factual responses optimized for fast transaction completion.</p>
+              <p class="text-[11px] text-slate-600 leading-relaxed">Direct, swift, highly factual responses optimized for fast booking completion.</p>
             </label>
           </div>
         </div>
 
-        <!-- Escalation WhatsApp Setup -->
         <div class="bg-white rounded-xl border border-brand-200 p-6 shadow-sm space-y-4">
           <h3 class="font-serif font-bold text-lg text-brand-900">2. Manager Handoff Escalation</h3>
           <p class="text-xs text-slate-500">WhatsApp number that receives instant alert payloads when a customer asks for a human manager.</p>
@@ -181,13 +177,13 @@
             <label class="block text-xs font-semibold text-brand-900 mb-2">Manager WhatsApp Phone Number</label>
             <div class="relative">
               <i data-lucide="phone" class="w-4 h-4 absolute left-3 top-3 text-slate-400"></i>
-              <input type="text" id="escalation-phone" value="254768820142" class="w-full pl-10 pr-4 py-2.5 text-xs bg-brand-50 border border-brand-200 rounded-xl focus:outline-none focus:border-brand-600 font-medium" />
+              <input type="text" id="escalation-phone" placeholder="2547XXXXXXXX" class="w-full pl-10 pr-4 py-2.5 text-xs bg-brand-50 border border-brand-200 rounded-xl focus:outline-none focus:border-brand-600 font-medium" />
             </div>
           </div>
         </div>
       </div>
 
-      <!-- Right Column: ElevenLabs Neural Voice Studio -->
+      <!-- Right Column: Voice Studio -->
       <div class="lg:col-span-5 space-y-6">
         <div class="bg-white rounded-xl border border-brand-200 p-6 shadow-sm space-y-5">
           <div class="flex items-center justify-between">
@@ -195,17 +191,12 @@
             <span class="text-[10px] font-bold text-purple-700 bg-purple-100 px-2 py-0.5 rounded">ElevenLabs v2</span>
           </div>
 
-          <!-- Voice Selector Dropdown -->
           <div>
             <label class="block text-xs font-semibold text-brand-900 mb-2">Select Voice Model</label>
             <select id="voice-select" class="w-full px-3 py-2.5 text-xs bg-brand-50 border border-brand-200 rounded-xl focus:outline-none focus:border-brand-600 font-medium text-brand-900">
-              <option value="21m00Tcm4TlvDq8ikWAM">Nova (Nairobi Warm Sheng)</option>
-              <option value="AZnzlk1XvdvUeBnXmlld">Rachel (Luxury Velvet Concierge)</option>
-              <option value="EXAVITQu4vr4xnSDxMaL">Shimmer (Smooth Boutique Style)</option>
             </select>
           </div>
 
-          <!-- Interactive Audio Preview Player -->
           <div class="p-4 bg-brand-900 text-white rounded-xl space-y-3">
             <div class="flex items-center justify-between">
               <div class="flex items-center gap-2">
@@ -216,7 +207,7 @@
             </div>
 
             <p id="sample-text" class="text-xs text-brand-100 font-light italic leading-relaxed">
-              "Niaje! Welcome to Nairobi Kicks Studio. We have 4 pairs of Air Force 1 White remaining in stock!"
+              "Karibu! How can I assist you with your booking or order today?"
             </p>
 
             <button id="play-sample-btn" class="w-full py-2.5 bg-brand-600 hover:bg-brand-500 text-white rounded-lg text-xs font-semibold shadow transition-all flex items-center justify-center gap-2 cursor-pointer">
@@ -225,96 +216,28 @@
           </div>
         </div>
       </div>
-
     </div>
   </main>
 
-  <!-- Email/Password & Registration Auth Modal -->
-  <div id="authModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center hidden p-4">
-    <div class="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6 relative border border-brand-100 animate-in fade-in zoom-in duration-200">
-      
-      <!-- Close Button -->
-      <button type="button" onclick="closeSignInModal()" class="absolute top-4 right-4 text-slate-400 hover:text-slate-600 transition-colors cursor-pointer">
-        <i data-lucide="x" class="w-5 h-5"></i>
-      </button>
-
-      <!-- Modal Header -->
-      <div class="text-center mb-4">
-        <img src="Luvon q logo.png" alt="Luvon Q Logo" class="h-12 mx-auto mb-2 object-contain" />
-        <h2 class="text-xl font-serif font-bold text-slate-900" id="authModalTitle">Sign in to Orélune OS</h2>
-        <p class="text-xs text-slate-500 mt-1">Access developer sandboxes, M-Pesa test triggers & voice integration</p>
-      </div>
-
-      <!-- Mode Switcher Tabs -->
-      <div class="flex border-b border-slate-100 mb-5 text-xs font-semibold">
-        <button id="tabSignIn" type="button" onclick="switchAuthTab('signin')" class="flex-1 py-2 text-center text-brand-600 border-b-2 border-brand-600 transition-all">
-          Sign In
-        </button>
-        <button id="tabSignUp" type="button" onclick="switchAuthTab('signup')" class="flex-1 py-2 text-center text-slate-400 hover:text-slate-600 border-b-2 border-transparent transition-all">
-          Create Account
-        </button>
-      </div>
-
-      <!-- Authentication Form -->
-      <form id="loginForm" onsubmit="handleCustomerAuth(event)" class="space-y-3.5">
-        <!-- Full Name (Only visible during Sign Up) -->
-        <div id="nameFieldGroup" class="hidden">
-          <label for="fullName" class="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1">Full Name / Business Name</label>
-          <input 
-            type="text" 
-            id="fullName" 
-            placeholder="Nairobi Kicks Studio" 
-            class="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-brand-600/20 focus:border-brand-600 transition-all"
-          />
-        </div>
-
-        <!-- Email Field -->
-        <div>
-          <label for="email" class="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1">Email Address</label>
-          <input 
-            type="email" 
-            id="email" 
-            required 
-            placeholder="developer@studio.com" 
-            class="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-brand-600/20 focus:border-brand-600 transition-all"
-          />
-        </div>
-
-        <!-- Password Field -->
-        <div>
-          <label for="password" class="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1">Password</label>
-          <input 
-            type="password" 
-            id="password" 
-            required 
-            placeholder="••••••••" 
-            class="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-brand-600/20 focus:border-brand-600 transition-all"
-          />
-        </div>
-
-        <!-- Sign-In Options (Remember / Forgot Password) -->
-        <div id="signInOptions" class="flex items-center justify-between text-xs pt-1">
-          <label class="flex items-center gap-2 text-slate-600 cursor-pointer">
-            <input type="checkbox" class="rounded border-slate-300 text-brand-600 focus:ring-brand-600" />
-            <span>Remember me</span>
-          </label>
-          <a href="#" class="text-brand-600 hover:underline font-medium">Forgot password?</a>
-        </div>
-
-        <!-- Submit Button -->
-        <button 
-          type="submit" 
-          id="authSubmitBtn"
-          class="w-full py-3 bg-brand-600 hover:bg-brand-700 text-white rounded-xl font-medium text-sm transition-all shadow-md shadow-brand-600/20 cursor-pointer mt-2"
-        >
-          Authenticate Session
-        </button>
-      </form>
-    </div>
-  </div>
-
-  <!-- Shared API Bridge & Page Script -->
   <script src="api.js"></script>
   <script src="voice.js"></script>
+  <script>
+    function toggleMobileMenu() {
+      const nav = document.getElementById("sidebarNav");
+      const backdrop = document.getElementById("sidebarBackdrop");
+      if (!nav || !backdrop) return;
+      nav.classList.toggle("-translate-x-full");
+      backdrop.classList.toggle("hidden");
+    }
+
+    function renderIcons() {
+      if (typeof lucide !== 'undefined' && lucide.createIcons) {
+        lucide.createIcons();
+      }
+    }
+    document.addEventListener("DOMContentLoaded", renderIcons);
+    window.addEventListener("load", renderIcons);
+    setTimeout(renderIcons, 250);
+  </script>
 </body>
 </html>

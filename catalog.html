@@ -3,11 +3,9 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>LUVON Q ORÉLUNE | Catalog & Stock Manager</title>
+  <title>LUVON Q | Catalog & Stock Manager</title>
   
-  <!-- Tailwind CSS via CDN -->
   <script src="https://cdn.tailwindcss.com"></script>
-  
   <script>
     tailwind.config = {
       theme: {
@@ -32,24 +30,22 @@
     }
   </script>
 
-  <!-- Google Fonts -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Playfair+Display:ital,wght@0,600;0,700;1,400&display=swap" rel="stylesheet">
   
-  <!-- Rock-solid Lucide CDN with Instant Fallback -->
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/lucide/0.344.0/umd/lucide.min.js"></script>
-  <script>
-    if (!window.lucide) {
-      document.write('<script src="https://cdn.jsdelivr.net/npm/lucide@0.344.0/dist/umd/lucide.min.js"><\/script>');
-    }
-  </script>
+  <script src="https://unpkg.com/lucide@0.344.0/dist/umd/lucide.js"></script>
 
-  <!-- Inline SVG Icon Sizing Safeguard -->
   <style>
     svg.lucide {
       display: inline-block !important;
       vertical-align: middle !important;
+      stroke-width: 2 !important;
+    }
+    i[data-lucide] {
+      display: inline-flex !important;
+      align-items: center !important;
+      justify-content: center !important;
     }
   </style>
 
@@ -57,7 +53,7 @@
 </head>
 <body class="bg-slate-50 text-slate-800 min-h-screen flex flex-col md:flex-row overflow-x-hidden">
 
-  <!-- Mobile Top Navigation Header -->
+  <!-- Mobile Top Nav -->
   <header class="md:hidden bg-white/90 backdrop-blur-md border-b border-slate-200 p-4 flex items-center justify-between sticky top-0 z-30 w-full">
     <img src="Luvon q logo.png" alt="Luvon Q Logo" class="h-10 w-auto object-contain" />
     <button type="button" onclick="toggleMobileMenu()" class="p-2 text-slate-700 hover:text-brand-600 focus:outline-none cursor-pointer">
@@ -105,8 +101,8 @@
         <div class="flex items-center gap-3 overflow-hidden">
           <div class="w-8 h-8 rounded-lg bg-brand-600 text-white flex items-center justify-center font-bold text-xs flex-shrink-0">LQ</div>
           <div class="overflow-hidden">
-            <p class="text-xs font-semibold text-brand-900 truncate" id="tenantName">Luvon Q Flagship</p>
-            <span class="inline-block px-1.5 py-0.5 text-[10px] font-semibold text-emerald-700 bg-emerald-100 rounded">Verified Provider</span>
+            <p class="text-xs font-semibold text-brand-900 truncate" id="tenantName">Loading...</p>
+            <span class="inline-block px-1.5 py-0.5 text-[10px] font-semibold text-emerald-700 bg-emerald-100 rounded">Active Merchant</span>
           </div>
         </div>
         <button onclick="toggleSignOut()" class="text-slate-400 hover:text-rose-600 p-1 cursor-pointer">
@@ -157,7 +153,7 @@
               <th class="p-4">Category</th>
               <th class="p-4">Price (KSh)</th>
               <th class="p-4">Stock Count</th>
-              <th class="p-4">AI Recommendation</th>
+              <th class="p-4">Status</th>
               <th class="p-4 text-right">Actions</th>
             </tr>
           </thead>
@@ -221,6 +217,8 @@
     </div>
   </div>
 
+  <script src="api.js"></script>
+  <script src="catalog.js"></script>
   <script>
     function toggleMobileMenu() {
       const nav = document.getElementById("sidebarNav");
@@ -230,18 +228,14 @@
       backdrop.classList.toggle("hidden");
     }
 
-    function renderAllIcons() {
-      if (window.lucide && typeof window.lucide.createIcons === 'function') {
-        window.lucide.createIcons();
+    function renderIcons() {
+      if (typeof lucide !== 'undefined' && lucide.createIcons) {
+        lucide.createIcons();
       }
     }
-
-    document.addEventListener("DOMContentLoaded", renderAllIcons);
-    window.addEventListener("load", renderAllIcons);
-    setTimeout(renderAllIcons, 500);
+    document.addEventListener("DOMContentLoaded", renderIcons);
+    window.addEventListener("load", renderIcons);
+    setTimeout(renderIcons, 250);
   </script>
-
-  <script src="api.js"></script>
-  <script src="catalog.js"></script>
 </body>
 </html>

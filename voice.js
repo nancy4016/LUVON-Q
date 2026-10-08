@@ -1,10 +1,15 @@
 document.addEventListener("DOMContentLoaded", async () => {
-  if (window.lucide) lucide.createIcons();
+  if (window.lucide && typeof window.lucide.createIcons === 'function') lucide.createIcons();
 
   let currentAudio = null;
-  const backendBaseUrl = 'http://localhost:3000';
+  const backendBaseUrl = (typeof window !== 'undefined' && window.location.origin && window.location.origin.includes('http') && !window.location.origin.includes('localhost'))
+    ? window.location.origin
+    : 'https://luvon-engine.onrender.com';
 
-  // Available Free Default Stock Voices
+  function getActiveTenantId() {
+    return localStorage.getItem('luvon_active_tenant_id') || 'anonymous';
+  }
+
   const freeVoices = [
     { id: "EXAVITQu4vr4xnSDxMaL", name: "Sarah (Soft & Professional Female)" },
     { id: "Xb7hH8MSUJpSbSDYk0k2", name: "Alice (Expressive & Clear Female)" },
@@ -13,16 +18,12 @@ document.addEventListener("DOMContentLoaded", async () => {
     { id: "JBFqnCBsd6RMkjVDRZzb", name: "George (British Male)" }
   ];
 
-  const voiceSelect = document.getElementById("voice-select") || document.querySelector("select");
-  const escalationPhoneInput = document.getElementById("escalation-phone") || document.querySelector("input[type='tel'], input[placeholder*='Phone']");
-  const playBtn = document.getElementById("play-sample-btn") || Array.from(document.querySelectorAll("button")).find(b => b.textContent.includes("Play Voice Sample"));
-  const saveBtn = document.getElementById("save-persona-btn") || Array.from(document.querySelectorAll("button")).find(b => b.textContent.includes("Save Settings"));
+  const voiceSelect = document.getElementById("voice-select");
+  const escalationPhoneInput = document.getElementById("escalation-phone");
+  const playBtn = document.getElementById("play-sample-btn");
+  const saveBtn = document.getElementById("save-persona-btn");
+  const previewTextElement = document.getElementById("sample-text");
 
-  // Locate the actual text element inside the preview card
-  const previewTextElement = document.querySelector(".bg-brand-900 p, [class*='bg-neutral-900'] p, .bg-stone-900 p, .bg-black p, p.italic") || 
-                             Array.from(document.querySelectorAll("p")).find(p => p.textContent.includes("Air Force 1"));
-
-  // Populate Voice Options
   if (voiceSelect) {
     voiceSelect.innerHTML = freeVoices
       .map(v => `<option value="${v.id}">${v.name}</option>`)
@@ -32,7 +33,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   // 1. Load Existing Settings from Backend
   try {
     const res = await fetch(`${backendBaseUrl}/api/tenant/settings`, {
-      headers: { 'x-tenant-id': 'luvon_q_flagship' }
+      headers: { 'x-tenant-id': getActiveTenantId() }
     });
     const data = await res.json();
 
@@ -46,7 +47,6 @@ document.addEventListener("DOMContentLoaded", async () => {
         escalationPhoneInput.value = tenant.escalationPhone;
       }
 
-      // Activate corresponding Tone Card
       if (tenant.tone) {
         const matchingRadio = document.querySelector(`input[name="tone_archetype"][value="${tenant.tone}"]`);
         if (matchingRadio) {
@@ -76,11 +76,11 @@ document.addEventListener("DOMContentLoaded", async () => {
       const radioInput = label.querySelector('input[name="tone_archetype"]');
       if (radioInput) radioInput.checked = true;
 
-      if (window.lucide) lucide.createIcons();
+      if (window.lucide && typeof window.lucide.createIcons === 'function') lucide.createIcons();
     });
   });
 
-  // 3. Real Neural Voice Sample Audio Preview Handler
+  // 3. Audio Preview Handler
   if (playBtn) {
     playBtn.addEventListener("click", async (e) => {
       e.preventDefault();
@@ -90,28 +90,23 @@ document.addEventListener("DOMContentLoaded", async () => {
         currentAudio = null;
         playBtn.classList.remove("opacity-60");
         playBtn.innerHTML = `<i data-lucide="play" class="w-3.5 h-3.5"></i> Play Voice Sample`;
-        if (window.lucide) lucide.createIcons();
+        if (window.lucide && typeof window.lucide.createIcons === 'function') lucide.createIcons();
         return;
       }
 
       const selectedVoice = voiceSelect?.value || "EXAVITQu4vr4xnSDxMaL";
-      
-      // Grab exact text displayed in the black preview card
-      let previewText = "Niaje! Welcome to Nairobi Kicks Studio. We have 4 pairs of Air Force 1 White remaining in stock!";
-      if (previewTextElement && previewTextElement.textContent.trim()) {
-        previewText = previewTextElement.textContent.replace(/["“”]/g, '').trim();
-      }
+      const previewText = previewTextElement?.textContent?.replace(/["“”]/g, '').trim() || "Karibu! How can I assist you today?";
 
       playBtn.classList.add("opacity-60");
       playBtn.innerHTML = `<i data-lucide="loader-2" class="w-3.5 h-3.5 animate-spin"></i> Generating Audio...`;
-      if (window.lucide) lucide.createIcons();
+      if (window.lucide && typeof window.lucide.createIcons === 'function') lucide.createIcons();
 
       try {
         const response = await fetch(`${backendBaseUrl}/api/tenant/voice/preview`, {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
-            "x-tenant-id": "luvon_q_flagship"
+            "x-tenant-id": getActiveTenantId()
           },
           body: JSON.stringify({
             voiceId: selectedVoice,
@@ -120,7 +115,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         });
 
         if (!response.ok) {
-          throw new Error("Preview generation failed. Check API key status.");
+          throw new Error("Preview generation failed.");
         }
 
         const audioBlob = await response.blob();
@@ -128,25 +123,25 @@ document.addEventListener("DOMContentLoaded", async () => {
 
         currentAudio = new Audio(audioUrl);
         playBtn.innerHTML = `<i data-lucide="volume-2" class="w-3.5 h-3.5 animate-pulse"></i> Playing Sample...`;
-        if (window.lucide) lucide.createIcons();
+        if (window.lucide && typeof window.lucide.createIcons === 'function') lucide.createIcons();
 
         currentAudio.play();
 
         currentAudio.onended = () => {
           playBtn.classList.remove("opacity-60");
           playBtn.innerHTML = `<i data-lucide="play" class="w-3.5 h-3.5"></i> Play Voice Sample`;
-          if (window.lucide) lucide.createIcons();
+          if (window.lucide && typeof window.lucide.createIcons === 'function') lucide.createIcons();
         };
       } catch (err) {
-        alert("Audio Preview Error: " + err.message);
+        alert("Audio Preview Notice: " + err.message);
         playBtn.classList.remove("opacity-60");
         playBtn.innerHTML = `<i data-lucide="play" class="w-3.5 h-3.5"></i> Play Voice Sample`;
-        if (window.lucide) lucide.createIcons();
+        if (window.lucide && typeof window.lucide.createIcons === 'function') lucide.createIcons();
       }
     });
   }
 
-  // 4. Save Settings Handler (POST /api/tenant/settings/personality)
+  // 4. Save Settings Handler
   if (saveBtn) {
     saveBtn.addEventListener("click", async (e) => {
       e.preventDefault();
@@ -169,7 +164,7 @@ document.addEventListener("DOMContentLoaded", async () => {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            'x-tenant-id': 'luvon_q_flagship'
+            'x-tenant-id': getActiveTenantId()
           },
           body: JSON.stringify(payload)
         });
@@ -184,7 +179,8 @@ document.addEventListener("DOMContentLoaded", async () => {
         alert("❌ Failed to save voice settings: " + err.message);
       } finally {
         saveBtn.classList.remove("opacity-60");
-        saveBtn.textContent = "Save Settings";
+        saveBtn.innerHTML = `<i data-lucide="save" class="w-4 h-4"></i> Save Settings`;
+        if (window.lucide && typeof window.lucide.createIcons === 'function') lucide.createIcons();
       }
     });
   }

@@ -3,22 +3,27 @@
 // ==========================================
 let catalogItems = [];
 
-const BASE_ORIGIN = (typeof window !== 'undefined' && window.location.origin && window.location.origin.includes('http'))
+const BASE_ORIGIN = (typeof window !== 'undefined' && window.location.origin && window.location.origin.includes('http') && !window.location.origin.includes('localhost'))
   ? window.location.origin
-  : 'http://localhost:3000';
+  : 'https://luvon-engine.onrender.com';
 const API_BASE = `${BASE_ORIGIN}/api/tenant`;
-const TENANT_ID = 'luvon_q_flagship';
+
+function getActiveTenantId() {
+  return localStorage.getItem('luvon_active_tenant_id') || 'anonymous';
+}
 
 async function fetchTenantCatalog() {
-  try {
-    const data = (typeof window.API !== 'undefined' && typeof window.API.getInventory === 'function')
-      ? await window.API.getInventory()
-      : (typeof apiCall === 'function')
-        ? await apiCall('/inventory')
-        : await (await fetch(`${API_BASE}/inventory`, {
-            headers: { 'x-tenant-id': TENANT_ID }
-          })).json();
+  const tenantId = getActiveTenantId();
+  if (tenantId === 'anonymous') {
+    renderCatalog([]);
+    return;
+  }
 
+  try {
+    const res = await fetch(`${API_BASE}/inventory`, {
+      headers: { 'x-tenant-id': tenantId }
+    });
+    const data = await res.json();
     catalogItems = Array.isArray(data) ? data : [];
     renderCatalog(catalogItems);
   } catch (err) {
@@ -33,15 +38,28 @@ function renderCatalog(items) {
   const tbody = document.getElementById("catalog-table-body");
   if (!tbody) return;
 
-  if (items.length === 0) {
+  const tenantId = getActiveTenantId();
+  if (tenantId === 'anonymous') {
     tbody.innerHTML = `
       <tr>
-        <td colspan="6" class="p-6 text-center text-slate-400 font-medium">
-          No inventory items found. Click "+ Add New Product" to create one.
+        <td colspan="6" class="p-8 text-center text-slate-400 font-medium">
+          Please sign in to access and manage your private store catalog.
         </td>
       </tr>
     `;
-    if (window.lucide) lucide.createIcons();
+    if (window.lucide && typeof window.lucide.createIcons === 'function') lucide.createIcons();
+    return;
+  }
+
+  if (items.length === 0) {
+    tbody.innerHTML = `
+      <tr>
+        <td colspan="6" class="p-8 text-center text-slate-400 font-medium">
+          No inventory items found. Click "+ Add New Product" to create your first product.
+        </td>
+      </tr>
+    `;
+    if (window.lucide && typeof window.lucide.createIcons === 'function') lucide.createIcons();
     return;
   }
 
@@ -49,7 +67,7 @@ function renderCatalog(items) {
     <tr class="hover:bg-brand-50/50 transition-colors border-b border-slate-100">
       <td class="p-4 flex items-center gap-3">
         <img 
-          src="${item.imageUrl || 'https://images.unsplash.com/photo-1549298916-b41d501d3772?auto=format&fit=crop&w=100&q=80'}" 
+          src="${item.imageUrl || item.image_url || 'https://images.unsplash.com/photo-1549298916-b41d501d3772?auto=format&fit=crop&w=100&q=80'}" 
           class="w-10 h-10 rounded-lg object-cover border border-brand-200" 
           onerror="this.src='https://images.unsplash.com/photo-1549298916-b41d501d3772?auto=format&fit=crop&w=100&q=80'"
         />
@@ -63,8 +81,8 @@ function renderCatalog(items) {
       <td class="p-4 font-medium">${item.stock} units</td>
       <td class="p-4">
         ${item.stock > 0 
-          ? `<span class="px-2.5 py-1 text-[10px] font-bold text-emerald-800 bg-emerald-100 rounded-full">Active for Sale</span>`
-          : `<span class="px-2.5 py-1 text-[10px] font-bold text-rose-800 bg-rose-100 rounded-full">Blocked by AI</span>`
+          ? `<span class="px-2.5 py-1 text-[10px] font-bold text-emerald-800 bg-emerald-100 rounded-full">Active</span>`
+          : `<span class="px-2.5 py-1 text-[10px] font-bold text-rose-800 bg-rose-100 rounded-full">Out of Stock</span>`
         }
       </td>
       <td class="p-4 text-right">
@@ -73,8 +91,7 @@ function renderCatalog(items) {
     </tr>
   `).join('');
 
-  // Re-initialize Lucide icons on newly rendered DOM elements
-  if (window.lucide) {
+  if (window.lucide && typeof window.lucide.createIcons === 'function') {
     lucide.createIcons();
   }
 }
@@ -84,26 +101,11 @@ function deleteProductLocal(id) {
   renderCatalog(catalogItems);
 }
 
-function toggleMobileMenu() {
-  const sidebar = document.getElementById('sidebarNav');
-  const backdrop = document.getElementById('sidebarBackdrop');
-  if (!sidebar) return;
-
-  const isClosed = sidebar.classList.contains('-translate-x-full');
-  if (isClosed) {
-    sidebar.classList.remove('-translate-x-full');
-    backdrop?.classList.remove('hidden');
-  } else {
-    sidebar.classList.add('-translate-x-full');
-    backdrop?.classList.add('hidden');
-  }
-}
-
 // ==========================================
 // 3. EVENT LISTENERS & MODAL MANAGEMENT
 // ==========================================
 document.addEventListener("DOMContentLoaded", () => {
-  if (window.lucide) lucide.createIcons();
+  if (window.lucide && typeof window.lucide.createIcons === 'function') lucide.createIcons();
   
   fetchTenantCatalog();
 
@@ -115,8 +117,12 @@ document.addEventListener("DOMContentLoaded", () => {
 
   const toggleModal = (show) => {
     if (show) {
+      if (getActiveTenantId() === 'anonymous') {
+        if (typeof openSignInModal === 'function') openSignInModal();
+        return;
+      }
       modal?.classList.remove("hidden");
-      if (window.lucide) lucide.createIcons();
+      if (window.lucide && typeof window.lucide.createIcons === 'function') lucide.createIcons();
     } else {
       modal?.classList.add("hidden");
     }
@@ -145,23 +151,14 @@ document.addEventListener("DOMContentLoaded", () => {
     };
 
     try {
-      if (typeof window.API !== 'undefined' && typeof window.API.saveInventoryItem === 'function') {
-        await window.API.saveInventoryItem(payload);
-      } else if (typeof apiCall === 'function') {
-        await apiCall('/inventory', {
-          method: 'POST',
-          body: JSON.stringify(payload)
-        });
-      } else {
-        await fetch(`${API_BASE}/inventory`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'x-tenant-id': TENANT_ID
-          },
-          body: JSON.stringify(payload)
-        });
-      }
+      await fetch(`${API_BASE}/inventory`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-tenant-id': getActiveTenantId()
+        },
+        body: JSON.stringify(payload)
+      });
 
       form.reset();
       toggleModal(false);

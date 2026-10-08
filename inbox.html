@@ -3,12 +3,9 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>LUVON Q ORÉLUNE | Omnichannel Inbox</title>
+  <title>LUVON Q | Omnichannel Inbox</title>
   
-  <!-- Tailwind CSS via CDN -->
   <script src="https://cdn.tailwindcss.com"></script>
-  
-  <!-- Tailwind JavaScript Theme Configuration for Luvon Q -->
   <script>
     tailwind.config = {
       theme: {
@@ -36,28 +33,26 @@
     }
   </script>
 
-  <!-- Google Fonts & Reliable Lucide CDN -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Playfair+Display:ital,wght@0,600;0,700;1,400&display=swap" rel="stylesheet">
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/lucide/0.344.0/umd/lucide.min.js"></script>
+  
+  <script src="https://unpkg.com/lucide@0.344.0/dist/umd/lucide.js"></script>
   
   <style>
-    /* Custom Scrollbar for Luxury Aesthetic */
-    ::-webkit-scrollbar {
-      width: 5px;
-      height: 5px;
+    svg.lucide {
+      display: inline-block !important;
+      vertical-align: middle !important;
+      stroke-width: 2 !important;
     }
-    ::-webkit-scrollbar-track {
-      background: #fcfaf6;
+    i[data-lucide] {
+      display: inline-flex !important;
+      align-items: center !important;
+      justify-content: center !important;
     }
-    ::-webkit-scrollbar-thumb {
-      background: #e7e0d0;
-      border-radius: 9999px;
-    }
-    ::-webkit-scrollbar-thumb:hover {
-      background: #bc9f67;
-    }
+    ::-webkit-scrollbar { width: 5px; height: 5px; }
+    ::-webkit-scrollbar-track { background: #fcfaf6; }
+    ::-webkit-scrollbar-thumb { background: #e7e0d0; border-radius: 9999px; }
   </style>
 </head>
 <body class="bg-[#fcfaf6] text-stone-800 min-h-screen flex flex-col md:flex-row overflow-x-hidden font-sans">
@@ -70,13 +65,11 @@
     </button>
   </header>
 
-  <!-- Mobile Overlay -->
   <div id="sidebarBackdrop" onclick="toggleMobileMenu()" class="fixed inset-0 bg-stone-900/40 z-40 hidden md:hidden backdrop-blur-sm transition-opacity"></div>
 
   <!-- Sidebar Navigation Drawer -->
-  <aside id="sidebarNav" class="fixed top-0 left-0 bottom-0 z-50 w-72 bg-white/95 backdrop-blur-md border-r border-brand-200/70 flex flex-col justify-between p-6 -translate-x-full md:translate-x-0 transition-transform duration-300 ease-in-out md:static md:w-64 flex-shrink-0 shadow-sm md:shadow-none">
+  <aside id="sidebarNav" class="fixed top-0 left-0 bottom-0 z-50 w-72 bg-white/95 backdrop-blur-md border-r border-brand-200/70 flex flex-col justify-between p-6 -translate-x-full md:translate-x-0 transition-transform duration-300 ease-in-out md:static md:w-64 flex-shrink-0">
     <div class="space-y-8">
-      <!-- Logo Header -->
       <div class="flex items-center justify-between">
         <img src="Luvon q logo.png" alt="Luvon Q Logo" class="h-11 w-auto object-contain" />
         <button type="button" onclick="toggleMobileMenu()" class="md:hidden text-stone-400 hover:text-stone-600 p-1 cursor-pointer">
@@ -84,7 +77,6 @@
         </button>
       </div>
 
-      <!-- Navigation Links -->
       <nav class="space-y-1.5">
         <a href="index.html" class="flex items-center gap-3 px-3 py-2.5 rounded-xl text-stone-600 hover:bg-brand-50 hover:text-brand-700 transition-all font-medium text-xs">
           <i data-lucide="layout-dashboard" class="w-4 h-4 text-brand-600"></i> Overview
@@ -106,21 +98,27 @@
 
     <!-- Tenant Status Footer -->
     <div class="pt-6 border-t border-brand-200/60">
-      <div id="activeTenantCard" class="p-3 bg-brand-50/80 rounded-xl border border-brand-200 flex items-center justify-between shadow-sm">
+      <button id="portalSignInBtn" onclick="openSignInModal()" class="w-full p-3 bg-brand-600 text-white rounded-xl flex items-center justify-center gap-2 font-medium text-xs shadow-md hover:bg-brand-700 transition-all cursor-pointer">
+        <i data-lucide="log-in" class="w-4 h-4"></i>
+        <span>Sign In to Portal</span>
+      </button>
+      <div id="activeTenantCard" class="hidden p-3 bg-brand-50/80 rounded-xl border border-brand-200 flex items-center justify-between shadow-sm">
         <div class="flex items-center gap-3 overflow-hidden">
-          <div class="w-8 h-8 rounded-lg bg-brand-700 text-white flex items-center justify-center font-serif font-bold text-xs flex-shrink-0 shadow-sm">LQ</div>
+          <div class="w-8 h-8 rounded-lg bg-brand-700 text-white flex items-center justify-center font-serif font-bold text-xs flex-shrink-0">LQ</div>
           <div class="overflow-hidden">
-            <p class="text-xs font-bold text-brand-900 truncate">Luvon Q Flagship</p>
+            <p class="text-xs font-bold text-brand-900 truncate" id="tenantName">Loading...</p>
             <span class="inline-block px-1.5 py-0.2 text-[9px] font-bold text-emerald-800 bg-emerald-100 rounded">Verified Provider</span>
           </div>
         </div>
+        <button onclick="toggleSignOut()" class="text-slate-400 hover:text-rose-600 p-1 cursor-pointer">
+          <i data-lucide="log-out" class="w-3.5 h-3.5"></i>
+        </button>
       </div>
     </div>
   </aside>
 
   <!-- Main Inbox Layout -->
   <main class="flex-1 flex flex-col md:flex-row h-screen overflow-hidden">    
-    
     <!-- Left Pane: Conversation Threads -->
     <section class="w-full md:w-80 bg-white border-r border-brand-200/70 flex flex-col h-full flex-shrink-0">
       <div class="p-4 border-b border-brand-200/70 space-y-3 bg-[#fdfcf9]">
@@ -160,13 +158,11 @@
 
       <!-- Thread Items List -->
       <div id="threads-container" class="flex-1 overflow-y-auto divide-y divide-brand-100">
-        <!-- Rendered dynamically -->
       </div>
     </section>
 
     <!-- Right Pane: Live Chat Stream -->
     <section class="flex-1 flex flex-col h-full bg-[#fbf9f5] overflow-hidden">
-      
       <!-- Top Chat Header -->
       <div class="p-4 bg-white border-b border-brand-200/70 flex items-center justify-between shadow-sm">
         <div class="flex items-center gap-3">
@@ -175,14 +171,13 @@
           </div>
           <div>
             <div class="flex items-center gap-2">
-              <h3 id="active-name" class="font-bold text-sm text-stone-900">Test Customer</h3>
+              <h3 id="active-name" class="font-bold text-sm text-stone-900">Select Thread</h3>
               <span id="active-channel-badge" class="px-2 py-0.5 text-[9px] font-extrabold uppercase rounded bg-emerald-100 text-emerald-800 border border-emerald-200">WhatsApp</span>
             </div>
-            <p id="active-phone" class="text-xs text-stone-500 font-mono">+254768820142</p>
+            <p id="active-phone" class="text-xs text-stone-500 font-mono">No conversation active</p>
           </div>
         </div>
 
-        <!-- Stage & AI Toggle Controls -->
         <div class="flex items-center gap-2.5">
           <span id="active-stage-badge" class="px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider rounded-lg bg-amber-100/80 text-amber-900 border border-amber-300">
             QUALIFICATION
@@ -201,14 +196,11 @@
 
       <!-- Chat Messages Container -->
       <div id="chat-stream" class="flex-1 p-4 md:p-6 overflow-y-auto space-y-3.5 bg-[#fcfaf6]">
-        <!-- Rendered dynamically -->
       </div>
 
       <!-- Chat Bottom Input Bar -->
       <div class="p-3.5 bg-white border-t border-brand-200/70 shadow-sm">
         <form id="chat-form" class="flex items-center gap-2" onsubmit="event.preventDefault(); handleSendMessage();">
-          
-          <!-- Quick STK Push Action Button -->
           <button 
             type="button" 
             id="quick-stk-btn"
@@ -220,7 +212,6 @@
             <span class="hidden sm:inline">STK Push</span>
           </button>
 
-          <!-- Input Field -->
           <input 
             type="text" 
             id="chat-input"
@@ -229,7 +220,6 @@
             class="flex-1 px-4 py-2.5 bg-[#fcfaf6] border border-brand-200 focus:border-brand-600 rounded-xl text-xs focus:outline-none text-stone-900 placeholder-stone-400 transition-all shadow-inner" 
           />
 
-          <!-- Send Button -->
           <button 
             type="submit" 
             id="send-btn"
@@ -260,18 +250,14 @@
         </div>
       </div>
 
-      <!-- Quick Choice Pills -->
       <div class="my-3.5 space-y-1.5">
         <p class="text-[10px] font-bold text-stone-500 uppercase tracking-wider">Quick Prompts:</p>
         <div class="flex flex-wrap gap-1.5">
           <button type="button" onclick="setSimText(this.innerText)" class="text-[11px] px-2.5 py-1 bg-brand-50 hover:bg-brand-100 text-brand-800 rounded-lg border border-brand-200/80 transition-colors cursor-pointer text-left">
-            Where is your luxury salon located in Nairobi?
+            Where is your business located in Nairobi?
           </button>
           <button type="button" onclick="setSimText(this.innerText)" class="text-[11px] px-2.5 py-1 bg-brand-50 hover:bg-brand-100 text-brand-800 rounded-lg border border-brand-200/80 transition-colors cursor-pointer text-left">
-            Niaje! How much are the Air Force 1s?
-          </button>
-          <button type="button" onclick="setSimText(this.innerText)" class="text-[11px] px-2.5 py-1 bg-brand-50 hover:bg-brand-100 text-brand-800 rounded-lg border border-brand-200/80 transition-colors cursor-pointer text-left">
-            Do you have knotless braids available tomorrow?
+            Niaje! Which items do you have in stock today?
           </button>
           <button type="button" onclick="setSimText(this.innerText)" class="text-[11px] px-2.5 py-1 bg-brand-50 hover:bg-brand-100 text-brand-800 rounded-lg border border-brand-200/80 transition-colors cursor-pointer text-left">
             Nataka kulipa na M-Pesa sasa hivi.
@@ -286,7 +272,7 @@
           rows="3" 
           class="w-full p-3 text-xs bg-[#fcfaf6] border border-brand-300 rounded-xl focus:outline-none focus:ring-1 focus:ring-brand-600 text-stone-900 resize-none shadow-inner"
           placeholder="Type an inquiry..."
-        >Where is your luxury salon located in Nairobi?</textarea>
+        >Niaje! Which items do you have in stock today?</textarea>
       </div>
 
       <div class="flex items-center justify-end gap-2">
@@ -370,451 +356,13 @@
     </div>
   </div>
 
-  <!-- Toast Notification Container -->
   <div id="toast" class="fixed bottom-5 right-5 z-50 hidden transition-all duration-300">
     <div id="toast-inner" class="px-4 py-3 rounded-xl shadow-xl flex items-center gap-2.5 text-xs font-semibold border">
       <span id="toast-msg">Notification</span>
     </div>
   </div>
 
-  <!-- Shared API Bridge & In-Line Controller -->
   <script src="api.js"></script>
-  <script>
-    let conversations = [];
-    let activeConvId = "254768820142";
-    let isSending = false;
-    let lastMessageCount = 0;
-
-    const BASE_ORIGIN = (window.location.origin && window.location.origin.includes('http'))
-      ? window.location.origin
-      : 'http://localhost:3000';
-    const BACKEND_URL = `${BASE_ORIGIN}/api/tenant`;
-    const TENANT_ID = 'luvon_q_flagship';
-
-    // Toast Utility
-    function showToast(message, type = 'info') {
-      const toast = document.getElementById('toast');
-      const inner = document.getElementById('toast-inner');
-      const msg = document.getElementById('toast-msg');
-      if (!toast || !inner || !msg) return;
-
-      msg.textContent = message;
-      if (type === 'success') {
-        inner.className = "px-4 py-3 rounded-xl shadow-xl flex items-center gap-2.5 text-xs font-semibold border bg-emerald-900 text-emerald-100 border-emerald-700";
-      } else if (type === 'error') {
-        inner.className = "px-4 py-3 rounded-xl shadow-xl flex items-center gap-2.5 text-xs font-semibold border bg-rose-900 text-rose-100 border-rose-700";
-      } else {
-        inner.className = "px-4 py-3 rounded-xl shadow-xl flex items-center gap-2.5 text-xs font-semibold border bg-stone-900 text-brand-100 border-brand-700";
-      }
-
-      toast.classList.remove('hidden');
-      setTimeout(() => toast.classList.add('hidden'), 4000);
-    }
-
-    // Default Seed Conversation
-    function getStarterData() {
-      return [{
-        id: "254768820142",
-        customerId: "254768820142",
-        customerName: "Joel (Test Customer)",
-        customerPhone: "+254768820142",
-        channel: "whatsapp",
-        stage: "QUALIFICATION",
-        isPaused: false,
-        messages: [
-          {
-            role: "user",
-            text: "Niaje, do you have Air Force 1 White in stock?",
-            timestamp: "01:15 AM"
-          },
-          {
-            role: "assistant",
-            text: "Niaje! Yes, we currently have 4 pairs of Air Force 1 White available for KSh 2,500. Would you like me to initiate an M-Pesa STK push for you?",
-            timestamp: "01:15 AM"
-          }
-        ]
-      }];
-    }
-
-    async function fetchLiveConversations() {
-      try {
-        const res = await fetch(`${BACKEND_URL}/conversations`, {
-          headers: { 
-            'Content-Type': 'application/json',
-            'x-tenant-id': TENANT_ID 
-          }
-        });
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        const rawChats = await res.json();
-
-        if (Array.isArray(rawChats) && rawChats.length > 0) {
-          conversations = rawChats.map((c, index) => {
-            const cId = String(c.customerId || c.phone || `conv_${index}`);
-            return {
-              id: cId,
-              customerId: cId,
-              customerName: c.customerName || `Customer +${cId.replace(/^\+/, '')}`,
-              customerPhone: cId.startsWith('+') ? cId : `+${cId}`,
-              channel: c.channel || 'whatsapp',
-              stage: c.stage || 'QUALIFICATION',
-              isPaused: Boolean(c.isPaused),
-              messages: (c.conversationHistory || c.messages || []).map(m => ({
-                role: m.role === 'user' ? 'user' : 'assistant',
-                text: m.text || m.body || '',
-                timestamp: m.timestamp 
-                  ? new Date(m.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) 
-                  : new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-              }))
-            };
-          });
-
-          if (!activeConvId || !conversations.some(c => c.id === activeConvId)) {
-            activeConvId = conversations[0].id;
-          }
-        } else {
-          if (conversations.length === 0) {
-            conversations = getStarterData();
-            activeConvId = "254768820142";
-          }
-        }
-      } catch (err) {
-        if (conversations.length === 0) {
-          conversations = getStarterData();
-          activeConvId = "254768820142";
-        }
-      }
-
-      renderThreads();
-
-      const activeConv = conversations.find(c => c.id === activeConvId);
-      const currentCount = activeConv ? activeConv.messages.length : 0;
-      if (currentCount !== lastMessageCount) {
-        lastMessageCount = currentCount;
-        renderChatStream();
-      }
-    }
-
-    function renderThreads() {
-      const container = document.getElementById("threads-container");
-      if (!container) return;
-
-      if (conversations.length === 0) {
-        container.innerHTML = `
-          <div class="p-6 text-center text-stone-400 text-xs">
-            No active conversations. Click <b>+ Test Inquiry</b> above.
-          </div>
-        `;
-        return;
-      }
-
-      container.innerHTML = conversations.map(c => {
-        const lastMsg = c.messages[c.messages.length - 1];
-        const isActive = c.id === activeConvId;
-
-        return `
-          <div onclick="selectConversation('${c.id}')" class="p-3.5 cursor-pointer hover:bg-brand-50 transition-colors border-b border-brand-100 ${isActive ? 'bg-brand-100/60 border-l-4 border-brand-600' : ''}">
-            <div class="flex items-center justify-between mb-1">
-              <span class="font-bold text-xs text-stone-900">${c.customerName}</span>
-              <span class="text-[10px] text-stone-400">${lastMsg ? lastMsg.timestamp : ''}</span>
-            </div>
-            <div class="flex items-center justify-between gap-2">
-              <p class="text-xs text-stone-500 truncate max-w-[160px]">${lastMsg ? lastMsg.text : 'No messages yet'}</p>
-              <span class="text-[9px] font-bold uppercase px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-800 border border-emerald-200">${c.channel}</span>
-            </div>
-          </div>
-        `;
-      }).join('');
-    }
-
-    function renderChatStream() {
-      const conv = conversations.find(c => c.id === activeConvId);
-      const stream = document.getElementById("chat-stream");
-
-      if (!conv) {
-        if (stream) stream.innerHTML = `<div class="h-full flex items-center justify-center text-stone-400 text-xs">Select a conversation thread to view the live chat.</div>`;
-        return;
-      }
-
-      const nameEl = document.getElementById("active-name");
-      const phoneEl = document.getElementById("active-phone");
-      const avatarEl = document.getElementById("active-avatar");
-      const stageBadge = document.getElementById("active-stage-badge");
-
-      if (nameEl) nameEl.textContent = conv.customerName || "Customer";
-      if (phoneEl) phoneEl.textContent = conv.customerPhone;
-      if (avatarEl) avatarEl.textContent = conv.customerName ? conv.customerName.replace(/[^a-zA-Z]/g, '').slice(0, 2).toUpperCase() : 'LQ';
-      if (stageBadge) stageBadge.textContent = conv.stage;
-
-      const toggleBtn = document.getElementById("ai-toggle-btn");
-      const toggleLabel = document.getElementById("ai-toggle-label");
-      if (toggleBtn && toggleLabel) {
-        if (conv.isPaused) {
-          toggleBtn.className = "px-3.5 py-1.5 rounded-xl text-xs font-semibold bg-rose-700 hover:bg-rose-800 text-white transition-all flex items-center gap-1.5 shadow-sm cursor-pointer";
-          toggleLabel.textContent = "AI Paused (Manager Mode)";
-        } else {
-          toggleBtn.className = "px-3.5 py-1.5 rounded-xl text-xs font-semibold bg-emerald-700 hover:bg-emerald-800 text-white transition-all flex items-center gap-1.5 shadow-sm cursor-pointer";
-          toggleLabel.textContent = "AI Responding";
-        }
-      }
-
-      if (stream) {
-        stream.innerHTML = conv.messages.map(m => {
-          const isUser = m.role === 'user';
-          return `
-            <div class="flex ${isUser ? 'justify-start' : 'justify-end'} mb-2">
-              <div class="max-w-[75%] p-3.5 rounded-2xl ${isUser ? 'bg-white border border-brand-200 text-stone-900 rounded-tl-none shadow-sm' : 'bg-brand-900 text-brand-50 rounded-tr-none shadow-md'} space-y-1">
-                <p class="text-xs leading-relaxed whitespace-pre-wrap">${m.text}</p>
-                <span class="text-[9px] block text-right ${isUser ? 'text-stone-400' : 'text-brand-300'}">${m.timestamp}</span>
-              </div>
-            </div>
-          `;
-        }).join('');
-
-        stream.scrollTop = stream.scrollHeight;
-      }
-
-      if (window.lucide) lucide.createIcons();
-    }
-
-    function selectConversation(id) {
-      activeConvId = id;
-      const activeConv = conversations.find(c => c.id === activeConvId);
-      lastMessageCount = activeConv ? activeConv.messages.length : 0;
-      renderThreads();
-      renderChatStream();
-    }
-
-    async function toggleAIPauseState() {
-      const conv = conversations.find(c => c.id === activeConvId);
-      if (!conv) return;
-
-      const newStatus = !conv.isPaused;
-      conv.isPaused = newStatus;
-      renderChatStream();
-
-      try {
-        await fetch(`${BACKEND_URL}/conversations/toggle-pause`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'x-tenant-id': TENANT_ID
-          },
-          body: JSON.stringify({ customerId: conv.customerId, isPaused: newStatus })
-        });
-        showToast(`AI mode set to: ${newStatus ? 'Paused' : 'Active'}`, 'info');
-      } catch (err) {
-        showToast('AI mode updated locally', 'info');
-      }
-    }
-
-    async function handleSendMessage() {
-      if (isSending) return;
-
-      const input = document.getElementById("chat-input");
-      if (!input || !input.value.trim()) return;
-
-      let conv = conversations.find(c => c.id === activeConvId);
-      if (!conv) {
-        if (conversations.length > 0) {
-          conv = conversations[0];
-          activeConvId = conv.id;
-        } else {
-          return;
-        }
-      }
-
-      const messageText = input.value.trim();
-      input.value = "";
-      isSending = true;
-
-      conv.messages.push({
-        role: "assistant",
-        text: messageText,
-        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-      });
-      lastMessageCount = conv.messages.length;
-      renderChatStream();
-      renderThreads();
-
-      try {
-        const res = await fetch(`${BACKEND_URL}/conversations/send-message`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'x-tenant-id': TENANT_ID
-          },
-          body: JSON.stringify({
-            customerId: conv.customerId,
-            text: messageText
-          })
-        });
-        const data = await res.json();
-        if (!res.ok) {
-          showToast(`Outbound Notice: ${data.error || 'Failed'}`, 'error');
-        } else {
-          showToast(`Message delivered to +${conv.customerId}`, 'success');
-        }
-      } catch (err) {
-        console.error("Outbound send notice:", err.message);
-      } finally {
-        isSending = false;
-      }
-    }
-
-    function openTestInquiryModal() {
-      document.getElementById("testInquiryModal")?.classList.remove("hidden");
-      if (window.lucide) lucide.createIcons();
-    }
-
-    function closeTestInquiryModal() {
-      document.getElementById("testInquiryModal")?.classList.add("hidden");
-    }
-
-    function setSimText(text) {
-      const textarea = document.getElementById("sim-input-text");
-      if (textarea) textarea.value = text.trim();
-    }
-
-    async function executeSimulateInquiry() {
-      const text = document.getElementById("sim-input-text")?.value.trim();
-      if (!text) {
-        showToast("Please enter an inquiry message", "error");
-        return;
-      }
-
-      closeTestInquiryModal();
-
-      let conv = conversations.find(c => c.id === activeConvId);
-      if (!conv) {
-        conv = conversations[0];
-        activeConvId = conv.id;
-      }
-
-      conv.messages.push({
-        role: "user",
-        text: text,
-        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-      });
-      lastMessageCount = conv.messages.length;
-      renderChatStream();
-      renderThreads();
-
-      showToast("Inquiry sent. Generating Gemini response...", "info");
-
-      try {
-        await fetch(`${BASE_ORIGIN}/api/webhook`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            entry: [{
-              changes: [{
-                value: {
-                  metadata: { phone_number_id: "1279716021891578" },
-                  messages: [{
-                    id: `sim_${Date.now()}`,
-                    from: conv.customerId,
-                    type: 'text',
-                    text: { body: text }
-                  }]
-                }
-              }]
-            }]
-          })
-        });
-
-        setTimeout(fetchLiveConversations, 2500);
-      } catch (err) {
-        showToast("Webhook error: " + err.message, "error");
-      }
-    }
-
-    function openQuickSTKModal() {
-      const phoneEl = document.getElementById("active-phone");
-      const phoneText = phoneEl ? phoneEl.textContent.replace(/[^0-9]/g, '') : '254768820142';
-      const input = document.getElementById("stk-modal-phone");
-      if (input) input.value = `+${phoneText}`;
-      document.getElementById("quickSTKModal")?.classList.remove("hidden");
-      if (window.lucide) lucide.createIcons();
-    }
-
-    function closeQuickSTKModal() {
-      document.getElementById("quickSTKModal")?.classList.add("hidden");
-    }
-
-    async function executeQuickSTK() {
-      const phoneVal = document.getElementById("stk-modal-phone")?.value.replace(/[^0-9]/g, '') || '254768820142';
-      const amountVal = document.getElementById("stk-modal-amount")?.value || '1';
-
-      closeQuickSTKModal();
-      showToast(`Dispatching KSh ${amountVal} STK Push to +${phoneVal}...`, "info");
-
-      try {
-        const res = await fetch(`${BACKEND_URL}/payments/test-stk`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'x-tenant-id': TENANT_ID
-          },
-          body: JSON.stringify({ testPhone: phoneVal })
-        });
-        const data = await res.json();
-        if (res.ok) {
-          showToast(`✅ STK Push sent! Check handset for PIN prompt.`, "success");
-        } else {
-          showToast(`STK Error: ${data.message || 'Check Daraja configuration'}`, "error");
-        }
-      } catch (err) {
-        showToast(`Network Error: ${err.message}`, "error");
-      }
-    }
-
-    function handleSearch(query) {
-      const q = query.toLowerCase().trim();
-      const items = document.querySelectorAll("#threads-container > div");
-      items.forEach(el => {
-        const text = el.innerText.toLowerCase();
-        el.style.display = text.includes(q) ? "" : "none";
-      });
-    }
-
-    function toggleMobileMenu() {
-      const nav = document.getElementById("sidebarNav");
-      const backdrop = document.getElementById("sidebarBackdrop");
-      if (!nav || !backdrop) return;
-      const isClosed = nav.classList.contains("-translate-x-full");
-      if (isClosed) {
-        nav.classList.remove("-translate-x-full");
-        backdrop.classList.remove("hidden");
-      } else {
-        nav.classList.add("-translate-x-full");
-        backdrop.classList.add("hidden");
-      }
-    }
-
-    window.openTestInquiryModal = openTestInquiryModal;
-    window.closeTestInquiryModal = closeTestInquiryModal;
-    window.setSimText = setSimText;
-    window.executeSimulateInquiry = executeSimulateInquiry;
-    window.openQuickSTKModal = openQuickSTKModal;
-    window.closeQuickSTKModal = closeQuickSTKModal;
-    window.executeQuickSTK = executeQuickSTK;
-    window.fetchLiveConversations = fetchLiveConversations;
-    window.selectConversation = selectConversation;
-    window.toggleAIPauseState = toggleAIPauseState;
-    window.handleSendMessage = handleSendMessage;
-    window.handleSearch = handleSearch;
-    window.toggleMobileMenu = toggleMobileMenu;
-
-    document.addEventListener("DOMContentLoaded", () => {
-      if (window.lucide) lucide.createIcons();
-      fetchLiveConversations();
-      setInterval(() => {
-        if (!isSending) fetchLiveConversations();
-      }, 4000);
-      setTimeout(() => {
-        if (window.lucide) lucide.createIcons();
-      }, 600);
-    });
-  </script>
+  <script src="inbox.js"></script>
 </body>
 </html>
