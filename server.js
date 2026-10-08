@@ -5,10 +5,17 @@ const express = require('express');
 const axios = require('axios');
 const FormData = require('form-data');
 const cron = require('node-cron');
+const { createClient } = require('@supabase/supabase-js');
+
+// 1. SUPABASE SERVER INITIALIZATION (From .env)
+const SUPABASE_URL = process.env.SUPABASE_URL || 'https://kmwwgmzypjnjfkpoyims.supabase.co';
+const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY || 'sb_publishable_DhTvZ4K5YCYLXErehDkBFQ_noylBgEH';
+const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 const geminiApiKey = (process.env.GEMINI_API_KEY || "").trim();
 console.log("🔑 Loaded WhatsApp Token Prefix:", process.env.WHATSAPP_ACCESS_TOKEN ? process.env.WHATSAPP_ACCESS_TOKEN.substring(0, 14) + "..." : "❌ NO TOKEN LOADED");
 console.log("✨ Loaded Gemini Key Prefix:", geminiApiKey ? geminiApiKey.substring(0, 10) + "..." : "❌ NO GEMINI KEY LOADED");
+console.log("🗄️ Supabase Connected:", SUPABASE_URL);
 
 const app = express();
 app.use(express.json());
@@ -27,13 +34,11 @@ const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 const DEFAULT_FEMALE_VOICE_ID = "EXAVITQu4vr4xnSDxMaL";
 
-// ==========================================
-// HARDCODED SAFARICOM DARAJA SANDBOX CREDENTIALS
-// ==========================================
-const HC_SHORTCODE = "174379";
-const HC_PASSKEY = "bfb279f9aa9bdbcf158e97dd71a467cd2e0c893059b10f78e6b72ada1ed2c919";
-const HC_CONSUMER_KEY = "5U68vQHgUCU7HpYSQZXegh2pFmzG1uBPTMNFcw5obW96GPVn";
-const HC_CONSUMER_SECRET = "2qwVKez82Raza13QyV9Ti8GqNLWKgGPWrJVpr1eot3OGNWluJAO1QaAjr1WaDsII";
+// Fallback Daraja Sandbox Constants
+const HC_SHORTCODE = process.env.DARAJA_BUSINESS_SHORTCODE || "174379";
+const HC_PASSKEY = process.env.DARAJA_PASSKEY || "bfb279f9aa9bdbcf158e97dd71a467cd2e0c893059b10f78e6b72ada1ed2c919";
+const HC_CONSUMER_KEY = process.env.DARAJA_CONSUMER_KEY || "5U68vQHgUCU7HpYSQZXegh2pFmzG1uBPTMNFcw5obW96GPVn";
+const HC_CONSUMER_SECRET = process.env.DARAJA_CONSUMER_SECRET || "2qwVKez82Raza13QyV9Ti8GqNLWKgGPWrJVpr1eot3OGNWluJAO1QaAjr1WaDsII";
 
 // ==========================================
 // 1. MULTI-TENANT PERSISTENT DATABASE STORE
@@ -79,48 +84,7 @@ function initializeStore() {
             consumerKey: HC_CONSUMER_KEY,
             consumerSecret: HC_CONSUMER_SECRET
           },
-          catalog: [
-            {
-              id: '1',
-              name: 'Air Force 1 White',
-              price: 2500,
-              stock: 4,
-              category: 'Shoes',
-              tags: ['sneakers', 'nike', 'shoes', 'footwear', 'white shoes', 'airforce'],
-              hasImage: true,
-              imageUrl: 'https://images.unsplash.com/photo-1595950653106-6c9ebd614d3a?w=800'
-            },
-            {
-              id: '2',
-              name: 'Knotless Braids Service',
-              price: 1500,
-              stock: 10,
-              category: 'Salon',
-              tags: ['braids', 'knotless', 'hair', 'hair styling', 'salon', 'plaits', 'box braids'],
-              hasImage: true,
-              imageUrl: 'https://images.unsplash.com/photo-1607083206869-4c7672e72a8a?w=800'
-            },
-            {
-              id: '3',
-              name: 'Leather Shoulder Bag',
-              price: 3200,
-              stock: 2,
-              category: 'Boutique',
-              tags: ['bag', 'handbag', 'leather', 'accessories', 'purse'],
-              hasImage: true,
-              imageUrl: 'https://images.unsplash.com/photo-1584917865442-de89df76afd3?w=800'
-            },
-            {
-              id: '4',
-              name: 'Swedish Deep Tissue Massage',
-              price: 3000,
-              stock: 5,
-              category: 'Spa',
-              tags: ['massage', 'deep tissue', 'relaxation', 'swedish', 'back pain', 'stress relief'],
-              hasImage: false,
-              imageUrl: null
-            }
-          ]
+          catalog: []
         }
       },
       crmProfiles: {},
@@ -130,7 +94,6 @@ function initializeStore() {
     };
   }
 
-  // Force overwrite any invalid stored values
   if (loadedStore.tenants && loadedStore.tenants["luvon_q_flagship"]) {
     const flagship = loadedStore.tenants["luvon_q_flagship"];
     flagship.whatsappPhoneId = process.env.WHATSAPP_PHONE_NUMBER_ID || flagship.whatsappPhoneId || "1279716021891578";
@@ -169,7 +132,191 @@ function resolveTenant(channelId) {
 }
 
 // ==========================================
-// 2. DARAJA HARDCODED SANDBOX PIPELINE
+// 2. SUPABASE SERVER AUTH PROXY
+// ==========================================
+app.post('/api/auth/signup', async (req, res) => {
+  const { email, password, fullName } = req.body;
+  if (!email || !password) return res.status(400).json({ error: "Email and password required" });
+
+  try {
+    const { data, error } = await supabase.auth.signUp({
+      email,
+      password,
+      options: { data: { full_name: fullName } }
+    });
+    if (error) throw error;
+
+    const tenantId = 'tenant_' + (data.user?.id?.slice(0, 8) || Date.now());
+
+    await supabase.from('tenants').insert({
+      id: tenantId,
+      owner_id: data.user.id,
+      business_name: fullName || 'New Business',
+      brand_signature: (fullName || 'New Business') + ' Official',
+      industry: 'Retail & Services'
+    });
+
+    db.tenants[tenantId] = {
+      id: tenantId,
+      businessName: fullName || 'New Business',
+      brandSignature: (fullName || 'New Business') + ' Official',
+      industry: 'Retail & Services',
+      tone: 'luxury_chic',
+      catalog: []
+    };
+    saveStore();
+
+    res.json({
+      success: true,
+      user: data.user,
+      tenantId,
+      businessName: fullName
+    });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.post('/api/auth/signin', async (req, res) => {
+  const { email, password } = req.body;
+  if (!email || !password) return res.status(400).json({ error: "Email and password required" });
+
+  try {
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+    if (error) throw error;
+
+    const { data: tenantData } = await supabase
+      .from('tenants')
+      .select('*')
+      .eq('owner_id', data.user.id)
+      .limit(1);
+
+    const tenantId = tenantData?.[0]?.id || ('tenant_' + data.user.id.slice(0, 8));
+    const businessName = tenantData?.[0]?.business_name || data.user.user_metadata?.full_name || 'My Store';
+
+    if (!db.tenants[tenantId]) {
+      db.tenants[tenantId] = {
+        id: tenantId,
+        businessName,
+        catalog: []
+      };
+      saveStore();
+    }
+
+    res.json({
+      success: true,
+      user: data.user,
+      tenantId,
+      businessName
+    });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// Tenant Middleware
+function tenantMiddleware(req, res, next) {
+  const tenantId = req.headers['x-tenant-id'] || 'luvon_q_flagship';
+  if (!db.tenants[tenantId]) {
+    db.tenants[tenantId] = {
+      id: tenantId,
+      businessName: "Merchant Store",
+      catalog: []
+    };
+  }
+  req.tenant = db.tenants[tenantId];
+  next();
+}
+
+// ==========================================
+// 3. AI ONBOARDING ENGINE (GEMINI)
+// ==========================================
+app.post('/api/tenant/ai-onboard', tenantMiddleware, async (req, res) => {
+  const { prompt } = req.body;
+  if (!prompt || !prompt.trim()) {
+    return res.status(400).json({ error: "A business prompt description is required" });
+  }
+
+  if (!geminiApiKey) {
+    return res.status(500).json({ error: "GEMINI_API_KEY is not configured in .env" });
+  }
+
+  try {
+    const systemPrompt = `
+You are the business architect for Luvon Q.
+A merchant has provided this description:
+"${prompt}"
+
+Analyze this description and extract structured JSON matching this EXACT schema:
+{
+  "businessName": "Name of business",
+  "industry": "Industry category",
+  "tone": "luxury_chic" | "friendly_conversational" | "professional",
+  "catalog": [
+    {
+      "name": "Product or service name",
+      "price": 2500,
+      "stock": 10,
+      "category": "Category",
+      "tags": ["tag1", "tag2"]
+    }
+  ]
+}
+Return STRICT RAW JSON only without markdown code blocks.
+`;
+
+    const aiRes = await axios.post(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${geminiApiKey}`,
+      { contents: [{ role: 'user', parts: [{ text: systemPrompt }] }] },
+      { headers: { 'Content-Type': 'application/json' }, timeout: 25000 }
+    );
+
+    let raw = aiRes.data?.candidates?.[0]?.content?.parts?.[0]?.text || '{}';
+    raw = raw.replace(/```json/gi, '').replace(/```/g, '').trim();
+    const parsed = JSON.parse(raw);
+
+    req.tenant.businessName = parsed.businessName || req.tenant.businessName;
+    req.tenant.industry = parsed.industry || req.tenant.industry;
+    req.tenant.tone = parsed.tone || req.tenant.tone;
+    req.tenant.catalog = parsed.catalog || [];
+
+    // Sync to Supabase
+    await supabase.from('tenants').upsert({
+      id: req.tenant.id,
+      business_name: req.tenant.businessName,
+      industry: req.tenant.industry,
+      tone: req.tenant.tone
+    });
+
+    if (parsed.catalog && parsed.catalog.length > 0) {
+      const inventoryRows = parsed.catalog.map(item => ({
+        tenant_id: req.tenant.id,
+        name: item.name,
+        price: Number(item.price || 0),
+        stock: Number(item.stock || 5),
+        category: item.category || 'General',
+        tags: item.tags || []
+      }));
+      await supabase.from('inventory').delete().eq('tenant_id', req.tenant.id);
+      await supabase.from('inventory').insert(inventoryRows);
+    }
+
+    saveStore();
+
+    res.json({
+      success: true,
+      businessName: req.tenant.businessName,
+      industry: req.tenant.industry,
+      catalog: req.tenant.catalog
+    });
+  } catch (err) {
+    console.error("AI Setup Error:", err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ==========================================
+// 4. DARAJA SANDBOX PIPELINE
 // ==========================================
 let cachedDarajaToken = null;
 let tokenExpiryTime = 0;
@@ -181,7 +328,7 @@ async function getHardcodedDarajaToken(forceRefresh = false) {
   }
 
   const auth = Buffer.from(`${HC_CONSUMER_KEY}:${HC_CONSUMER_SECRET}`).toString('base64');
-  console.log("🔄 Requesting OAuth Token with hardcoded Sandbox keys...");
+  console.log("🔄 Requesting OAuth Token from Safaricom...");
 
   const response = await axios.get('https://sandbox.safaricom.co.ke/oauth/v1/generate?grant_type=client_credentials', {
     headers: { Authorization: `Basic ${auth}` },
@@ -192,7 +339,7 @@ async function getHardcodedDarajaToken(forceRefresh = false) {
   const expiresIn = Number(response.data.expires_in || 3599);
   tokenExpiryTime = now + (expiresIn - 60) * 1000;
 
-  console.log("🔑 Hardcoded Daraja OAuth Token generated successfully.");
+  console.log("🔑 Daraja OAuth Token generated successfully.");
   return cachedDarajaToken;
 }
 
@@ -211,7 +358,7 @@ async function executeDarajaSTK(tenant, phoneNumber, amount, itemRef, isRetry = 
     let cleanPhone = String(phoneNumber || '').replace(/\D/g, '').trim();
     if (cleanPhone.startsWith('0')) cleanPhone = '254' + cleanPhone.slice(1);
     if (!cleanPhone.startsWith('254')) cleanPhone = '254' + cleanPhone;
-    if (cleanPhone.length !== 12) cleanPhone = "254768820142";
+    if (cleanPhone.length !== 12) cleanPhone = "254708374149";
 
     const serverBaseUrl = (process.env.SERVER_URL || "https://luvon-engine.onrender.com").replace(/\/$/, "");
     const serverCallback = `${serverBaseUrl}/api/stk-callback`;
@@ -231,7 +378,7 @@ async function executeDarajaSTK(tenant, phoneNumber, amount, itemRef, isRetry = 
       TransactionDesc: "Payment"
     };
 
-    console.log(`📤 Dispatching Daraja STK Push:`, JSON.stringify(payload));
+    console.log(`📤 Dispatching Daraja STK Push to +${cleanPhone}:`, JSON.stringify(payload));
 
     const res = await axios.post(
       'https://sandbox.safaricom.co.ke/mpesa/stkpush/v1/processrequest',
@@ -246,7 +393,7 @@ async function executeDarajaSTK(tenant, phoneNumber, amount, itemRef, isRetry = 
     );
 
     console.log(`✅ STK Push Handshake Successful:`, JSON.stringify(res.data));
-    return res.data;
+    return { success: true, result: res.data };
   } catch (err) {
     const rawData = err.response?.data;
     const errorDetails = rawData || { errorMessage: err.message, status: err.response?.status };
@@ -269,13 +416,13 @@ async function triggerTenantSTKPush(tenant, phoneNumber, amount, itemRef) {
 }
 
 // ==========================================
-// 3. GOOGLE GEMINI 3.8 FLASH SALES CONCIERGE
+// 5. GOOGLE GEMINI SALES CONCIERGE
 // ==========================================
 function buildTenantSystemInstruction(tenant, profile) {
   return `
 You are the dedicated female AI sales concierge for **${tenant.businessName}**${
     tenant.brandSignature ? ` (Brand Signature: *${tenant.brandSignature}*)` : ''
-  }, an elite ${tenant.industry} house in Nairobi.
+  }, an elite ${tenant.industry || 'boutique'} house in Nairobi.
 Powered by: Google Gemini on Luvon Q Conversational Commerce Engine.
 
 Current Customer Stage: ${(profile.stage || 'QUALIFICATION').toUpperCase()}
@@ -284,7 +431,7 @@ Live Catalog:
 ${JSON.stringify(tenant.catalog, null, 2)}
 
 BRAND VOICE & PERSONA:
-- Archetype Tone: ${tenant.tone.toUpperCase().replace('_', ' ')}
+- Archetype Tone: ${(tenant.tone || 'luxury_chic').toUpperCase().replace('_', ' ')}
 - Persona: Warm, charming, confident Kenyan female host.
 - Language Policy:
   * If customer uses Sheng (e.g., "Kaende kaende", "Niaje", "Form ni gani"), reply warmly and naturally in authentic Sheng!
@@ -311,10 +458,9 @@ If no action is triggered, output conversational prose.
 }
 
 async function generateGeminiSalesResponse(tenant, profile, userPromptText) {
-  const apiKey = (process.env.GEMINI_API_KEY || "").trim();
-  if (!apiKey) {
+  if (!geminiApiKey) {
     console.warn("⚠️ GEMINI_API_KEY is not configured in environment.");
-    return `Karibu ${tenant.businessName}! We have Air Force 1 White (KSh 2,500) and salon styling services available today. How can I help you book or order?`;
+    return `Karibu ${tenant.businessName}! How can I help you today?`;
   }
 
   const contents = [];
@@ -343,13 +489,13 @@ async function generateGeminiSalesResponse(tenant, profile, userPromptText) {
     }
   };
 
-  const models = ['gemini-3.8-flash', 'gemini-3.5-flash-lite'];
+  const models = ['gemini-2.5-flash', 'gemini-1.5-flash'];
 
   for (const model of models) {
     try {
       console.log(`✨ Invoking Google Gemini model: [${model}]...`);
       const response = await axios.post(
-        `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
+        `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${geminiApiKey}`,
         payload,
         {
           headers: { 'Content-Type': 'application/json' },
@@ -368,7 +514,7 @@ async function generateGeminiSalesResponse(tenant, profile, userPromptText) {
     }
   }
 
-  return `Karibu ${tenant.businessName}! We have our exclusive collection ready. Would you like to check out our sneakers or book a service consultation?`;
+  return `Karibu ${tenant.businessName}! We have our exclusive collection ready. How can I assist you today?`;
 }
 
 function getOrCreateCustomerSession(tenant, customerId, channel = 'whatsapp') {
@@ -396,7 +542,7 @@ function getOrCreateCustomerSession(tenant, customerId, channel = 'whatsapp') {
 }
 
 // ==========================================
-// 4. ELEVENLABS AUDIO DISPATCH
+// 6. ELEVENLABS AUDIO DISPATCH
 // ==========================================
 async function sendWhatsAppElevenLabsAudio(tenant, toPhone, textReply) {
   if (!toPhone || !textReply) return;
@@ -458,7 +604,7 @@ async function sendWhatsAppElevenLabsAudio(tenant, toPhone, textReply) {
 }
 
 // ==========================================
-// 5. MESSAGING UTILITIES
+// 7. MESSAGING UTILITIES
 // ==========================================
 async function markMessageAsRead(messageId) {
   if (!messageId) return;
@@ -531,7 +677,7 @@ async function sendWhatsAppImage(tenant, toPhone, imageUrl, caption) {
 }
 
 // ==========================================
-// 6. MAIN WEBHOOK INTAKE
+// 8. MAIN WEBHOOK INTAKE
 // ==========================================
 function handleWebhookVerification(req, res) {
   const mode = req.query['hub.mode'];
@@ -584,7 +730,6 @@ async function handleWebhookIncoming(req, res) {
     }
 
     if (profile.isPaused) {
-      console.log(`⏸ Chat with ${fromNumber} is paused.`);
       profile.conversationHistory.push({
         role: 'user',
         text: incomingTextRaw || `[${msgType}]`,
@@ -597,8 +742,6 @@ async function handleWebhookIncoming(req, res) {
     await markMessageAsRead(message.id);
 
     let loggedUserText = incomingTextRaw || `[Sent ${msgType}]`;
-
-    console.log(`🤖 Generating Gemini sales response...`);
     let responseText = await generateGeminiSalesResponse(tenant, profile, loggedUserText);
 
     if (!responseText) {
@@ -693,8 +836,8 @@ async function handleWebhookIncoming(req, res) {
         if (isVoiceInput) await sendWhatsAppElevenLabsAudio(tenant, fromNumber, promptMsg);
 
         const stkResult = await triggerTenantSTKPush(tenant, fromNumber, paymentData.amount, paymentData.item);
-        if (stkResult?.CheckoutRequestID) {
-          db.orders[stkResult.CheckoutRequestID] = {
+        if (stkResult?.result?.CheckoutRequestID) {
+          db.orders[stkResult.result.CheckoutRequestID] = {
             tenantId: tenant.id,
             phone: fromNumber,
             item: paymentData.item,
@@ -726,7 +869,7 @@ app.get('/api/webhook', handleWebhookVerification);
 app.post('/api/webhook', handleWebhookIncoming);
 
 // ==========================================
-// 7. M-PESA DARAJA CALLBACK WEBHOOK
+// 9. M-PESA DARAJA CALLBACK WEBHOOK
 // ==========================================
 app.post('/api/stk-callback', async (req, res) => {
   res.status(200).json({ ResultCode: 0, ResultDesc: "Accepted" });
@@ -790,15 +933,8 @@ app.post('/api/stk-callback', async (req, res) => {
 });
 
 // ==========================================
-// 8. REST API FOR FRONTEND DASHBOARD
+// 10. REST DATA ENDPOINTS
 // ==========================================
-function tenantMiddleware(req, res, next) {
-  const tenantId = req.headers['x-tenant-id'] || 'luvon_q_flagship';
-  req.tenant = db.tenants[tenantId];
-  if (!req.tenant) return res.status(404).json({ error: "Tenant not found" });
-  next();
-}
-
 app.get('/api/tenant/settings', tenantMiddleware, (req, res) => {
   res.json({
     success: true,
@@ -813,7 +949,7 @@ app.get('/api/tenant/settings', tenantMiddleware, (req, res) => {
   });
 });
 
-app.get('/api/tenant/metrics', tenantMiddleware, (req, res) => {
+app.get('/api/tenant/metrics', tenantMiddleware, async (req, res) => {
   const tenantSales = db.attributionLedger.filter(t => t.tenantId === req.tenant.id);
   const totalRevenue = tenantSales.reduce((sum, t) => sum + t.amount, 0);
   const activeChats = Object.values(db.crmProfiles).filter(p => p.tenantId === req.tenant.id);
@@ -822,17 +958,25 @@ app.get('/api/tenant/metrics', tenantMiddleware, (req, res) => {
     totalRevenue,
     dealsClosed: tenantSales.length,
     activeCustomers: activeChats.length,
-    catalogItems: req.tenant.catalog.length,
-    recentSales: tenantSales.slice(-10)
+    catalogItems: req.tenant.catalog ? req.tenant.catalog.length : 0
   });
 });
 
-app.get('/api/tenant/inventory', tenantMiddleware, (req, res) => {
+app.get('/api/tenant/inventory', tenantMiddleware, async (req, res) => {
+  try {
+    const { data, error } = await supabase
+      .from('inventory')
+      .select('*')
+      .eq('tenant_id', req.tenant.id);
+    if (!error && data && data.length > 0) {
+      return res.json(data);
+    }
+  } catch (e) {}
   res.json(req.tenant.catalog || []);
 });
 
-app.post('/api/tenant/inventory', tenantMiddleware, (req, res) => {
-  const { name, price, stock, category, tags, hasImage, imageUrl } = req.body;
+app.post('/api/tenant/inventory', tenantMiddleware, async (req, res) => {
+  const { name, price, stock, category, tags, imageUrl } = req.body;
   const newItem = {
     id: String(Date.now()),
     name,
@@ -840,11 +984,25 @@ app.post('/api/tenant/inventory', tenantMiddleware, (req, res) => {
     stock: Number(stock || 0),
     category: category || "General",
     tags: tags || [],
-    hasImage: Boolean(hasImage),
+    hasImage: Boolean(imageUrl),
     imageUrl: imageUrl || null
   };
+
   req.tenant.catalog.push(newItem);
   saveStore();
+
+  try {
+    await supabase.from('inventory').insert({
+      tenant_id: req.tenant.id,
+      name,
+      price: Number(price),
+      stock: Number(stock || 0),
+      category,
+      tags,
+      image_url: imageUrl
+    });
+  } catch (e) {}
+
   res.status(201).json(newItem);
 });
 
@@ -856,7 +1014,6 @@ app.post('/api/tenant/settings/personality', tenantMiddleware, (req, res) => {
   if (languagePreference) req.tenant.languagePreference = languagePreference;
   if (businessName) req.tenant.businessName = businessName;
   saveStore();
-  console.log(`🎛️ Settings updated for [${req.tenant.businessName}]: Voice ID = ${req.tenant.elevenLabsVoiceId}, Tone = ${req.tenant.tone}`);
   res.json({ success: true, tenant: req.tenant });
 });
 
@@ -890,7 +1047,6 @@ app.post('/api/tenant/voice/preview', async (req, res) => {
     });
     res.send(Buffer.from(ttsRes.data));
   } catch (err) {
-    console.error("Preview voice error:", err.response?.data ? JSON.stringify(err.response.data) : err.message);
     res.status(500).json({ error: "Failed to generate sample" });
   }
 });
@@ -901,7 +1057,7 @@ app.post('/api/tenant/conversations/simulate-inquiry', tenantMiddleware, async (
     return res.status(400).json({ error: "Text inquiry is required" });
   }
 
-  const phone = customerId ? customerId.toString().replace(/\+/g, '').trim() : "254768820142";
+  const phone = customerId ? customerId.toString().replace(/\+/g, '').trim() : "254708374149";
   const { profile } = getOrCreateCustomerSession(req.tenant, phone, 'whatsapp');
 
   try {
@@ -920,7 +1076,6 @@ app.post('/api/tenant/conversations/simulate-inquiry', tenantMiddleware, async (
       conversationHistory: profile.conversationHistory
     });
   } catch (err) {
-    console.error("Simulation endpoint error:", err.message);
     res.status(500).json({ error: err.message });
   }
 });
@@ -947,13 +1102,9 @@ app.post('/api/tenant/conversations/send-message', tenantMiddleware, async (req,
 
   try {
     const sendResult = await sendWhatsAppText(req.tenant, cleanPhone, text);
-    res.json({ success: true, message: "Outbound message delivered via Meta WhatsApp API", details: sendResult });
+    res.json({ success: true, message: "Outbound message delivered", details: sendResult });
   } catch (err) {
-    console.error("❌ Outbound manual send error:", err.response?.data || err.message);
-    res.status(500).json({ 
-      error: "Meta API delivery failed", 
-      details: err.response?.data || err.message 
-    });
+    res.status(500).json({ error: "Meta API delivery failed", details: err.response?.data || err.message });
   }
 });
 
@@ -964,39 +1115,25 @@ app.post('/api/tenant/payments/daraja', tenantMiddleware, (req, res) => {
 // TEST STK TRIGGER WITH DETAILED ERROR REPORTING
 app.post('/api/tenant/payments/test-stk', tenantMiddleware, async (req, res) => {
   const { testPhone } = req.body;
-  let cleanPhone = String(testPhone || "254768820142").replace(/\D/g, '').trim();
+  let cleanPhone = String(testPhone || "254708374149").replace(/\D/g, '').trim();
   if (cleanPhone.startsWith('0')) cleanPhone = '254' + cleanPhone.slice(1);
   if (!cleanPhone.startsWith('254')) cleanPhone = '254' + cleanPhone;
 
-  try {
-    const result = await triggerTenantSTKPush(req.tenant, cleanPhone, 1, "Test");
+  const result = await triggerTenantSTKPush(req.tenant, cleanPhone, 1, "Test");
 
-    if (result && (result.ResponseCode === "0" || result.CheckoutRequestID)) {
-      return res.json({ 
-        success: true, 
-        message: result.CustomerMessage || "STK prompt sent to your phone! Check handset.", 
-        result 
-      });
-    }
-
-    const rawDetails = result?.details || result;
-    const errMsg = rawDetails?.errorMessage || rawDetails?.ResponseDescription || JSON.stringify(rawDetails);
-    return res.status(400).json({ 
-      success: false, 
-      message: errMsg, 
-      errorMessage: errMsg,
-      result: rawDetails 
-    });
-  } catch (err) {
-    const rawDetails = err.response?.data || { message: err.message };
-    const errMsg = rawDetails?.errorMessage || rawDetails?.ResponseDescription || err.message;
-    return res.status(400).json({ 
-      success: false, 
-      message: errMsg, 
-      errorMessage: errMsg,
-      result: rawDetails 
+  if (result.success && (result.result?.ResponseCode === "0" || result.result?.CheckoutRequestID)) {
+    return res.status(200).json({ 
+      success: true, 
+      message: result.result?.CustomerMessage || "STK push accepted by Safaricom Sandbox!",
+      result: result.result 
     });
   }
+
+  return res.status(400).json({ 
+    success: false, 
+    message: "Safaricom Gateway rejected prompt", 
+    details: result.details || result 
+  });
 });
 
 app.get('/api/tenant/conversations', tenantMiddleware, (req, res) => {
@@ -1017,7 +1154,7 @@ app.post('/api/tenant/conversations/toggle-pause', tenantMiddleware, (req, res) 
 });
 
 // ==========================================
-// 9. ROOT & SPA ROUTE FALLBACKS
+// 11. ROOT & SPA ROUTE FALLBACKS
 // ==========================================
 app.get('/', (req, res) => {
   const indexPath = path.join(__dirname, 'index.html');
@@ -1028,7 +1165,7 @@ app.get('/', (req, res) => {
 });
 
 // ==========================================
-// 10. CRON SCHEDULER
+// 12. CRON SCHEDULER
 // ==========================================
 if (!process.env.VERCEL) {
   cron.schedule('0 * * * *', async () => {
@@ -1067,7 +1204,7 @@ if (!process.env.VERCEL) {
 }
 
 // ==========================================
-// 11. EXPORT FOR VERCEL & LOCAL LISTENER
+// 13. EXPORT FOR VERCEL & LOCAL LISTENER
 // ==========================================
 const PORT = process.env.PORT || 3000;
 if (process.env.NODE_ENV !== 'production' || !process.env.VERCEL) {
