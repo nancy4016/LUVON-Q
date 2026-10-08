@@ -4,6 +4,9 @@
     ? window.location.origin
     : 'https://luvon-engine.onrender.com';
 
+  const SUPABASE_URL = 'https://kmwwgmzypjnjfkpoyims.supabase.co';
+  const SUPABASE_ANON_KEY = 'sb_publishable_DhTvZ4K5YCYLXErehDkBFQ_noylBgEH';
+
   function getActiveTenantId() {
     return localStorage.getItem('luvon_active_tenant_id') || 'luvon_q_flagship';
   }
@@ -63,6 +66,73 @@
       throw new Error(data?.message || data?.error || `Request failed (${res.status})`);
     }
     return data;
+  }
+
+  // Parse Supabase Auth Hash Fragment on Page Load
+  async function handleAuthHashRedirect() {
+    const hash = window.location.hash;
+    if (!hash || !hash.includes('access_token=')) return false;
+
+    try {
+      const params = new URLSearchParams(hash.substring(1));
+      const accessToken = params.get('access_token');
+      const authType = params.get('type'); // 'invite', 'signup', 'recovery'
+
+      if (!accessToken) return false;
+
+      // Clean the address bar immediately
+      window.history.replaceState({}, document.title, window.location.pathname);
+
+      // Fetch user profile from Supabase using the received access token
+      const userRes = await fetch(`${SUPABASE_URL}/auth/v1/user`, {
+        headers: {
+          'apikey': SUPABASE_ANON_KEY,
+          'Authorization': `Bearer ${accessToken}`
+        }
+      });
+
+      if (!userRes.ok) throw new Error('Could not verify invitation credentials.');
+      const user = await userRes.json();
+      const meta = user.user_metadata || {};
+
+      const tenantId = meta.tenant_id || 'tenant_' + user.id.slice(0, 8);
+      const businessName = meta.tenant_name || meta.full_name || 'Merchant Workspace';
+
+      // Save active session
+      localStorage.setItem('luvon_active_tenant_id', tenantId);
+      localStorage.setItem('luvon_business_name', businessName);
+      localStorage.setItem('luvon_user_email', user.email);
+      localStorage.setItem('luvon_access_token', accessToken);
+
+      // Inform server to mark team member status as Active
+      await fetch(`${BASE_URL}/api/tenant/team/accept`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-tenant-id': tenantId
+        },
+        body: JSON.stringify({ email: user.email })
+      }).catch(() => {});
+
+      updateAuthUI(user, businessName);
+
+      if (authType === 'invite') {
+        showNotification(`Welcome to ${businessName}! You joined as a team collaborator.`, 'success');
+      } else {
+        showNotification(`Welcome back, ${businessName}! Email verified.`, 'success');
+      }
+
+      setTimeout(() => {
+        if (window.location.pathname.endsWith('settings.html') || window.location.pathname.endsWith('index.html')) {
+          window.location.reload();
+        }
+      }, 1000);
+
+      return true;
+    } catch (err) {
+      showNotification(`Auth Error: ${err.message}`, 'error');
+      return false;
+    }
   }
 
   // Auth Modal Handlers
@@ -134,7 +204,6 @@
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Authentication failed');
 
-      // CRITICAL: Check if email verification is required
       if (currentAuthMode === 'signup' && data.requiresVerification) {
         closeSignInModal();
         showNotification(`Confirmation email sent to ${email}. Please verify your email before signing in!`, 'info');
@@ -142,7 +211,6 @@
         return;
       }
 
-      // Authenticated session established
       localStorage.setItem('luvon_active_tenant_id', data.tenantId);
       localStorage.setItem('luvon_business_name', data.businessName || fullName);
 
@@ -178,6 +246,8 @@
   function toggleSignOut() {
     localStorage.removeItem('luvon_active_tenant_id');
     localStorage.removeItem('luvon_business_name');
+    localStorage.removeItem('luvon_user_email');
+    localStorage.removeItem('luvon_access_token');
     updateAuthUI(null);
     showNotification('Signed out successfully.', 'info');
     setTimeout(() => window.location.reload(), 600);
@@ -260,5 +330,10 @@
   window.openOnboardingModal = openOnboardingModal;
   window.closeOnboardingModal = closeOnboardingModal;
 
-  document.addEventListener('DOMContentLoaded', checkAuthSession);
+  document.addEventListener('DOMContentLoaded', async () => {
+    const redirected = await handleAuthHashRedirect();
+    if (!redirected) {
+      checkAuthSession();
+    }
+  });
 })();

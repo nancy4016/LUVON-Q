@@ -22,7 +22,7 @@ const geminiApiKey = (process.env.GEMINI_API_KEY || "").trim();
 console.log("🔑 WhatsApp Token Prefix:", process.env.WHATSAPP_ACCESS_TOKEN ? process.env.WHATSAPP_ACCESS_TOKEN.substring(0, 14) + "..." : "❌ NO TOKEN LOADED");
 console.log("✨ Gemini Key Prefix:", geminiApiKey ? geminiApiKey.substring(0, 10) + "..." : "❌ NO GEMINI KEY LOADED");
 console.log("🗄️ Supabase REST Host:", SUPABASE_URL);
-console.log("🛡️ Supabase Service Role Key:", SUPABASE_SERVICE_ROLE_KEY ? "CONFIGURED" : "❌ MISSING (Required for Team Invites)");
+console.log("🛡️ Supabase Service Role Key:", SUPABASE_SERVICE_ROLE_KEY ? "CONFIGURED" : "❌ MISSING");
 
 const app = express();
 app.use(express.json());
@@ -286,7 +286,7 @@ app.get('/api/tenant/team', tenantMiddleware, (req, res) => {
   });
 });
 
-// Team Members: Invite (Direct Supabase Auth Dispatch + Strict Error Catching)
+// Team Members: Invite
 app.post('/api/tenant/team/invite', tenantMiddleware, async (req, res) => {
   const { email, role } = req.body;
   if (!email || !email.includes('@')) {
@@ -301,14 +301,9 @@ app.post('/api/tenant/team/invite', tenantMiddleware, async (req, res) => {
     return res.status(400).json({ error: "This email already has an active invitation or workspace role." });
   }
 
-  // Ensure Service Role Key is available to authorize /auth/v1/invite
   const keyToUse = SUPABASE_SERVICE_ROLE_KEY || SUPABASE_ANON_KEY;
-  if (!SUPABASE_SERVICE_ROLE_KEY) {
-    console.warn("⚠️ SUPABASE_SERVICE_ROLE_KEY is missing. Attempting with ANON key (may be blocked by Supabase Auth).");
-  }
 
   try {
-    // 1. Dispatch official Supabase Auth invitation email
     const authInviteRes = await axios.post(
       `${SUPABASE_URL}/auth/v1/invite`,
       { 
@@ -328,7 +323,6 @@ app.post('/api/tenant/team/invite', tenantMiddleware, async (req, res) => {
       }
     );
 
-    // 2. Add as Pending to the workspace record
     const newMember = {
       id: authInviteRes.data?.id ? 'mem_' + authInviteRes.data.id.slice(0, 8) : 'mem_' + Date.now(),
       email: cleanEmail,
@@ -345,10 +339,9 @@ app.post('/api/tenant/team/invite', tenantMiddleware, async (req, res) => {
     const errorDetails = authErr.response?.data?.msg || authErr.response?.data?.error_description || authErr.message;
     console.error("❌ Supabase Auth Invite Rejected:", errorDetails);
     
-    // Distinguish service role configuration issues
     if (authErr.response?.status === 401 || authErr.response?.status === 403) {
       return res.status(500).json({ 
-        error: "Supabase denied invitation dispatch. SUPABASE_SERVICE_ROLE_KEY must be added to your environment variables on Render." 
+        error: "Supabase denied invite dispatch. SUPABASE_SERVICE_ROLE_KEY must be configured on Render." 
       });
     }
 
@@ -356,7 +349,32 @@ app.post('/api/tenant/team/invite', tenantMiddleware, async (req, res) => {
   }
 });
 
-// Team Members: Resend Invitation
+// Team Members: Accept / Activate
+app.post('/api/tenant/team/accept', tenantMiddleware, (req, res) => {
+  const { email } = req.body;
+  if (!email) return res.status(400).json({ error: "Email required" });
+
+  const cleanEmail = email.trim().toLowerCase();
+  let found = false;
+
+  if (req.tenant.teamMembers) {
+    req.tenant.teamMembers = req.tenant.teamMembers.map(m => {
+      if (m.email.toLowerCase() === cleanEmail) {
+        found = true;
+        return { ...m, status: 'Active', acceptedAt: new Date().toISOString() };
+      }
+      return m;
+    });
+  }
+
+  if (found) {
+    saveStore();
+  }
+
+  res.json({ success: true, status: 'Active' });
+});
+
+// Team Members: Resend
 app.post('/api/tenant/team/resend', tenantMiddleware, async (req, res) => {
   const { memberId } = req.body;
   const member = (req.tenant.teamMembers || []).find(m => m.id === memberId);
@@ -371,7 +389,11 @@ app.post('/api/tenant/team/resend', tenantMiddleware, async (req, res) => {
       `${SUPABASE_URL}/auth/v1/invite`,
       { 
         email: member.email,
-        data: { role: member.role, tenant_id: req.tenant.id }
+        data: {
+          role: member.role,
+          tenant_id: req.tenant.id,
+          tenant_name: req.tenant.businessName
+        }
       },
       {
         headers: {
