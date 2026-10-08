@@ -114,8 +114,123 @@ function resolveTenant(channelId) {
   return db.tenants["luvon_q_flagship"];
 }
 
+function tenantMiddleware(req, res, next) {
+  const tenantId = req.headers['x-tenant-id'] || 'luvon_q_flagship';
+  if (!db.tenants[tenantId]) {
+    db.tenants[tenantId] = {
+      id: tenantId,
+      businessName: "Merchant Store",
+      industry: "Retail & Services",
+      tone: "luxury_chic",
+      catalog: []
+    };
+    saveStore();
+  }
+  req.tenant = db.tenants[tenantId];
+  next();
+}
+
 // ==========================================
-// 2. SUPABASE SERVER AUTH PROXY
+// 2. AI ONBOARDING ENGINE (GEMINI)
+// ==========================================
+async function handleAIOnboarding(req, res) {
+  const { prompt } = req.body;
+  if (!prompt || !prompt.trim()) {
+    return res.status(400).json({ error: "Please enter a description of your business." });
+  }
+
+  if (!geminiApiKey) {
+    return res.status(500).json({ error: "Gemini API Key is not configured on the server." });
+  }
+
+  try {
+    const systemPrompt = `
+You are the business architect for Luvon Q.
+A merchant has provided this description:
+"${prompt}"
+
+Analyze this description and extract structured JSON matching this EXACT schema:
+{
+  "businessName": "Name of business",
+  "industry": "Industry category",
+  "tone": "luxury_chic" | "friendly_conversational" | "professional",
+  "catalog": [
+    {
+      "name": "Product or service name",
+      "price": 2500,
+      "stock": 10,
+      "category": "Category",
+      "tags": ["tag1", "tag2"]
+    }
+  ]
+}
+Return STRICT RAW JSON only without markdown code blocks.
+`;
+
+    const aiRes = await axios.post(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${geminiApiKey}`,
+      { contents: [{ role: 'user', parts: [{ text: systemPrompt }] }] },
+      { headers: { 'Content-Type': 'application/json' }, timeout: 25000 }
+    );
+
+    let raw = aiRes.data?.candidates?.[0]?.content?.parts?.[0]?.text || '{}';
+    raw = raw.replace(/```json/gi, '').replace(/```/g, '').trim();
+    const parsed = JSON.parse(raw);
+
+    req.tenant.businessName = parsed.businessName || req.tenant.businessName;
+    req.tenant.industry = parsed.industry || req.tenant.industry;
+    req.tenant.tone = parsed.tone || req.tenant.tone;
+    req.tenant.catalog = parsed.catalog || [];
+
+    // Sync to Supabase via REST
+    await axios.post(`${SUPABASE_URL}/rest/v1/tenants`, {
+      id: req.tenant.id,
+      business_name: req.tenant.businessName,
+      industry: req.tenant.industry,
+      tone: req.tenant.tone
+    }, {
+      headers: { ...supabaseHeaders, 'Prefer': 'resolution=merge-duplicates' }
+    }).catch((e) => console.warn("Supabase tenant sync notice:", e.message));
+
+    if (parsed.catalog && parsed.catalog.length > 0) {
+      const inventoryRows = parsed.catalog.map(item => ({
+        tenant_id: req.tenant.id,
+        name: item.name,
+        price: Number(item.price || 0),
+        stock: Number(item.stock || 5),
+        category: item.category || 'General',
+        tags: item.tags || []
+      }));
+
+      await axios.delete(`${SUPABASE_URL}/rest/v1/inventory?tenant_id=eq.${req.tenant.id}`, {
+        headers: supabaseHeaders
+      }).catch(() => {});
+
+      await axios.post(`${SUPABASE_URL}/rest/v1/inventory`, inventoryRows, {
+        headers: supabaseHeaders
+      }).catch((e) => console.warn("Supabase inventory insert notice:", e.message));
+    }
+
+    saveStore();
+
+    return res.json({
+      success: true,
+      businessName: req.tenant.businessName,
+      industry: req.tenant.industry,
+      tone: req.tenant.tone,
+      catalog: req.tenant.catalog
+    });
+  } catch (err) {
+    console.error("AI Setup Error:", err.message);
+    return res.status(500).json({ error: err.response?.data?.error?.message || err.message });
+  }
+}
+
+app.post('/api/tenant/ai-onboard', tenantMiddleware, handleAIOnboarding);
+app.post('/api/ai-onboard', tenantMiddleware, handleAIOnboarding);
+
+// ==========================================
+// 3. SUPABASE SERVER AUTH PROXY
 // ==========================================
 app.post('/api/auth/signup', async (req, res) => {
   const { email, password, fullName } = req.body;
@@ -206,530 +321,19 @@ app.post('/api/auth/signin', async (req, res) => {
   }
 });
 
-// Tenant Middleware
-function tenantMiddleware(req, res, next) {
-  const tenantId = req.headers['x-tenant-id'] || 'luvon_q_flagship';
-  if (!db.tenants[tenantId]) {
-    db.tenants[tenantId] = {
-      id: tenantId,
-      businessName: "Merchant Store",
-      catalog: []
-    };
-  }
-  req.tenant = db.tenants[tenantId];
-  next();
-}
-
 // ==========================================
-// 3. AI ONBOARDING ENGINE (GEMINI)
-// ==========================================
-app.post('/api/tenant/ai-onboard', tenantMiddleware, async (req, res) => {
-  const { prompt } = req.body;
-  if (!prompt || !prompt.trim()) {
-    return res.status(400).json({ error: "A business prompt description is required" });
-  }
-
-  if (!geminiApiKey) {
-    return res.status(500).json({ error: "GEMINI_API_KEY is not configured in .env" });
-  }
-
-  try {
-    const systemPrompt = `
-You are the business architect for Luvon Q.
-A merchant has provided this description:
-"${prompt}"
-
-Analyze this description and extract structured JSON matching this EXACT schema:
-{
-  "businessName": "Name of business",
-  "industry": "Industry category",
-  "tone": "luxury_chic" | "friendly_conversational" | "professional",
-  "catalog": [
-    {
-      "name": "Product or service name",
-      "price": 2500,
-      "stock": 10,
-      "category": "Category",
-      "tags": ["tag1", "tag2"]
-    }
-  ]
-}
-Return STRICT RAW JSON only without markdown code blocks.
-`;
-
-    const aiRes = await axios.post(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${geminiApiKey}`,
-      { contents: [{ role: 'user', parts: [{ text: systemPrompt }] }] },
-      { headers: { 'Content-Type': 'application/json' }, timeout: 25000 }
-    );
-
-    let raw = aiRes.data?.candidates?.[0]?.content?.parts?.[0]?.text || '{}';
-    raw = raw.replace(/```json/gi, '').replace(/```/g, '').trim();
-    const parsed = JSON.parse(raw);
-
-    req.tenant.businessName = parsed.businessName || req.tenant.businessName;
-    req.tenant.industry = parsed.industry || req.tenant.industry;
-    req.tenant.tone = parsed.tone || req.tenant.tone;
-    req.tenant.catalog = parsed.catalog || [];
-
-    // Sync to Supabase via REST
-    await axios.post(`${SUPABASE_URL}/rest/v1/tenants`, {
-      id: req.tenant.id,
-      business_name: req.tenant.businessName,
-      industry: req.tenant.industry,
-      tone: req.tenant.tone
-    }, {
-      headers: { ...supabaseHeaders, 'Prefer': 'resolution=merge-duplicates' }
-    }).catch((e) => console.warn("Supabase tenant sync notice:", e.message));
-
-    if (parsed.catalog && parsed.catalog.length > 0) {
-      const inventoryRows = parsed.catalog.map(item => ({
-        tenant_id: req.tenant.id,
-        name: item.name,
-        price: Number(item.price || 0),
-        stock: Number(item.stock || 5),
-        category: item.category || 'General',
-        tags: item.tags || []
-      }));
-
-      await axios.delete(`${SUPABASE_URL}/rest/v1/inventory?tenant_id=eq.${req.tenant.id}`, {
-        headers: supabaseHeaders
-      }).catch(() => {});
-
-      await axios.post(`${SUPABASE_URL}/rest/v1/inventory`, inventoryRows, {
-        headers: supabaseHeaders
-      }).catch((e) => console.warn("Supabase inventory insert notice:", e.message));
-    }
-
-    saveStore();
-
-    res.json({
-      success: true,
-      businessName: req.tenant.businessName,
-      industry: req.tenant.industry,
-      catalog: req.tenant.catalog
-    });
-  } catch (err) {
-    console.error("AI Setup Error:", err.message);
-    res.status(500).json({ error: err.message });
-  }
-});
-
-// ==========================================
-// 4. DARAJA SANDBOX PIPELINE
-// ==========================================
-let cachedDarajaToken = null;
-let tokenExpiryTime = 0;
-
-async function getHardcodedDarajaToken(forceRefresh = false) {
-  const now = Date.now();
-  if (!forceRefresh && cachedDarajaToken && now < tokenExpiryTime) {
-    return cachedDarajaToken;
-  }
-
-  const auth = Buffer.from(`${HC_CONSUMER_KEY}:${HC_CONSUMER_SECRET}`).toString('base64');
-  console.log("🔄 Requesting OAuth Token from Safaricom...");
-
-  const response = await axios.get('https://sandbox.safaricom.co.ke/oauth/v1/generate?grant_type=client_credentials', {
-    headers: { Authorization: `Basic ${auth}` },
-    timeout: 20000
-  });
-
-  cachedDarajaToken = response.data.access_token;
-  const expiresIn = Number(response.data.expires_in || 3599);
-  tokenExpiryTime = now + (expiresIn - 60) * 1000;
-
-  console.log("🔑 Daraja OAuth Token generated successfully.");
-  return cachedDarajaToken;
-}
-
-async function executeDarajaSTK(tenant, phoneNumber, amount, itemRef, isRetry = false) {
-  try {
-    const rawToken = await getHardcodedDarajaToken(isRetry);
-    const token = String(rawToken).trim();
-
-    const eatDate = new Date(Date.now() + (3 * 60 * 60 * 1000));
-    const pad = (n) => String(n).padStart(2, '0');
-    const timestamp = `${eatDate.getUTCFullYear()}${pad(eatDate.getUTCMonth() + 1)}${pad(eatDate.getUTCDate())}${pad(eatDate.getUTCHours())}${pad(eatDate.getUTCMinutes())}${pad(eatDate.getUTCSeconds())}`;
-
-    const password = Buffer.from(`${HC_SHORTCODE}${HC_PASSKEY}${timestamp}`).toString('base64');
-
-    let cleanPhone = String(phoneNumber || '').replace(/\D/g, '').trim();
-    if (cleanPhone.startsWith('0')) cleanPhone = '254' + cleanPhone.slice(1);
-    if (!cleanPhone.startsWith('254')) cleanPhone = '254' + cleanPhone;
-    if (cleanPhone.length !== 12) cleanPhone = "254708374149";
-
-    const serverBaseUrl = (process.env.SERVER_URL || "https://luvon-engine.onrender.com").replace(/\/$/, "");
-    const serverCallback = `${serverBaseUrl}/api/stk-callback`;
-    const numericAmount = Math.max(1, Math.round(Number(amount) || 1));
-
-    const payload = {
-      BusinessShortCode: HC_SHORTCODE,
-      Password: password,
-      Timestamp: timestamp,
-      TransactionType: "CustomerPayBillOnline",
-      Amount: numericAmount,
-      PartyA: cleanPhone,
-      PartyB: HC_SHORTCODE,
-      PhoneNumber: cleanPhone,
-      CallBackURL: serverCallback,
-      AccountReference: "LuvonQ",
-      TransactionDesc: "Payment"
-    };
-
-    console.log(`📤 Dispatching Daraja STK Push to +${cleanPhone}:`, JSON.stringify(payload));
-
-    const res = await axios.post(
-      'https://sandbox.safaricom.co.ke/mpesa/stkpush/v1/processrequest',
-      payload,
-      {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        },
-        timeout: 25000
-      }
-    );
-
-    console.log(`✅ STK Push Handshake Successful:`, JSON.stringify(res.data));
-    return { success: true, result: res.data };
-  } catch (err) {
-    const rawData = err.response?.data;
-    const errorDetails = rawData || { errorMessage: err.message, status: err.response?.status };
-
-    console.error(`❌ STK Push Safaricom Gateway Error:`, JSON.stringify(errorDetails));
-
-    if (!isRetry && (err.response?.status === 401 || JSON.stringify(errorDetails).includes('Invalid Access Token'))) {
-      cachedDarajaToken = null;
-      await sleep(1000);
-      return await executeDarajaSTK(tenant, phoneNumber, amount, itemRef, true);
-    }
-
-    return { error: true, details: errorDetails };
-  }
-}
-
-async function triggerTenantSTKPush(tenant, phoneNumber, amount, itemRef) {
-  return await executeDarajaSTK(tenant, phoneNumber, amount, itemRef, false);
-}
-
-// ==========================================
-// 5. GOOGLE GEMINI SALES CONCIERGE
-// ==========================================
-function buildTenantSystemInstruction(tenant, profile) {
-  return `
-You are the dedicated female AI sales concierge for **${tenant.businessName}**${
-    tenant.brandSignature ? ` (Brand Signature: *${tenant.brandSignature}*)` : ''
-  }, an elite ${tenant.industry || 'boutique'} house in Nairobi.
-Powered by: Google Gemini on Luvon Q Conversational Commerce Engine.
-
-Current Customer Stage: ${(profile.stage || 'QUALIFICATION').toUpperCase()}
-Customer Context: ${JSON.stringify(profile)}
-Live Catalog:
-${JSON.stringify(tenant.catalog, null, 2)}
-
-BRAND VOICE & PERSONA:
-- Archetype Tone: ${(tenant.tone || 'luxury_chic').toUpperCase().replace('_', ' ')}
-- Persona: Warm, charming, confident Kenyan female host.
-- Language Policy:
-  * If customer uses Sheng (e.g., "Kaende kaende", "Niaje", "Form ni gani"), reply warmly and naturally in authentic Sheng!
-  * If customer uses English or Swahili, mirror their vocabulary and elegance seamlessly.
-- Length: 1 to 3 concise, punchy, conversational sentences.
-
-CORE OPERATING DIRECTIVES:
-1. TASK-ORIENTED: Guide inquiries directly toward product exploration, booking consultations, or checkout.
-2. STOCK SAFETY: Never sell or initiate payment for items with stock <= 0.
-3. CLEAR PRICING: State prices clearly in Kenyan Shillings (KSh).
-
-STRUCTURED JSON ACTIONS (STRICT FORMAT ONLY WHEN TRIGGERED):
-- ACTION 1: SEND IMAGE (Only if customer explicitly asks to see photo AND hasImage is true)
-  {"action": "SEND_IMAGE", "itemId": "1", "caption": "..."}
-
-- ACTION 2: INITIATE M-PESA CHECKOUT (When customer confirms intent to pay/buy)
-  {"action": "STK_PUSH", "itemId": "1", "amount": 2500, "item": "Air Force 1 White"}
-
-- ACTION 3: HUMAN HANDOFF (Manager requested, custom consultation, or heavy bargaining)
-  {"action": "HUMAN_HANDOFF", "reason": "..."}
-
-If no action is triggered, output conversational prose.
-`.trim();
-}
-
-async function generateGeminiSalesResponse(tenant, profile, userPromptText) {
-  if (!geminiApiKey) {
-    console.warn("⚠️ GEMINI_API_KEY is not configured in environment.");
-    return `Karibu ${tenant.businessName}! How can I help you today?`;
-  }
-
-  const contents = [];
-  const history = profile.conversationHistory || [];
-
-  for (const turn of history.slice(-10)) {
-    contents.push({
-      role: turn.role === 'model' || turn.role === 'assistant' ? 'model' : 'user',
-      parts: [{ text: turn.text || "" }]
-    });
-  }
-
-  contents.push({
-    role: 'user',
-    parts: [{ text: userPromptText }]
-  });
-
-  const payload = {
-    system_instruction: {
-      parts: [{ text: buildTenantSystemInstruction(tenant, profile) }]
-    },
-    contents: contents,
-    generationConfig: {
-      temperature: 0.7,
-      maxOutputTokens: 600
-    }
-  };
-
-  const models = ['gemini-2.5-flash', 'gemini-1.5-flash'];
-
-  for (const model of models) {
-    try {
-      const response = await axios.post(
-        `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${geminiApiKey}`,
-        payload,
-        { headers: { 'Content-Type': 'application/json' }, timeout: 25000 }
-      );
-
-      const candidateText = response.data?.candidates?.[0]?.content?.parts?.[0]?.text;
-      if (candidateText && candidateText.trim()) {
-        return candidateText.trim();
-      }
-    } catch (err) {
-      console.error(`❌ Gemini [${model}] Failed:`, err.response?.data?.error?.message || err.message);
-    }
-  }
-
-  return `Karibu ${tenant.businessName}! We have our exclusive collection ready. How can I assist you today?`;
-}
-
-function getOrCreateCustomerSession(tenant, customerId, channel = 'whatsapp') {
-  const cleanId = customerId.toString().replace(/\+/g, '').trim();
-  const sessionKey = `${tenant.id}_${cleanId}`;
-  let profile = db.crmProfiles[sessionKey];
-
-  if (!profile) {
-    profile = {
-      tenantId: tenant.id,
-      customerId: cleanId,
-      channel,
-      stage: 'QUALIFICATION',
-      cart: null,
-      isPaused: false,
-      lastInteraction: new Date().toISOString(),
-      conversationHistory: []
-    };
-    db.crmProfiles[sessionKey] = profile;
-    saveStore();
-  }
-
-  profile.lastInteraction = new Date().toISOString();
-  return { profile, sessionKey };
-}
-
-// ==========================================
-// 6. ELEVENLABS AUDIO DISPATCH
-// ==========================================
-async function sendWhatsAppElevenLabsAudio(tenant, toPhone, textReply) {
-  if (!toPhone || !textReply) return;
-  const cleanPhone = toPhone.toString().replace(/\+/g, '').trim();
-  const cleanSpeech = textReply.replace(/[*_~`#]/g, '').trim();
-  const phoneId = process.env.WHATSAPP_PHONE_NUMBER_ID || tenant.whatsappPhoneId || "1279716021891578";
-
-  try {
-    const voiceId = tenant.elevenLabsVoiceId || process.env.ELEVENLABS_VOICE_ID || DEFAULT_FEMALE_VOICE_ID;
-    const apiKey = process.env.ELEVENLABS_API_KEY;
-    if (!apiKey) return;
-
-    const ttsRes = await axios.post(
-      `https://api.elevenlabs.io/v1/text-to-speech/${voiceId}?output_format=mp3_44100_128`,
-      {
-        text: cleanSpeech,
-        model_id: 'eleven_multilingual_v2',
-        voice_settings: { stability: 0.5, similarity_boost: 0.75, style: 0.2, use_speaker_boost: true }
-      },
-      {
-        headers: { 'xi-api-key': apiKey, 'Content-Type': 'application/json' },
-        responseType: 'arraybuffer'
-      }
-    );
-
-    const form = new FormData();
-    form.append('file', Buffer.from(ttsRes.data), { filename: 'voice_note.mp3', contentType: 'audio/mpeg' });
-    form.append('type', 'audio/mpeg');
-    form.append('messaging_product', 'whatsapp');
-
-    const uploadRes = await axios.post(
-      `https://graph.facebook.com/v20.0/${phoneId}/media`,
-      form,
-      {
-        headers: {
-          ...form.getHeaders(),
-          Authorization: `Bearer ${process.env.WHATSAPP_ACCESS_TOKEN}`
-        }
-      }
-    );
-
-    await axios.post(
-      `https://graph.facebook.com/v20.0/${phoneId}/messages`,
-      {
-        messaging_product: 'whatsapp',
-        to: cleanPhone,
-        type: 'audio',
-        audio: { id: uploadRes.data.id }
-      },
-      { headers: { Authorization: `Bearer ${process.env.WHATSAPP_ACCESS_TOKEN}` } }
-    );
-  } catch (err) {
-    console.warn('⚠️ ElevenLabs generation notice:', err.response?.data ? JSON.stringify(err.response.data) : err.message);
-  }
-}
-
-// ==========================================
-// 7. MESSAGING UTILITIES
-// ==========================================
-async function markMessageAsRead(messageId) {
-  if (!messageId) return;
-  const phoneId = process.env.WHATSAPP_PHONE_NUMBER_ID || "1279716021891578";
-  try {
-    await axios.post(
-      `https://graph.facebook.com/v20.0/${phoneId}/messages`,
-      { messaging_product: 'whatsapp', status: 'read', message_id: messageId },
-      { headers: { Authorization: `Bearer ${process.env.WHATSAPP_ACCESS_TOKEN}` } }
-    );
-  } catch (e) {}
-}
-
-async function sendWhatsAppText(tenant, toPhone, text) {
-  if (!toPhone || !text) return;
-  let cleanPhone = toPhone.toString().replace(/\D/g, '').trim();
-  if (cleanPhone.startsWith('0')) cleanPhone = '254' + cleanPhone.slice(1);
-  if (!cleanPhone.startsWith('254')) cleanPhone = '254' + cleanPhone;
-
-  const phoneId = process.env.WHATSAPP_PHONE_NUMBER_ID || tenant.whatsappPhoneId || "1279716021891578";
-
-  try {
-    const res = await axios.post(
-      `https://graph.facebook.com/v20.0/${phoneId}/messages`,
-      {
-        messaging_product: 'whatsapp',
-        to: cleanPhone,
-        type: 'text',
-        text: { body: String(text).trim() }
-      },
-      {
-        headers: {
-          Authorization: `Bearer ${process.env.WHATSAPP_ACCESS_TOKEN}`,
-          'Content-Type': 'application/json'
-        }
-      }
-    );
-    return res.data;
-  } catch (err) {
-    console.error('❌ Meta Outbound Send Error:', JSON.stringify(err.response?.data || err.message));
-    throw err;
-  }
-}
-
-async function sendWhatsAppImage(tenant, toPhone, imageUrl, caption) {
-  if (!toPhone || !imageUrl) return;
-  let cleanPhone = toPhone.toString().replace(/\D/g, '').trim();
-  if (cleanPhone.startsWith('0')) cleanPhone = '254' + cleanPhone.slice(1);
-  if (!cleanPhone.startsWith('254')) cleanPhone = '254' + cleanPhone;
-
-  const phoneId = process.env.WHATSAPP_PHONE_NUMBER_ID || tenant.whatsappPhoneId || "1279716021891578";
-
-  try {
-    await axios.post(
-      `https://graph.facebook.com/v20.0/${phoneId}/messages`,
-      {
-        messaging_product: 'whatsapp',
-        to: cleanPhone,
-        type: 'image',
-        image: { link: imageUrl, caption: caption || '' }
-      },
-      { headers: { Authorization: `Bearer ${process.env.WHATSAPP_ACCESS_TOKEN}` } }
-    );
-  } catch (err) {
-    console.error('❌ Failed to send image:', err.response?.data || err.message);
-  }
-}
-
-// ==========================================
-// 8. WEBHOOK INTAKE & CALLBACKS
-// ==========================================
-app.get('/webhook', (req, res) => {
-  if (req.query['hub.mode'] && req.query['hub.verify_token'] === process.env.WHATSAPP_VERIFY_TOKEN) {
-    return res.status(200).send(req.query['hub.challenge']);
-  }
-  res.sendStatus(403);
-});
-
-app.post('/webhook', async (req, res) => {
-  res.sendStatus(200);
-  try {
-    const entry = req.body.entry?.[0];
-    const changes = entry?.changes?.[0]?.value;
-    const message = changes?.messages?.[0];
-    if (!message) return;
-
-    if (db.processedMessageIds.includes(message.id)) return;
-    db.processedMessageIds.push(message.id);
-    saveStore();
-
-    const incomingPhoneId = changes?.metadata?.phone_number_id || process.env.WHATSAPP_PHONE_NUMBER_ID;
-    const tenant = resolveTenant(incomingPhoneId);
-
-    const fromNumber = message.from.replace(/\+/g, '').trim();
-    const msgType = message.type;
-    const incomingTextRaw = (msgType === 'text' && message.text?.body) ? message.text.body : '';
-    const isVoiceInput = (msgType === 'audio' || msgType === 'voice');
-
-    const { profile } = getOrCreateCustomerSession(tenant, fromNumber, 'whatsapp');
-
-    if (profile.isPaused) return;
-    await markMessageAsRead(message.id);
-
-    const responseText = await generateGeminiSalesResponse(tenant, profile, incomingTextRaw || `[${msgType}]`);
-
-    profile.conversationHistory.push(
-      { role: 'user', text: incomingTextRaw, timestamp: new Date().toISOString() },
-      { role: 'model', text: responseText, timestamp: new Date().toISOString() }
-    );
-    saveStore();
-
-    await sendWhatsAppText(tenant, fromNumber, responseText);
-    if (isVoiceInput) {
-      await sendWhatsAppElevenLabsAudio(tenant, fromNumber, responseText);
-    }
-  } catch (e) {
-    console.error('Webhook intake notice:', e.message);
-  }
-});
-
-app.post('/api/stk-callback', (req, res) => {
-  res.status(200).json({ ResultCode: 0, ResultDesc: "Accepted" });
-});
-
-// ==========================================
-// 9. REST DATA & SETTINGS ENDPOINTS
+// 4. REST DATA & SETTINGS ENDPOINTS
 // ==========================================
 app.get('/api/tenant/settings', tenantMiddleware, (req, res) => {
   res.json({
     success: true,
     tenant: req.tenant,
     availableVoices: [
-      { id: "EXAVITQu4vr4xnSDxMaL", name: "Sarah (Soft & Professional Female)", gender: "Female" },
-      { id: "Xb7hH8MSUJpSbSDYk0k2", name: "Alice (Expressive & Natural Female)", gender: "Female" },
-      { id: "FGY2WhTYpPnrIDTdsKH5", name: "Laura (Warm & Upbeat Female)", gender: "Female" },
-      { id: "cgSgspJ2msm6clMCkdW9", name: "Jessica (Expressive Concierge Female)", gender: "Female" },
-      { id: "JBFqnCBsd6RMkjVDRZzb", name: "George (British Male)", gender: "Male" }
+      { id: "EXAVITQu4vr4xnSDxMaL", name: "Sarah (Soft & Professional Female)" },
+      { id: "Xb7hH8MSUJpSbSDYk0k2", name: "Alice (Expressive & Natural Female)" },
+      { id: "FGY2WhTYpPnrIDTdsKH5", name: "Laura (Warm & Upbeat Female)" },
+      { id: "cgSgspJ2msm6clMCkdW9", name: "Jessica (Modern Concise Female)" },
+      { id: "JBFqnCBsd6RMkjVDRZzb", name: "George (British Male)" }
     ]
   });
 });
@@ -894,7 +498,6 @@ app.post('/api/tenant/payments/daraja', tenantMiddleware, (req, res) => {
   res.json({ success: true, daraja: req.tenant.daraja });
 });
 
-// Test STK Push
 app.post('/api/tenant/payments/test-stk', tenantMiddleware, async (req, res) => {
   const { testPhone } = req.body;
   let cleanPhone = String(testPhone || "254708374149").replace(/\D/g, '').trim();
@@ -936,59 +539,290 @@ app.post('/api/tenant/conversations/toggle-pause', tenantMiddleware, (req, res) 
 });
 
 // ==========================================
-// 10. ROOT & SPA ROUTE FALLBACKS
+// 5. DARAJA & MESSAGING ENGINES
 // ==========================================
+let cachedDarajaToken = null;
+let tokenExpiryTime = 0;
+
+async function getHardcodedDarajaToken(forceRefresh = false) {
+  const now = Date.now();
+  if (!forceRefresh && cachedDarajaToken && now < tokenExpiryTime) {
+    return cachedDarajaToken;
+  }
+
+  const auth = Buffer.from(`${HC_CONSUMER_KEY}:${HC_CONSUMER_SECRET}`).toString('base64');
+  console.log("🔄 Requesting OAuth Token from Safaricom...");
+
+  const response = await axios.get('https://sandbox.safaricom.co.ke/oauth/v1/generate?grant_type=client_credentials', {
+    headers: { Authorization: `Basic ${auth}` },
+    timeout: 20000
+  });
+
+  cachedDarajaToken = response.data.access_token;
+  const expiresIn = Number(response.data.expires_in || 3599);
+  tokenExpiryTime = now + (expiresIn - 60) * 1000;
+
+  console.log("🔑 Daraja OAuth Token generated successfully.");
+  return cachedDarajaToken;
+}
+
+async function executeDarajaSTK(tenant, phoneNumber, amount, itemRef, isRetry = false) {
+  try {
+    const rawToken = await getHardcodedDarajaToken(isRetry);
+    const token = String(rawToken).trim();
+
+    const eatDate = new Date(Date.now() + (3 * 60 * 60 * 1000));
+    const pad = (n) => String(n).padStart(2, '0');
+    const timestamp = `${eatDate.getUTCFullYear()}${pad(eatDate.getUTCMonth() + 1)}${pad(eatDate.getUTCDate())}${pad(eatDate.getUTCHours())}${pad(eatDate.getUTCMinutes())}${pad(eatDate.getUTCSeconds())}`;
+
+    const password = Buffer.from(`${HC_SHORTCODE}${HC_PASSKEY}${timestamp}`).toString('base64');
+
+    let cleanPhone = String(phoneNumber || '').replace(/\D/g, '').trim();
+    if (cleanPhone.startsWith('0')) cleanPhone = '254' + cleanPhone.slice(1);
+    if (!cleanPhone.startsWith('254')) cleanPhone = '254' + cleanPhone;
+    if (cleanPhone.length !== 12) cleanPhone = "254708374149";
+
+    const serverBaseUrl = (process.env.SERVER_URL || "https://luvon-engine.onrender.com").replace(/\/$/, "");
+    const serverCallback = `${serverBaseUrl}/api/stk-callback`;
+    const numericAmount = Math.max(1, Math.round(Number(amount) || 1));
+
+    const payload = {
+      BusinessShortCode: HC_SHORTCODE,
+      Password: password,
+      Timestamp: timestamp,
+      TransactionType: "CustomerPayBillOnline",
+      Amount: numericAmount,
+      PartyA: cleanPhone,
+      PartyB: HC_SHORTCODE,
+      PhoneNumber: cleanPhone,
+      CallBackURL: serverCallback,
+      AccountReference: "LuvonQ",
+      TransactionDesc: "Payment"
+    };
+
+    console.log(`📤 Dispatching Daraja STK Push to +${cleanPhone}:`, JSON.stringify(payload));
+
+    const res = await axios.post(
+      'https://sandbox.safaricom.co.ke/mpesa/stkpush/v1/processrequest',
+      payload,
+      {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        timeout: 25000
+      }
+    );
+
+    console.log(`✅ STK Push Handshake Successful:`, JSON.stringify(res.data));
+    return { success: true, result: res.data };
+  } catch (err) {
+    const rawData = err.response?.data;
+    const errorDetails = rawData || { errorMessage: err.message, status: err.response?.status };
+
+    console.error(`❌ STK Push Safaricom Gateway Error:`, JSON.stringify(errorDetails));
+
+    if (!isRetry && (err.response?.status === 401 || JSON.stringify(errorDetails).includes('Invalid Access Token'))) {
+      cachedDarajaToken = null;
+      await sleep(1000);
+      return await executeDarajaSTK(tenant, phoneNumber, amount, itemRef, true);
+    }
+
+    return { error: true, details: errorDetails };
+  }
+}
+
+async function triggerTenantSTKPush(tenant, phoneNumber, amount, itemRef) {
+  return await executeDarajaSTK(tenant, phoneNumber, amount, itemRef, false);
+}
+
+function buildTenantSystemInstruction(tenant, profile) {
+  return `
+You are the dedicated female AI sales concierge for **${tenant.businessName}**${
+    tenant.brandSignature ? ` (Brand Signature: *${tenant.brandSignature}*)` : ''
+  }, an elite ${tenant.industry || 'boutique'} house in Nairobi.
+Powered by: Google Gemini on Luvon Q Conversational Commerce Engine.
+
+Current Customer Stage: ${(profile.stage || 'QUALIFICATION').toUpperCase()}
+Customer Context: ${JSON.stringify(profile)}
+Live Catalog:
+${JSON.stringify(tenant.catalog, null, 2)}
+
+BRAND VOICE & PERSONA:
+- Archetype Tone: ${(tenant.tone || 'luxury_chic').toUpperCase().replace('_', ' ')}
+- Persona: Warm, charming, confident Kenyan female host.
+- Language Policy:
+  * If customer uses Sheng (e.g., "Kaende kaende", "Niaje", "Form ni gani"), reply warmly and naturally in authentic Sheng!
+  * If customer uses English or Swahili, mirror their vocabulary and elegance seamlessly.
+- Length: 1 to 3 concise, punchy, conversational sentences.
+
+CORE OPERATING DIRECTIVES:
+1. TASK-ORIENTED: Guide inquiries directly toward product exploration, booking consultations, or checkout.
+2. STOCK SAFETY: Never sell or initiate payment for items with stock <= 0.
+3. CLEAR PRICING: State prices clearly in Kenyan Shillings (KSh).
+
+STRUCTURED JSON ACTIONS (STRICT FORMAT ONLY WHEN TRIGGERED):
+- ACTION 1: SEND IMAGE (Only if customer explicitly asks to see photo AND hasImage is true)
+  {"action": "SEND_IMAGE", "itemId": "1", "caption": "..."}
+
+- ACTION 2: INITIATE M-PESA CHECKOUT (When customer confirms intent to pay/buy)
+  {"action": "STK_PUSH", "itemId": "1", "amount": 2500, "item": "Air Force 1 White"}
+
+- ACTION 3: HUMAN HANDOFF (Manager requested, custom consultation, or heavy bargaining)
+  {"action": "HUMAN_HANDOFF", "reason": "..."}
+
+If no action is triggered, output conversational prose.
+`.trim();
+}
+
+async function generateGeminiSalesResponse(tenant, profile, userPromptText) {
+  if (!geminiApiKey) {
+    console.warn("⚠️ GEMINI_API_KEY is not configured in environment.");
+    return `Karibu ${tenant.businessName}! How can I help you today?`;
+  }
+
+  const contents = [];
+  const history = profile.conversationHistory || [];
+
+  for (const turn of history.slice(-10)) {
+    contents.push({
+      role: turn.role === 'model' || turn.role === 'assistant' ? 'model' : 'user',
+      parts: [{ text: turn.text || "" }]
+    });
+  }
+
+  contents.push({
+    role: 'user',
+    parts: [{ text: userPromptText }]
+  });
+
+  const payload = {
+    system_instruction: {
+      parts: [{ text: buildTenantSystemInstruction(tenant, profile) }]
+    },
+    contents: contents,
+    generationConfig: {
+      temperature: 0.7,
+      maxOutputTokens: 600
+    }
+  };
+
+  const models = ['gemini-2.5-flash', 'gemini-1.5-flash'];
+
+  for (const model of models) {
+    try {
+      const response = await axios.post(
+        `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${geminiApiKey}`,
+        payload,
+        { headers: { 'Content-Type': 'application/json' }, timeout: 25000 }
+      );
+
+      const candidateText = response.data?.candidates?.[0]?.content?.parts?.[0]?.text;
+      if (candidateText && candidateText.trim()) {
+        return candidateText.trim();
+      }
+    } catch (err) {
+      console.error(`❌ Gemini [${model}] Failed:`, err.response?.data?.error?.message || err.message);
+    }
+  }
+
+  return `Karibu ${tenant.businessName}! We have our exclusive collection ready. How can I assist you today?`;
+}
+
+function getOrCreateCustomerSession(tenant, customerId, channel = 'whatsapp') {
+  const cleanId = customerId.toString().replace(/\+/g, '').trim();
+  const sessionKey = `${tenant.id}_${cleanId}`;
+  let profile = db.crmProfiles[sessionKey];
+
+  if (!profile) {
+    profile = {
+      tenantId: tenant.id,
+      customerId: cleanId,
+      channel,
+      stage: 'QUALIFICATION',
+      cart: null,
+      isPaused: false,
+      lastInteraction: new Date().toISOString(),
+      conversationHistory: []
+    };
+    db.crmProfiles[sessionKey] = profile;
+    saveStore();
+  }
+
+  profile.lastInteraction = new Date().toISOString();
+  return { profile, sessionKey };
+}
+
+async function sendWhatsAppText(tenant, toPhone, text) {
+  if (!toPhone || !text) return;
+  let cleanPhone = toPhone.toString().replace(/\D/g, '').trim();
+  if (cleanPhone.startsWith('0')) cleanPhone = '254' + cleanPhone.slice(1);
+  if (!cleanPhone.startsWith('254')) cleanPhone = '254' + cleanPhone;
+
+  const phoneId = process.env.WHATSAPP_PHONE_NUMBER_ID || tenant.whatsappPhoneId || "1279716021891578";
+
+  try {
+    const res = await axios.post(
+      `https://graph.facebook.com/v20.0/${phoneId}/messages`,
+      {
+        messaging_product: 'whatsapp',
+        to: cleanPhone,
+        type: 'text',
+        text: { body: String(text).trim() }
+      },
+      {
+        headers: {
+          Authorization: `Bearer ${process.env.WHATSAPP_ACCESS_TOKEN}`,
+          'Content-Type': 'application/json'
+        }
+      }
+    );
+    return res.data;
+  } catch (err) {
+    console.error('❌ Meta Outbound Send Error:', JSON.stringify(err.response?.data || err.message));
+    throw err;
+  }
+}
+
+// Webhooks
+app.get('/webhook', (req, res) => {
+  if (req.query['hub.mode'] && req.query['hub.verify_token'] === process.env.WHATSAPP_VERIFY_TOKEN) {
+    return res.status(200).send(req.query['hub.challenge']);
+  }
+  res.sendStatus(403);
+});
+
+app.post('/webhook', (req, res) => res.sendStatus(200));
+app.post('/api/stk-callback', (req, res) => res.status(200).json({ ResultCode: 0, ResultDesc: "Accepted" }));
+
 app.get('/', (req, res) => {
   const indexPath = path.join(__dirname, 'index.html');
   if (fs.existsSync(indexPath)) return res.sendFile(indexPath);
   res.send("Luvon Q API is running.");
 });
 
-// ==========================================
-// 11. CRON SCHEDULER
-// ==========================================
+// CRON
 if (!process.env.VERCEL) {
   cron.schedule('0 * * * *', async () => {
     const now = new Date();
     for (const profile of Object.values(db.crmProfiles)) {
       if (profile.cart && profile.stage === 'CLOSING' && !profile.isPaused) {
         const elapsedHours = (now - new Date(profile.cart.timestamp)) / (1000 * 60 * 60);
-
         if (elapsedHours >= 2 && elapsedHours <= 4 && !profile.followedUp) {
           profile.followedUp = true;
           saveStore();
           const tenant = db.tenants[profile.tenantId] || db.tenants["luvon_q_flagship"];
-          const msg = `Hey! Just checking in from ${tenant.businessName}. You were looking at *${profile.cart.item}* (KSh ${profile.cart.amount}) earlier.\n\nWould you like me to send a fresh M-Pesa prompt, or do you have any questions?`;
+          const msg = `Hey! Just checking in from ${tenant.businessName}. You were looking at *${profile.cart.item}* (KSh ${profile.cart.amount}) earlier. Would you like me to send a fresh M-Pesa prompt?`;
           await sendWhatsAppText(tenant, profile.customerId, msg);
         }
       }
     }
   });
-
-  cron.schedule('0 20 * * 0', async () => {
-    for (const tenant of Object.values(db.tenants)) {
-      if (!tenant.escalationPhone) continue;
-      const tenantSales = db.attributionLedger.filter(t => t.tenantId === tenant.id);
-      const totalRevenue = tenantSales.reduce((sum, entry) => sum + entry.amount, 0);
-      const report = 
-  `📈 *${tenant.brandSignature || tenant.businessName} REVENUE REPORT*
-  ━━━━━━━━━━━━━━━━━━━━━
-  💰 *DIRECT REVENUE GENERATED:*
-  • Total Sales: KSh ${totalRevenue.toLocaleString()}
-  • Closed Deals: ${tenantSales.length}
-  • Attribution Source: 100% Conversational AI Agent
-  ━━━━━━━━━━━━━━━━━━━━━`;
-      await sendWhatsAppText(tenant, tenant.escalationPhone, report);
-    }
-  });
 }
 
-// ==========================================
-// 12. EXPORT & RUNNER
-// ==========================================
 const PORT = process.env.PORT || 3000;
 if (process.env.NODE_ENV !== 'production' || !process.env.VERCEL) {
-  app.listen(PORT, () => console.log(`🚀 Luvon Q Orélune Multi-Tenant Engine running on port ${PORT}`));
+  app.listen(PORT, () => console.log(`🚀 Luvon Q Multi-Tenant Engine running on port ${PORT}`));
 }
 
 module.exports = app;

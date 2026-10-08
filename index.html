@@ -34,14 +34,14 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Playfair+Display:ital,wght@0,600;0,700;1,400&display=swap" rel="stylesheet">
   
-  <!-- Rock-Solid Direct Lucide Production Script -->
+  <!-- Direct Lucide Production Script -->
   <script src="https://unpkg.com/lucide@0.344.0/dist/umd/lucide.js"></script>
 
-  <!-- Strict SVG Sizing Rules: Prevents icons from collapsing to 0px -->
+  <!-- Strict SVG Rules -->
   <style>
     svg.lucide, i[data-lucide] svg { 
       display: inline-block !important; 
-      vertical-align: middle !important;
+      vertical-align: middle !important; 
       stroke-width: 2 !important;
     }
     i[data-lucide] {
@@ -243,12 +243,12 @@
       <textarea 
         id="onboardingModalTextarea" 
         rows="4" 
-        placeholder="e.g. I run an organic wellness spa in Karen, Nairobi. We offer Swedish deep tissue massage for 3,500, hot stone therapy for 4,500, and organic facial scrubs for 2,000. Our tone is warm, relaxing, and soothing." 
+        placeholder="e.g. We automate business inquiries on WhatsApp, Instagram, and TikTok. We charge 50,000 for setup and a monthly retainer..." 
         class="w-full p-3 text-xs bg-brand-50 border border-brand-200 rounded-xl focus:outline-none focus:border-brand-600 text-slate-900"
       ></textarea>
 
       <div class="flex items-center justify-end gap-2 pt-2">
-        <button type="button" onclick="closeOnboardingModal()" class="px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-xl">
+        <button type="button" onclick="closeOnboardingModal()" class="px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-xl cursor-pointer">
           Skip for Now
         </button>
         <button type="button" id="modalOnboardSubmitBtn" onclick="submitModalOnboarding()" class="px-5 py-2.5 bg-brand-600 hover:bg-brand-700 text-white rounded-xl text-xs font-bold shadow transition-all flex items-center gap-2 cursor-pointer">
@@ -271,8 +271,8 @@
       </div>
 
       <div class="flex border-b border-slate-100 mb-5 text-xs font-semibold">
-        <button id="tabSignIn" type="button" onclick="switchAuthTab('signin')" class="flex-1 py-2 text-center text-brand-600 border-b-2 border-brand-600">Sign In</button>
-        <button id="tabSignUp" type="button" onclick="switchAuthTab('signup')" class="flex-1 py-2 text-center text-slate-400 hover:text-slate-600 border-b-2 border-transparent">Create Account</button>
+        <button id="tabSignIn" type="button" onclick="switchAuthTab('signin')" class="flex-1 py-2 text-center text-brand-600 border-b-2 border-brand-600 cursor-pointer">Sign In</button>
+        <button id="tabSignUp" type="button" onclick="switchAuthTab('signup')" class="flex-1 py-2 text-center text-slate-400 hover:text-slate-600 border-b-2 border-transparent cursor-pointer">Create Account</button>
       </div>
 
       <form id="loginForm" onsubmit="handleCustomerAuth(event)" class="space-y-3.5">
@@ -322,10 +322,13 @@
       btn.innerHTML = `<i data-lucide="loader-2" class="w-4 h-4 animate-spin"></i> Setting up...`;
       renderIcons();
 
-      await window.API.runAIBusinessSetup(input.value.trim());
-      btn.disabled = false;
-      btn.innerHTML = `<i data-lucide="sparkles" class="w-4 h-4"></i> Setup Store`;
-      renderIcons();
+      try {
+        await window.API.runAIBusinessSetup(input.value.trim());
+      } catch (err) {
+        btn.disabled = false;
+        btn.innerHTML = `<i data-lucide="sparkles" class="w-4 h-4"></i> Setup Store`;
+        renderIcons();
+      }
     }
 
     async function submitModalOnboarding() {
@@ -337,15 +340,19 @@
       btn.innerHTML = `<i data-lucide="loader-2" class="w-4 h-4 animate-spin"></i> Building...`;
       renderIcons();
 
-      await window.API.runAIBusinessSetup(textarea.value.trim());
+      try {
+        await window.API.runAIBusinessSetup(textarea.value.trim());
+      } catch (err) {
+        btn.disabled = false;
+        btn.innerHTML = `<i data-lucide="sparkles" class="w-4 h-4"></i> Build My Store`;
+        renderIcons();
+      }
     }
 
-    // Call icon rendering multiple times to catch delayed script loads
     document.addEventListener("DOMContentLoaded", renderIcons);
     window.addEventListener("load", renderIcons);
-    setTimeout(renderIcons, 200);
+    setTimeout(renderIcons, 250);
     setTimeout(renderIcons, 600);
-    setTimeout(renderIcons, 1500);
   </script>
 </body>
 </html>

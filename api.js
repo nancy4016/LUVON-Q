@@ -1,11 +1,51 @@
 // api.js - Luvon Q Production Client Bridge
 (function () {
-  // Production Host
   const BASE_URL = (typeof window !== 'undefined' && window.location.origin && window.location.origin.includes('http') && !window.location.origin.includes('localhost'))
     ? window.location.origin
     : 'https://luvon-engine.onrender.com';
 
-  let currentTenantId = localStorage.getItem('luvon_active_tenant_id') || null;
+  function getActiveTenantId() {
+    return localStorage.getItem('luvon_active_tenant_id') || 'luvon_q_flagship';
+  }
+
+  // Modern Toast Notification Engine (No native browser alerts)
+  function showNotification(message, type = 'info') {
+    let container = document.getElementById('luvon-toast-container');
+    if (!container) {
+      container = document.createElement('div');
+      container.id = 'luvon-toast-container';
+      container.className = 'fixed bottom-5 right-5 z-50 flex flex-col gap-2.5 max-w-sm pointer-events-none';
+      document.body.appendChild(container);
+    }
+
+    const toast = document.createElement('div');
+    toast.className = `p-4 rounded-xl shadow-2xl flex items-center gap-3 text-xs font-semibold border pointer-events-auto transition-all duration-300 transform translate-y-3 opacity-0 ${
+      type === 'success' 
+        ? 'bg-stone-900 text-brand-100 border-brand-500/50' 
+        : type === 'error'
+        ? 'bg-rose-950 text-rose-100 border-rose-800'
+        : 'bg-stone-900 text-stone-200 border-stone-800'
+    }`;
+
+    const indicatorHtml = type === 'success' 
+      ? '<span class="w-2 h-2 rounded-full bg-brand-500 flex-shrink-0 animate-ping"></span>' 
+      : type === 'error'
+      ? '<span class="w-2 h-2 rounded-full bg-rose-500 flex-shrink-0"></span>'
+      : '<span class="w-2 h-2 rounded-full bg-slate-400 flex-shrink-0"></span>';
+
+    toast.innerHTML = `${indicatorHtml}<div class="flex-1 leading-snug">${message}</div>`;
+    container.appendChild(toast);
+
+    requestAnimationFrame(() => {
+      toast.classList.remove('translate-y-3', 'opacity-0');
+      toast.classList.add('translate-y-0', 'opacity-100');
+    });
+
+    setTimeout(() => {
+      toast.classList.add('opacity-0', 'translate-y-3');
+      setTimeout(() => toast.remove(), 350);
+    }, 4500);
+  }
 
   async function apiCall(endpoint, options = {}) {
     const cleanEndpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
@@ -13,7 +53,7 @@
 
     const headers = {
       'Content-Type': 'application/json',
-      'x-tenant-id': currentTenantId || 'anonymous',
+      'x-tenant-id': getActiveTenantId(),
       ...(options.headers || {})
     };
 
@@ -26,16 +66,14 @@
     return data;
   }
 
-  // ==========================================
-  // AUTHENTICATION MODAL & BACKEND PROXY
-  // ==========================================
+  // Auth Modal Handlers
   let currentAuthMode = 'signin';
 
   function openSignInModal() {
     const modal = document.getElementById('authModal');
     if (modal) {
       modal.classList.remove('hidden');
-      if (window.lucide) lucide.createIcons();
+      if (window.lucide && typeof window.lucide.createIcons === 'function') lucide.createIcons();
     }
   }
 
@@ -97,19 +135,20 @@
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Authentication failed');
 
-      currentTenantId = data.tenantId;
-      localStorage.setItem('luvon_active_tenant_id', currentTenantId);
+      localStorage.setItem('luvon_active_tenant_id', data.tenantId);
+      localStorage.setItem('luvon_business_name', data.businessName || fullName);
 
       closeSignInModal();
       updateAuthUI(data.user, data.businessName);
+      showNotification(`Welcome, ${data.businessName || 'Merchant'}! Session authenticated.`, 'success');
 
       if (currentAuthMode === 'signup') {
         openOnboardingModal();
       } else {
-        window.location.reload();
+        setTimeout(() => window.location.reload(), 800);
       }
     } catch (err) {
-      alert('Authentication Failed: ' + err.message);
+      showNotification(err.message, 'error');
     } finally {
       if (submitBtn) {
         submitBtn.disabled = false;
@@ -120,8 +159,9 @@
 
   function checkAuthSession() {
     const activeTenant = localStorage.getItem('luvon_active_tenant_id');
+    const businessName = localStorage.getItem('luvon_business_name');
     if (activeTenant) {
-      updateAuthUI({ id: activeTenant }, localStorage.getItem('luvon_business_name') || 'Merchant Store');
+      updateAuthUI({ id: activeTenant }, businessName || 'Merchant Store');
     } else {
       updateAuthUI(null);
     }
@@ -130,9 +170,9 @@
   function toggleSignOut() {
     localStorage.removeItem('luvon_active_tenant_id');
     localStorage.removeItem('luvon_business_name');
-    currentTenantId = null;
     updateAuthUI(null);
-    window.location.reload();
+    showNotification('Signed out successfully.', 'info');
+    setTimeout(() => window.location.reload(), 600);
   }
 
   function updateAuthUI(user, businessName) {
@@ -144,22 +184,18 @@
       if (signInBtn) signInBtn.classList.add('hidden');
       if (tenantCard) tenantCard.classList.remove('hidden');
       if (tenantNameEl) tenantNameEl.textContent = businessName || 'My Business';
-      if (businessName) localStorage.setItem('luvon_business_name', businessName);
     } else {
       if (signInBtn) signInBtn.classList.remove('hidden');
       if (tenantCard) tenantCard.classList.add('hidden');
     }
-    if (window.lucide) lucide.createIcons();
+    if (window.lucide && typeof window.lucide.createIcons === 'function') lucide.createIcons();
   }
 
-  // ==========================================
-  // GEMINI AI BUSINESS ONBOARDING / SETUP
-  // ==========================================
   function openOnboardingModal() {
     const modal = document.getElementById('aiOnboardingModal');
     if (modal) {
       modal.classList.remove('hidden');
-      if (window.lucide) lucide.createIcons();
+      if (window.lucide && typeof window.lucide.createIcons === 'function') lucide.createIcons();
     }
   }
 
@@ -170,37 +206,37 @@
 
   async function runAIBusinessSetup(promptText) {
     if (!promptText || !promptText.trim()) return;
-    if (!currentTenantId) {
-      openSignInModal();
-      return;
-    }
 
     try {
       const res = await fetch(`${BASE_URL}/api/tenant/ai-onboard`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'x-tenant-id': currentTenantId
+          'x-tenant-id': getActiveTenantId()
         },
         body: JSON.stringify({ prompt: promptText })
       });
 
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'AI generation failed');
+      if (!res.ok) throw new Error(data.error || 'AI store configuration failed');
 
-      alert(`✅ Luvon Q Configured!\nBusiness: ${data.businessName}\nAdded ${data.catalog?.length || 0} items to your catalog.`);
+      localStorage.setItem('luvon_business_name', data.businessName);
+      showNotification(`✨ Store Generated! Business: ${data.businessName} with ${data.catalog?.length || 0} catalog items.`, 'success');
+      
       closeOnboardingModal();
-      window.location.reload();
+      setTimeout(() => window.location.reload(), 1200);
     } catch (err) {
-      alert('AI Setup Error: ' + err.message);
+      showNotification(`AI Setup Notice: ${err.message}`, 'error');
+      throw err;
     }
   }
 
   window.API = {
-    getTenantId: () => currentTenantId,
+    getTenantId: getActiveTenantId,
     runAIBusinessSetup,
     openOnboardingModal,
     closeOnboardingModal,
+    showToast: showNotification,
     getInventory: () => apiCall('/inventory'),
     saveInventoryItem: (item) => apiCall('/inventory', { method: 'POST', body: JSON.stringify(item) }),
     getMetrics: () => apiCall('/metrics'),
@@ -216,7 +252,5 @@
   window.openOnboardingModal = openOnboardingModal;
   window.closeOnboardingModal = closeOnboardingModal;
 
-  document.addEventListener('DOMContentLoaded', () => {
-    checkAuthSession();
-  });
+  document.addEventListener('DOMContentLoaded', checkAuthSession);
 })();
