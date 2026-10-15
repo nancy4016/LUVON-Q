@@ -111,7 +111,11 @@ function resolveTenant(channelId) {
 }
 
 function tenantMiddleware(req, res, next) {
-  const tenantId = req.headers['x-tenant-id'] || 'luvon_q_flagship';
+  let tenantId = req.headers['x-tenant-id'];
+  if (!tenantId || tenantId === 'anonymous') {
+    tenantId = 'luvon_q_flagship';
+  }
+
   if (!db.tenants[tenantId]) {
     db.tenants[tenantId] = {
       id: tenantId,
@@ -134,7 +138,6 @@ function tenantMiddleware(req, res, next) {
 // 2. AI CONVERSATIONAL ENGINE (GEMINI CASCADE & RETRY)
 // ==========================================
 async function callGeminiAPI(systemPrompt, userText) {
-  // Cascading models: Keep your desired primary models first, with fallbacks attached
   const models = [
     'gemini-3.8-flash',
     'gemini-3.1-pro-preview',
@@ -164,17 +167,15 @@ async function callGeminiAPI(systemPrompt, userText) {
         const errorMsg = err.response?.data?.error?.message || err.message;
         console.warn(`⚠️ Model [${model}] attempt ${attempt + 1} failed: ${errorMsg}`);
         
-        // Handle demand spikes or rate limits with a brief delay before attempt 2
         if (errorMsg.includes('high demand') || err.response?.status === 429 || err.response?.status === 503) {
           await sleep(1500);
         } else {
-          break; // If model doesn't support quota/preview or is invalid, jump to next model immediately
+          break;
         }
       }
     }
   }
 
-  // Graceful conversational response if all model requests hit limits
   return "Niaje! Tuko hapa kukusaidia. System yetu inafanya update kidogo—unatafuta sneakers gani specifically nikusaidie right now?";
 }
 
@@ -260,7 +261,7 @@ Return STRICT RAW JSON only. Do not wrap in markdown or backticks.
     });
   } catch (err) {
     console.error("❌ AI Onboard Failure:", err.message);
-    return res.status(500).json({ error: err.message });
+    return res.status(500).json({ error: "Our AI store architect is experiencing high demand. Please try again." });
   }
 }
 
@@ -857,7 +858,6 @@ app.get('/webhook', (req, res) => {
 });
 
 app.post('/webhook', async (req, res) => {
-  // Acknowledge receipt to Meta immediately within 3s
   res.sendStatus(200);
 
   try {
@@ -869,16 +869,14 @@ app.post('/webhook', async (req, res) => {
     const value = changes?.value;
     const message = value?.messages?.[0];
 
-    // Ignore receipts or non-text messages
     if (!message || message.type !== 'text') return;
 
     const messageId = message.id;
     if (db.processedMessageIds && db.processedMessageIds.includes(messageId)) {
-      return; // Deduplicate
+      return;
     }
     db.processedMessageIds.push(messageId);
 
-    // Resilient sender phone extraction
     const fromPhone = message.from || value?.contacts?.[0]?.wa_id;
     if (!fromPhone) {
       console.warn("⚠️ Received message payload without sender phone number.");
@@ -890,7 +888,6 @@ app.post('/webhook', async (req, res) => {
 
     console.log(`📩 Inbound WhatsApp [from: ${fromPhone}, phoneId: ${recipientPhoneId}]: "${userText}"`);
 
-    // Match tenant workspace
     const tenant = resolveTenant(recipientPhoneId);
     const { profile } = getOrCreateCustomerSession(tenant, fromPhone, 'whatsapp');
 
@@ -902,13 +899,11 @@ app.post('/webhook', async (req, res) => {
     profile.lastInteraction = new Date().toISOString();
     saveStore();
 
-    // If human agent has taken over, do not invoke Gemini
     if (profile.isPaused) {
       console.log(`⏸️ Bot paused for ${fromPhone}. Awaiting human agent response.`);
       return;
     }
 
-    // Formulate response with Gemini
     const systemPrompt = `
 You are the elite AI sales concierge for **${tenant.businessName}**, an e-commerce brand in Nairobi.
 Stage: ${(profile.stage || 'QUALIFICATION').toUpperCase()}
@@ -929,7 +924,6 @@ Directives:
     });
     saveStore();
 
-    // Dispatch message back to customer via WhatsApp
     await sendWhatsAppText(tenant, fromPhone, botReply);
     console.log(`🚀 AI Reply dispatched to ${fromPhone}: "${botReply}"`);
 

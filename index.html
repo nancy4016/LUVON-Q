@@ -271,6 +271,7 @@
       <div class="text-center mb-4">
         <img src="Luvon q logo.png" alt="Luvon Q Logo" class="h-12 mx-auto mb-2 object-contain" />
         <h2 class="text-xl font-serif font-bold text-slate-900" id="authModalTitle">Sign in to Luvon Q</h2>
+        <p id="authModalSubtitle" class="text-xs text-slate-500 mt-1 hidden"></p>
       </div>
 
       <div class="flex border-b border-slate-100 mb-5 text-xs font-semibold">
@@ -315,19 +316,56 @@
       }
     }
 
+    function isUserAuthenticated() {
+      const user = localStorage.getItem('luvon_user') || localStorage.getItem('sb-access-token');
+      const tenant = localStorage.getItem('luvon_active_tenant_id') || localStorage.getItem('luvon_tenant_id');
+      return Boolean(user && tenant && tenant !== 'anonymous');
+    }
+
     async function handleHomePagePromptSubmit(e) {
       e.preventDefault();
       const input = document.getElementById('homeAiPromptInput');
       const btn = document.getElementById('homeAiPromptBtn');
       if (!input || !input.value.trim()) return;
 
+      const promptText = input.value.trim();
+
+      // Check if signed in
+      if (!isUserAuthenticated()) {
+        sessionStorage.setItem('pending_onboard_prompt', promptText);
+        openSignInModal();
+        if (typeof switchAuthTab === 'function') switchAuthTab('signup');
+        const subtitle = document.getElementById('authModalSubtitle');
+        if (subtitle) {
+          subtitle.textContent = "Create an account to finish building your AI catalog";
+          subtitle.classList.remove('hidden');
+        }
+        return;
+      }
+
       btn.disabled = true;
       btn.innerHTML = `<i data-lucide="loader-2" class="w-4 h-4 animate-spin"></i> Setting up...`;
       renderIcons();
 
       try {
-        await window.API.runAIBusinessSetup(input.value.trim());
+        if (window.API && typeof window.API.runAIBusinessSetup === 'function') {
+          await window.API.runAIBusinessSetup(promptText);
+        } else {
+          const res = await fetch('/api/tenant/ai-onboard', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'x-tenant-id': localStorage.getItem('luvon_active_tenant_id') || 'luvon_q_flagship'
+            },
+            body: JSON.stringify({ prompt: promptText })
+          });
+          const data = await res.json();
+          if (!res.ok) throw new Error(data.error || 'Setup failed');
+          window.location.href = 'catalog.html';
+        }
       } catch (err) {
+        alert(err.message || "Setup failed. Please try again.");
+      } finally {
         btn.disabled = false;
         btn.innerHTML = `<i data-lucide="sparkles" class="w-4 h-4"></i> Setup Store`;
         renderIcons();
@@ -339,20 +377,57 @@
       const btn = document.getElementById('modalOnboardSubmitBtn');
       if (!textarea || !textarea.value.trim()) return;
 
+      const promptText = textarea.value.trim();
+
+      if (!isUserAuthenticated()) {
+        sessionStorage.setItem('pending_onboard_prompt', promptText);
+        closeOnboardingModal();
+        openSignInModal();
+        if (typeof switchAuthTab === 'function') switchAuthTab('signup');
+        return;
+      }
+
       btn.disabled = true;
       btn.innerHTML = `<i data-lucide="loader-2" class="w-4 h-4 animate-spin"></i> Building...`;
       renderIcons();
 
       try {
-        await window.API.runAIBusinessSetup(textarea.value.trim());
+        if (window.API && typeof window.API.runAIBusinessSetup === 'function') {
+          await window.API.runAIBusinessSetup(promptText);
+        } else {
+          const res = await fetch('/api/tenant/ai-onboard', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'x-tenant-id': localStorage.getItem('luvon_active_tenant_id') || 'luvon_q_flagship'
+            },
+            body: JSON.stringify({ prompt: promptText })
+          });
+          const data = await res.json();
+          if (!res.ok) throw new Error(data.error || 'Failed');
+          window.location.href = 'catalog.html';
+        }
       } catch (err) {
+        alert(err.message || "Could not generate store.");
+      } finally {
         btn.disabled = false;
         btn.innerHTML = `<i data-lucide="sparkles" class="w-4 h-4"></i> Build My Store`;
         renderIcons();
       }
     }
 
-    document.addEventListener("DOMContentLoaded", renderIcons);
+    // Auto-resume stashed prompt after authentication
+    document.addEventListener("DOMContentLoaded", () => {
+      renderIcons();
+      const stashedPrompt = sessionStorage.getItem('pending_onboard_prompt');
+      if (stashedPrompt && isUserAuthenticated()) {
+        sessionStorage.removeItem('pending_onboard_prompt');
+        const input = document.getElementById('homeAiPromptInput');
+        if (input) input.value = stashedPrompt;
+        handleHomePagePromptSubmit(new Event('submit'));
+      }
+    });
+
     window.addEventListener("load", renderIcons);
     setTimeout(renderIcons, 250);
     setTimeout(renderIcons, 600);

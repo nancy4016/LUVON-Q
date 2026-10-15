@@ -8,11 +8,13 @@ let lastMessageCount = 0;
 
 const BASE_ORIGIN = (typeof window !== 'undefined' && window.location.origin && window.location.origin.includes('http') && !window.location.origin.includes('localhost'))
   ? window.location.origin
-  : 'https://luvon-engine.onrender.com';
+  : 'https://luvonq.changelens.africa';
 const BACKEND_URL = `${BASE_ORIGIN}/api/tenant`;
 
 function getActiveTenantId() {
-  return localStorage.getItem('luvon_active_tenant_id') || 'anonymous';
+  return localStorage.getItem('luvon_active_tenant_id') 
+      || localStorage.getItem('luvon_tenant_id') 
+      || 'luvon_q_flagship';
 }
 
 function showToast(message, type = 'info') {
@@ -36,13 +38,6 @@ function showToast(message, type = 'info') {
 
 async function fetchLiveConversations() {
   const tenantId = getActiveTenantId();
-  if (tenantId === 'anonymous') {
-    conversations = [];
-    activeConvId = null;
-    renderThreads();
-    renderChatStream();
-    return;
-  }
 
   try {
     const res = await fetch(`${BACKEND_URL}/conversations`, {
@@ -87,7 +82,7 @@ async function fetchLiveConversations() {
 
     const activeConv = conversations.find(c => c.id === activeConvId);
     const currentCount = activeConv ? activeConv.messages.length : 0;
-    if (currentCount !== lastMessageCount) {
+    if (currentCount !== lastMessageCount || !document.getElementById("chat-stream")?.hasChildNodes()) {
       lastMessageCount = currentCount;
       renderChatStream();
     }
@@ -102,16 +97,6 @@ async function fetchLiveConversations() {
 function renderThreads() {
   const container = document.getElementById("threads-container");
   if (!container) return;
-
-  const tenantId = getActiveTenantId();
-  if (tenantId === 'anonymous') {
-    container.innerHTML = `
-      <div class="p-6 text-center text-stone-400 text-xs">
-        Please sign in to view customer threads.
-      </div>
-    `;
-    return;
-  }
 
   if (conversations.length === 0) {
     container.innerHTML = `
@@ -276,10 +261,6 @@ async function handleSendMessage() {
 }
 
 function openTestInquiryModal() {
-  if (getActiveTenantId() === 'anonymous') {
-    if (typeof openSignInModal === 'function') openSignInModal();
-    return;
-  }
   document.getElementById("testInquiryModal")?.classList.remove("hidden");
   if (window.lucide && typeof window.lucide.createIcons === 'function') lucide.createIcons();
 }
@@ -435,5 +416,5 @@ document.addEventListener("DOMContentLoaded", () => {
   fetchLiveConversations();
   setInterval(() => {
     if (!isSending) fetchLiveConversations();
-  }, 4000);
+  }, 3000);
 });
