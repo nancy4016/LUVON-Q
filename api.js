@@ -68,7 +68,32 @@
     return data;
   }
 
-  // Parse Supabase Auth Hash Fragment on Page Load
+  // ==========================================
+  // OAUTH INITIALIZATION (Google / Apple)
+  // ==========================================
+  function initiateOAuth(provider) {
+    if (!['google', 'apple'].includes(provider)) {
+      showNotification(`Unsupported login provider: ${provider}`, 'error');
+      return;
+    }
+
+    // Keep any pending onboarding prompt safe in sessionStorage
+    const homeInput = document.getElementById('homeAiPromptInput');
+    if (homeInput && homeInput.value.trim()) {
+      sessionStorage.setItem('pending_onboard_prompt', homeInput.value.trim());
+    }
+
+    const currentOrigin = window.location.origin;
+    const redirectUrl = `${currentOrigin}/index.html`;
+
+    // Direct redirect through Supabase Auth OAuth flow
+    const oauthUrl = `${SUPABASE_URL}/auth/v1/authorize?provider=${provider}&redirect_to=${encodeURIComponent(redirectUrl)}`;
+    window.location.href = oauthUrl;
+  }
+
+  // ==========================================
+  // PARSE SUPABASE AUTH HASH ON REDIRECT
+  // ==========================================
   async function handleAuthHashRedirect() {
     const hash = window.location.hash;
     if (!hash || !hash.includes('access_token=')) return false;
@@ -76,14 +101,15 @@
     try {
       const params = new URLSearchParams(hash.substring(1));
       const accessToken = params.get('access_token');
-      const authType = params.get('type'); // 'invite', 'signup', 'recovery'
+      const refreshToken = params.get('refresh_token');
+      const authType = params.get('type');
 
       if (!accessToken) return false;
 
-      // Clean the address bar immediately
+      // Clean the URL hash immediately so token is not exposed in history
       window.history.replaceState({}, document.title, window.location.pathname);
 
-      // Fetch user profile from Supabase using the received access token
+      // Verify user identity with Supabase Auth endpoint
       const userRes = await fetch(`${SUPABASE_URL}/auth/v1/user`, {
         headers: {
           'apikey': SUPABASE_ANON_KEY,
@@ -91,42 +117,56 @@
         }
       });
 
-      if (!userRes.ok) throw new Error('Could not verify invitation credentials.');
+      if (!userRes.ok) throw new Error('Could not verify credentials with authentication server.');
       const user = await userRes.json();
       const meta = user.user_metadata || {};
 
-      const tenantId = meta.tenant_id || 'tenant_' + user.id.slice(0, 8);
-      const businessName = meta.tenant_name || meta.full_name || 'Merchant Workspace';
+      // Determine or provision merchant workspace
+      const businessName = meta.tenant_name || meta.full_name || meta.name || (user.email ? user.email.split('@')[0] : 'My Store');
+      const tenantId = meta.tenant_id || `tenant_${user.id.replace(/-/g, '').slice(0, 10)}`;
 
-      // Save active session
+      // Save authenticated session in local state
+      localStorage.setItem('luvon_user', JSON.stringify(user));
       localStorage.setItem('luvon_active_tenant_id', tenantId);
       localStorage.setItem('luvon_business_name', businessName);
       localStorage.setItem('luvon_user_email', user.email);
       localStorage.setItem('luvon_access_token', accessToken);
+      if (refreshToken) {
+        localStorage.setItem('luvon_refresh_token', refreshToken);
+      }
 
-      // Inform server to mark team member status as Active
-      await fetch(`${BASE_URL}/api/tenant/team/accept`, {
+      // Sync active merchant on backend engine
+      await fetch(`${BASE_URL}/api/tenant/sync-profile`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'x-tenant-id': tenantId
         },
-        body: JSON.stringify({ email: user.email })
+        body: JSON.stringify({
+          userId: user.id,
+          email: user.email,
+          businessName: businessName,
+          avatarUrl: meta.avatar_url || meta.picture || null
+        })
       }).catch(() => {});
 
       updateAuthUI(user, businessName);
 
-      if (authType === 'invite') {
-        showNotification(`Welcome to ${businessName}! You joined as a team collaborator.`, 'success');
-      } else {
-        showNotification(`Welcome back, ${businessName}! Email verified.`, 'success');
-      }
+      showNotification(`Welcome, ${businessName}! Successfully signed in.`, 'success');
 
-      setTimeout(() => {
-        if (window.location.pathname.endsWith('settings.html') || window.location.pathname.endsWith('index.html')) {
-          window.location.reload();
-        }
-      }, 1000);
+      // Check if a prompt was waiting to be built prior to OAuth redirect
+      const pendingPrompt = sessionStorage.getItem('pending_onboard_prompt');
+      if (pendingPrompt && typeof runAIBusinessSetup === 'function') {
+        sessionStorage.removeItem('pending_onboard_prompt');
+        showNotification('Configuring store catalog with your prompt...', 'info');
+        runAIBusinessSetup(pendingPrompt).catch(() => {});
+      } else {
+        setTimeout(() => {
+          if (typeof loadLiveDashboardData === 'function') {
+            loadLiveDashboardData();
+          }
+        }, 500);
+      }
 
       return true;
     } catch (err) {
@@ -135,7 +175,9 @@
     }
   }
 
-  // Auth Modal Handlers
+  // ==========================================
+  // AUTH MODAL HANDLERS
+  // ==========================================
   let currentAuthMode = 'signin';
 
   function openSignInModal() {
@@ -236,7 +278,7 @@
   function checkAuthSession() {
     const activeTenant = localStorage.getItem('luvon_active_tenant_id');
     const businessName = localStorage.getItem('luvon_business_name');
-    if (activeTenant) {
+    if (activeTenant && activeTenant !== 'anonymous') {
       updateAuthUI({ id: activeTenant }, businessName || 'Merchant Store');
     } else {
       updateAuthUI(null);
@@ -244,13 +286,15 @@
   }
 
   function toggleSignOut() {
+    localStorage.removeItem('luvon_user');
     localStorage.removeItem('luvon_active_tenant_id');
     localStorage.removeItem('luvon_business_name');
     localStorage.removeItem('luvon_user_email');
     localStorage.removeItem('luvon_access_token');
+    localStorage.removeItem('luvon_refresh_token');
     updateAuthUI(null);
     showNotification('Signed out successfully.', 'info');
-    setTimeout(() => window.location.reload(), 600);
+    setTimeout(() => window.location.reload(), 500);
   }
 
   function updateAuthUI(user, businessName) {
@@ -329,6 +373,7 @@
   window.runAIBusinessSetup = runAIBusinessSetup;
   window.openOnboardingModal = openOnboardingModal;
   window.closeOnboardingModal = closeOnboardingModal;
+  window.initiateOAuth = initiateOAuth;
 
   document.addEventListener('DOMContentLoaded', async () => {
     const redirected = await handleAuthHashRedirect();

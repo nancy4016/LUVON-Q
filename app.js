@@ -64,8 +64,8 @@ async function loadLiveDashboardData() {
   const signedOutBanner = document.getElementById('signedOutBanner');
   const authenticatedArea = document.getElementById('authenticatedDataArea');
 
-  // If user is signed out, lock dashboard and show clean signed-out state
-  if (!activeTenantId) {
+  // If user is signed out or anonymous, lock dashboard and show clean signed-out state
+  if (!activeTenantId || activeTenantId === 'anonymous') {
     if (signedOutBanner) signedOutBanner.classList.remove('hidden');
     if (authenticatedArea) authenticatedArea.classList.add('hidden');
     if (window.lucide && typeof window.lucide.createIcons === 'function') {
@@ -83,17 +83,18 @@ async function loadLiveDashboardData() {
     const res = await fetch(`${APP_BASE_ORIGIN}/api/tenant/metrics`, {
       headers: { 'x-tenant-id': activeTenantId }
     });
-    const metrics = await res.json();
+    if (res.ok) {
+      const metrics = await res.json();
+      const revEl = document.getElementById('totalRevenue');
+      const closedEl = document.getElementById('dealsClosed');
+      const chatsEl = document.getElementById('activeCustomers');
+      const itemsEl = document.getElementById('totalCatalogItems');
 
-    const revEl = document.getElementById('totalRevenue');
-    const closedEl = document.getElementById('dealsClosed');
-    const chatsEl = document.getElementById('activeCustomers');
-    const itemsEl = document.getElementById('totalCatalogItems');
-
-    if (revEl) revEl.textContent = `KSh ${Number(metrics.totalRevenue || 0).toLocaleString()}`;
-    if (closedEl) closedEl.textContent = metrics.dealsClosed || 0;
-    if (chatsEl) chatsEl.textContent = metrics.activeCustomers || 0;
-    if (itemsEl) itemsEl.textContent = metrics.catalogItems || 0;
+      if (revEl) revEl.textContent = `KSh ${Number(metrics.totalRevenue || 0).toLocaleString()}`;
+      if (closedEl) closedEl.textContent = metrics.dealsClosed || 0;
+      if (chatsEl) chatsEl.textContent = metrics.activeCustomers || 0;
+      if (itemsEl) itemsEl.textContent = metrics.catalogItems || 0;
+    }
   } catch (err) {
     console.warn('⚠️ Could not load metrics:', err.message);
   }
@@ -103,8 +104,10 @@ async function loadLiveDashboardData() {
     const res = await fetch(`${APP_BASE_ORIGIN}/api/tenant/inventory`, {
       headers: { 'x-tenant-id': activeTenantId }
     });
-    const inventory = await res.json();
-    renderInventoryTable(Array.isArray(inventory) ? inventory : []);
+    if (res.ok) {
+      const inventory = await res.json();
+      renderInventoryTable(Array.isArray(inventory) ? inventory : []);
+    }
   } catch (err) {
     console.warn('⚠️ Could not load inventory:', err.message);
   }
@@ -213,3 +216,6 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   }, 300);
 });
+
+// Expose loader for re-use across auth callbacks
+window.loadLiveDashboardData = loadLiveDashboardData;
