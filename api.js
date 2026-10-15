@@ -69,15 +69,15 @@
   }
 
   // ==========================================
-  // OAUTH INITIALIZATION (Google / Apple)
+  // OAUTH INITIALIZATION (Google / GitHub)
   // ==========================================
   function initiateOAuth(provider) {
-    if (!['google', 'apple'].includes(provider)) {
+    if (!['google', 'github'].includes(provider)) {
       showNotification(`Unsupported login provider: ${provider}`, 'error');
       return;
     }
 
-    // Keep any pending onboarding prompt safe in sessionStorage
+    // Preserve any draft onboarding prompt before leaving page
     const homeInput = document.getElementById('homeAiPromptInput');
     if (homeInput && homeInput.value.trim()) {
       sessionStorage.setItem('pending_onboard_prompt', homeInput.value.trim());
@@ -102,11 +102,10 @@
       const params = new URLSearchParams(hash.substring(1));
       const accessToken = params.get('access_token');
       const refreshToken = params.get('refresh_token');
-      const authType = params.get('type');
 
       if (!accessToken) return false;
 
-      // Clean the URL hash immediately so token is not exposed in history
+      // Clean the URL hash immediately so the token is not kept in browser history
       window.history.replaceState({}, document.title, window.location.pathname);
 
       // Verify user identity with Supabase Auth endpoint
@@ -122,14 +121,14 @@
       const meta = user.user_metadata || {};
 
       // Determine or provision merchant workspace
-      const businessName = meta.tenant_name || meta.full_name || meta.name || (user.email ? user.email.split('@')[0] : 'My Store');
+      const businessName = meta.tenant_name || meta.full_name || meta.name || meta.user_name || (user.email ? user.email.split('@')[0] : 'My Store');
       const tenantId = meta.tenant_id || `tenant_${user.id.replace(/-/g, '').slice(0, 10)}`;
 
       // Save authenticated session in local state
       localStorage.setItem('luvon_user', JSON.stringify(user));
       localStorage.setItem('luvon_active_tenant_id', tenantId);
       localStorage.setItem('luvon_business_name', businessName);
-      localStorage.setItem('luvon_user_email', user.email);
+      localStorage.setItem('luvon_user_email', user.email || '');
       localStorage.setItem('luvon_access_token', accessToken);
       if (refreshToken) {
         localStorage.setItem('luvon_refresh_token', refreshToken);
@@ -154,7 +153,7 @@
 
       showNotification(`Welcome, ${businessName}! Successfully signed in.`, 'success');
 
-      // Check if a prompt was waiting to be built prior to OAuth redirect
+      // Check if an AI store generation prompt was pending before redirect
       const pendingPrompt = sessionStorage.getItem('pending_onboard_prompt');
       if (pendingPrompt && typeof runAIBusinessSetup === 'function') {
         sessionStorage.removeItem('pending_onboard_prompt');
