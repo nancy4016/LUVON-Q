@@ -375,29 +375,25 @@
     </div>
   </div>
 
-  <!-- Modal: 1-Minute Walkthrough Video (Custom Luvon Q Player) -->
-  <div id="tourVideoModal" class="fixed inset-0 bg-slate-900/80 backdrop-blur-sm z-50 flex items-center justify-center hidden p-4">
-    <div class="bg-[#1c1917] rounded-2xl shadow-2xl max-w-3xl w-full p-4 md:p-5 border border-brand-500/30 space-y-3.5 relative">
-      <!-- Top Modal Header -->
-      <div class="flex items-center justify-between px-1">
-        <div class="flex items-center gap-2.5">
-          <div class="w-6 h-6 rounded-md bg-brand-500/15 border border-brand-500/30 flex items-center justify-center">
-            <i data-lucide="sparkles" class="w-3.5 h-3.5 text-brand-500"></i>
-          </div>
-          <h3 class="font-serif font-bold text-sm md:text-base text-brand-50 tracking-wide">
-            Luvon Q Conversational Commerce Walkthrough
-          </h3>
-        </div>
-        <button type="button" onclick="closeTourModal()" class="text-stone-400 hover:text-brand-200 p-1 rounded-lg hover:bg-white/5 transition-colors cursor-pointer">
-          <i data-lucide="x" class="w-5 h-5"></i>
-        </button>
-      </div>
+  <!-- Modal: Cinematic Full-Card Luvon Q Video Player -->
+  <div id="tourVideoModal" class="fixed inset-0 bg-stone-950/90 backdrop-blur-md z-50 flex items-center justify-center hidden p-3 md:p-6">
+    <div class="bg-[#1c1917] rounded-3xl shadow-2xl max-w-4xl w-full border border-brand-500/30 overflow-hidden relative flex flex-col">
+      
+      <!-- Absolute Top-Right Floating X Close Overlay -->
+      <button 
+        type="button" 
+        onclick="closeTourModal()" 
+        class="absolute top-4 right-4 z-30 w-10 h-10 rounded-full bg-black/60 hover:bg-brand-600 text-white/90 hover:text-white flex items-center justify-center backdrop-blur-md border border-white/10 transition-all duration-200 cursor-pointer shadow-lg"
+        title="Close Tour"
+      >
+        <i data-lucide="x" class="w-5 h-5"></i>
+      </button>
 
-      <!-- Custom Luvon Q Video Player Container -->
-      <div id="luvonVideoContainer" class="relative w-full aspect-video rounded-xl overflow-hidden bg-[#141210] border border-brand-500/20 group select-none shadow-inner">
+      <!-- Cinematic Full-Bleed Video Surface -->
+      <div id="luvonVideoContainer" class="relative w-full aspect-video bg-[#141210] group select-none flex items-center justify-center">
         <video 
           id="tourVideoElement" 
-          class="w-full h-full object-contain cursor-pointer" 
+          class="w-full h-full object-cover cursor-pointer" 
           playsinline
           onclick="toggleLuvonPlay()"
         >
@@ -409,20 +405,50 @@
         <div 
           id="luvonCenterPlay" 
           onclick="toggleLuvonPlay()" 
-          class="absolute inset-0 flex items-center justify-center bg-black/25 transition-opacity duration-200 cursor-pointer hidden"
+          class="absolute inset-0 flex items-center justify-center bg-black/30 transition-opacity duration-200 cursor-pointer hidden"
         >
-          <div class="w-14 h-14 rounded-full bg-brand-600/95 hover:bg-brand-500 text-white flex items-center justify-center shadow-2xl ring-4 ring-brand-500/30 transition-transform hover:scale-105">
-            <i data-lucide="play" class="w-6 h-6 fill-white text-white translate-x-0.5"></i>
+          <div class="w-16 h-16 rounded-full bg-brand-600 hover:bg-brand-500 text-white flex items-center justify-center shadow-2xl ring-4 ring-brand-500/40 transition-transform hover:scale-110">
+            <i data-lucide="play" class="w-7 h-7 fill-white text-white translate-x-0.5"></i>
           </div>
         </div>
 
-        <!-- Bottom Custom Luvon Q Control Bar (Also covers bottom-right watermark cleanly) -->
-        <div class="absolute bottom-0 inset-x-0 bg-gradient-to-t from-[#141210] via-[#141210]/95 to-transparent pt-8 pb-3 px-4 flex flex-col gap-2.5">
+        <!-- End-Screen CTA Overlay (Appears automatically when video finishes) -->
+        <div 
+          id="luvonEndScreen" 
+          class="absolute inset-0 bg-stone-950/90 backdrop-blur-md flex flex-col items-center justify-center p-6 text-center space-y-4 transition-all duration-300 hidden z-20"
+        >
+          <div class="w-12 h-12 rounded-2xl bg-brand-500/20 border border-brand-500/40 flex items-center justify-center text-brand-400">
+            <i data-lucide="sparkles" class="w-6 h-6"></i>
+          </div>
+          <div class="space-y-1">
+            <h4 class="font-serif font-bold text-lg md:text-xl text-white">Experience Luvon Q for Your Business</h4>
+            <p class="text-xs text-stone-300 max-w-sm">Automate your customer inquiries and M-Pesa settlements in under 60 seconds.</p>
+          </div>
+          <div class="flex items-center gap-3 pt-2">
+            <button 
+              type="button" 
+              onclick="closeTourModal(); openSignInModal();" 
+              class="px-6 py-3 bg-brand-600 hover:bg-brand-500 text-white rounded-xl font-bold text-xs shadow-xl transition-all cursor-pointer flex items-center gap-2"
+            >
+              <i data-lucide="sparkles" class="w-4 h-4"></i> Get Started Free
+            </button>
+            <button 
+              type="button" 
+              onclick="replayLuvonVideo()" 
+              class="px-5 py-3 bg-white/10 hover:bg-white/20 text-white rounded-xl font-semibold text-xs transition-all cursor-pointer flex items-center gap-2 border border-white/10"
+            >
+              <i data-lucide="rotate-ccw" class="w-3.5 h-3.5"></i> Watch Again
+            </button>
+          </div>
+        </div>
+
+        <!-- Bottom Custom Luvon Q Control Bar (Conceals Jitter Watermark Cleanly) -->
+        <div class="absolute bottom-0 inset-x-0 bg-gradient-to-t from-[#141210] via-[#141210]/95 to-transparent pt-10 pb-4 px-6 flex flex-col gap-2.5 z-10">
           <!-- Interactive Gold Scrubber Track -->
           <div 
             id="luvonProgressTrack" 
             onclick="seekLuvonVideo(event)" 
-            class="w-full h-1.5 bg-white/15 hover:h-2 transition-all rounded-full overflow-hidden cursor-pointer relative"
+            class="w-full h-1.5 bg-white/20 hover:h-2.5 transition-all rounded-full overflow-hidden cursor-pointer relative"
           >
             <div 
               id="luvonProgressBar" 
@@ -432,7 +458,7 @@
 
           <!-- Controls & Time Readout Row -->
           <div class="flex items-center justify-between text-xs text-brand-100 font-sans">
-            <div class="flex items-center gap-3.5">
+            <div class="flex items-center gap-4">
               <!-- Play / Pause Button -->
               <button 
                 type="button" 
@@ -454,7 +480,7 @@
               </button>
 
               <!-- Tabular Timestamp -->
-              <div class="text-[11px] font-medium tracking-wider text-brand-200/90 tabular-nums">
+              <div class="text-xs font-medium tracking-wider text-brand-200/90 tabular-nums">
                 <span id="luvonCurrentTime">0:00</span>
                 <span class="mx-1 text-brand-500/60">/</span>
                 <span id="luvonDuration">0:45</span>
@@ -462,8 +488,8 @@
             </div>
 
             <!-- Right Side Brand Pill & Fullscreen -->
-            <div class="flex items-center gap-3">
-              <span class="px-2 py-0.5 rounded bg-brand-900/90 border border-brand-500/30 text-[9px] font-serif font-semibold uppercase tracking-widest text-brand-500">
+            <div class="flex items-center gap-3.5">
+              <span class="px-2.5 py-1 rounded-md bg-brand-900/90 border border-brand-500/30 text-[10px] font-serif font-semibold uppercase tracking-widest text-brand-400">
                 Luvon Q OS
               </span>
               <button 
@@ -472,20 +498,13 @@
                 class="text-brand-100 hover:text-brand-500 transition-colors cursor-pointer focus:outline-none"
                 title="Fullscreen"
               >
-                <i data-lucide="maximize" class="w-3.5 h-3.5"></i>
+                <i data-lucide="maximize" class="w-4 h-4"></i>
               </button>
             </div>
           </div>
         </div>
       </div>
 
-      <!-- Modal Footer CTA -->
-      <div class="flex items-center justify-between px-1 pt-1 text-xs text-stone-400">
-        <span>Ready to automate your inquiries?</span>
-        <button type="button" onclick="closeTourModal(); openSignInModal();" class="px-4 py-2 bg-brand-600 hover:bg-brand-500 text-white rounded-xl font-bold text-xs shadow-md transition-all cursor-pointer">
-          Get Started Free
-        </button>
-      </div>
     </div>
   </div>
 
@@ -513,7 +532,7 @@
     }
 
     // ==========================================
-    // CUSTOM LUVON Q MEDIA PLAYER CONTROLLERS
+    // CUSTOM CINEMATIC LUVON Q MEDIA PLAYER
     // ==========================================
     function formatVideoTime(seconds) {
       if (!seconds || isNaN(seconds)) return "0:00";
@@ -540,7 +559,12 @@
 
     function toggleLuvonPlay() {
       const video = document.getElementById('tourVideoElement');
+      const endScreen = document.getElementById('luvonEndScreen');
       if (!video) return;
+
+      // Hide end screen if playing again
+      if (endScreen) endScreen.classList.add('hidden');
+
       if (video.paused || video.ended) {
         video.play().catch(() => {});
         updatePlayButtonIcon(false);
@@ -548,6 +572,16 @@
         video.pause();
         updatePlayButtonIcon(true);
       }
+    }
+
+    function replayLuvonVideo() {
+      const video = document.getElementById('tourVideoElement');
+      const endScreen = document.getElementById('luvonEndScreen');
+      if (!video) return;
+      if (endScreen) endScreen.classList.add('hidden');
+      video.currentTime = 0;
+      video.play().catch(() => {});
+      updatePlayButtonIcon(false);
     }
 
     function toggleLuvonMute() {
@@ -586,6 +620,7 @@
       const progressBar = document.getElementById('luvonProgressBar');
       const currentTimeEl = document.getElementById('luvonCurrentTime');
       const durationEl = document.getElementById('luvonDuration');
+      const endScreen = document.getElementById('luvonEndScreen');
 
       if (!video) return;
 
@@ -605,18 +640,29 @@
         }
       });
 
-      video.addEventListener('play', () => updatePlayButtonIcon(false));
+      video.addEventListener('play', () => {
+        if (endScreen) endScreen.classList.add('hidden');
+        updatePlayButtonIcon(false);
+      });
+      
       video.addEventListener('pause', () => updatePlayButtonIcon(true));
-      video.addEventListener('ended', () => updatePlayButtonIcon(true));
+      
+      video.addEventListener('ended', () => {
+        updatePlayButtonIcon(true);
+        if (endScreen) endScreen.classList.remove('hidden');
+      });
     }
 
     // Product Tour Modal Handlers
     function openTourModal() {
       const modal = document.getElementById('tourVideoModal');
       const video = document.getElementById('tourVideoElement');
+      const endScreen = document.getElementById('luvonEndScreen');
       if (modal) {
         modal.classList.remove('hidden');
+        if (endScreen) endScreen.classList.add('hidden');
         if (video) {
+          video.currentTime = 0;
           video.play().then(() => {
             updatePlayButtonIcon(false);
           }).catch(() => {
