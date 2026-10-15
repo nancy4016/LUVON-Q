@@ -269,8 +269,45 @@ app.post('/api/tenant/ai-onboard', tenantMiddleware, handleAIOnboarding);
 app.post('/api/ai-onboard', tenantMiddleware, handleAIOnboarding);
 
 // ==========================================
-// 3. SETTINGS & WORKSPACE API ENDPOINTS
+// 3. SETTINGS, OAUTH SYNC & WORKSPACE ENDPOINTS
 // ==========================================
+app.post('/api/tenant/sync-profile', tenantMiddleware, async (req, res) => {
+  const { userId, email, businessName, avatarUrl } = req.body;
+
+  // Preserve custom business name if already set; otherwise adopt OAuth profile name
+  if (businessName && (!req.tenant.businessName || req.tenant.businessName === 'Merchant Store')) {
+    req.tenant.businessName = businessName;
+  }
+  if (userId) req.tenant.ownerId = userId;
+  if (email) req.tenant.ownerEmail = email;
+  if (avatarUrl) req.tenant.avatarUrl = avatarUrl;
+
+  // If this user was invited to any workspace, mark their team member status as Active
+  if (email && req.tenant.teamMembers) {
+    const cleanEmail = email.trim().toLowerCase();
+    req.tenant.teamMembers = req.tenant.teamMembers.map(m =>
+      m.email.toLowerCase() === cleanEmail
+        ? { ...m, status: 'Active', acceptedAt: new Date().toISOString() }
+        : m
+    );
+  }
+
+  saveStore();
+
+  // Upsert tenant record in Supabase
+  await axios.post(`${SUPABASE_URL}/rest/v1/tenants`, {
+    id: req.tenant.id,
+    owner_id: userId || null,
+    business_name: req.tenant.businessName,
+    brand_signature: req.tenant.brandSignature || `${req.tenant.businessName} Official`,
+    industry: req.tenant.industry || 'Retail & Services'
+  }, {
+    headers: { ...supabaseHeaders, 'Prefer': 'resolution=merge-duplicates' }
+  }).catch(() => {});
+
+  res.json({ success: true, tenant: req.tenant });
+});
+
 app.post('/api/tenant/settings/profile', tenantMiddleware, async (req, res) => {
   const { businessName, brandSignature, industry, escalationPhone, currency, orderPrefix, enableAlerts } = req.body;
 
@@ -475,7 +512,7 @@ app.post('/api/auth/signup', async (req, res) => {
     const session = authRes.data.session || null;
 
     const requiresVerification = !session && (!user.confirmed_at && !user.email_confirmed_at);
-    const tenantId = 'tenant_' + (user.id ? user.id.slice(0, 8) : Date.now());
+    const tenantId = 'tenant_' + (user.id ? user.id.replace(/-/g, '').slice(0, 10) : Date.now());
 
     await axios.post(`${SUPABASE_URL}/rest/v1/tenants`, {
       id: tenantId,
@@ -524,7 +561,7 @@ app.post('/api/auth/signin', async (req, res) => {
 
     const user = authRes.data.user;
     let businessName = user.user_metadata?.full_name || 'My Store';
-    let tenantId = 'tenant_' + user.id.slice(0, 8);
+    let tenantId = 'tenant_' + user.id.replace(/-/g, '').slice(0, 10);
 
     const tenantRes = await axios.get(`${SUPABASE_URL}/rest/v1/tenants?owner_id=eq.${user.id}&limit=1`, {
       headers: supabaseHeaders
@@ -680,7 +717,7 @@ Directives:
 
     profile.conversationHistory.push(
       { role: 'user', text, timestamp: new Date().toISOString() },
-      { role: 'model', text: botReply, timestamp: new Date().toISOString() }
+      { role: 'model', text, botReply, timestamp: new Date().toISOString() }
     );
     saveStore();
 

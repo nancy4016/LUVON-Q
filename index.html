@@ -155,16 +155,58 @@
       </form>
     </section>
 
-    <!-- Signed-Out Lock Banner -->
-    <div id="signedOutBanner" class="p-8 bg-white border border-dashed border-brand-300 rounded-2xl text-center space-y-3">
-      <div class="w-12 h-12 mx-auto bg-brand-100 text-brand-800 rounded-full flex items-center justify-center font-bold">
-        <i data-lucide="lock" class="w-6 h-6"></i>
+    <!-- Approach A: Product Tour & Sign-In Card -->
+    <div id="signedOutBanner" class="p-6 md:p-8 bg-white border border-brand-200/80 shadow-sm rounded-2xl overflow-hidden">
+      <div class="grid md:grid-cols-2 gap-8 items-center">
+        <!-- Left: Value Proposition & Auth Actions -->
+        <div class="space-y-4 text-left">
+          <div class="inline-flex items-center gap-2 px-3 py-1 bg-brand-50 text-brand-700 rounded-full text-[11px] font-semibold border border-brand-200/60">
+            <i data-lucide="shield-check" class="w-3.5 h-3.5 text-brand-600"></i> Multi-Tenant Commerce OS
+          </div>
+          
+          <h3 class="text-xl md:text-2xl font-serif font-bold text-brand-900 leading-tight">
+            Automate WhatsApp Sales & M-Pesa Settlements
+          </h3>
+          
+          <p class="text-xs text-slate-600 leading-relaxed">
+            Each merchant gets an isolated catalog, an autonomous conversational assistant in English & Swahili, and instant Daraja STK push payments.
+          </p>
+
+          <div class="flex flex-wrap items-center gap-3 pt-2">
+            <button type="button" onclick="openSignInModal()" class="px-5 py-3 bg-brand-600 hover:bg-brand-700 text-white text-xs font-bold rounded-xl shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer">
+              <i data-lucide="log-in" class="w-4 h-4"></i> Sign In to Access Portal
+            </button>
+            <button type="button" onclick="openTourModal()" class="px-4 py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold rounded-xl transition-all flex items-center justify-center gap-2 cursor-pointer">
+              <i data-lucide="play" class="w-3.5 h-3.5 text-brand-600"></i> Watch 1-Min Tour
+            </button>
+          </div>
+          
+          <div class="flex items-center gap-4 pt-2 text-[11px] text-slate-500">
+            <span class="flex items-center gap-1.5"><i data-lucide="check-circle-2" class="w-3.5 h-3.5 text-emerald-600"></i> Isolated catalog</span>
+            <span class="flex items-center gap-1.5"><i data-lucide="check-circle-2" class="w-3.5 h-3.5 text-emerald-600"></i> Live M-Pesa STK</span>
+          </div>
+        </div>
+
+        <!-- Right: Interactive Video Thumbnail Frame -->
+        <div class="relative rounded-2xl overflow-hidden border border-slate-200 shadow-md bg-stone-900 aspect-video flex items-center justify-center group cursor-pointer" onclick="openTourModal()">
+          <img 
+            src="https://images.unsplash.com/photo-1551288049-bebda4e38f71?auto=format&fit=crop&w=1000&q=80" 
+            alt="Luvon Q Architecture & Workflow Demo" 
+            class="w-full h-full object-cover opacity-70 group-hover:opacity-50 transition-opacity duration-300"
+          />
+          <div class="absolute inset-0 bg-gradient-to-t from-black/75 via-black/20 to-transparent"></div>
+
+          <div class="absolute inset-0 flex flex-col items-center justify-center text-white space-y-2.5">
+            <div class="w-12 h-12 rounded-full bg-brand-600/90 group-hover:bg-brand-500 group-hover:scale-110 transition-all duration-300 flex items-center justify-center shadow-xl ring-4 ring-white/20">
+              <i data-lucide="play" class="w-5 h-5 fill-white text-white translate-x-0.5"></i>
+            </div>
+            <div class="text-center">
+              <p class="text-xs font-bold tracking-wide uppercase">Interactive Demo</p>
+              <p class="text-[10px] text-brand-200/80">See WhatsApp Bot & STK Push</p>
+            </div>
+          </div>
+        </div>
       </div>
-      <h3 class="text-lg font-serif font-bold text-brand-900">Sign In to Access Your Merchant OS</h3>
-      <p class="text-xs text-slate-500 max-w-md mx-auto">Each merchant has their own isolated catalog, private WhatsApp customer threads, and live M-Pesa metrics.</p>
-      <button onclick="openSignInModal()" class="px-6 py-2.5 bg-brand-600 hover:bg-brand-700 text-white text-xs font-bold rounded-xl shadow-md cursor-pointer">
-        Sign In / Create Account
-      </button>
     </div>
 
     <!-- Authenticated Dashboard Data Container -->
@@ -220,7 +262,7 @@
                 <th class="p-4 text-right">Actions</th>
               </tr>
             </thead>
-            <tbody id="inventory-table-body" class="divide-y divide-brand-200/60">
+            <tbody id="inventory-table-body" class="divide-y border-brand-200/60">
             </tbody>
           </table>
         </div>
@@ -338,6 +380,36 @@
     </div>
   </div>
 
+  <!-- Modal: 1-Minute Walkthrough Video -->
+  <div id="tourVideoModal" class="fixed inset-0 bg-slate-900/80 backdrop-blur-sm z-50 flex items-center justify-center hidden p-4">
+    <div class="bg-stone-900 rounded-2xl shadow-2xl max-w-3xl w-full p-4 border border-brand-500/30 space-y-3 relative">
+      <div class="flex items-center justify-between px-2">
+        <div class="flex items-center gap-2">
+          <i data-lucide="sparkles" class="w-4 h-4 text-brand-400"></i>
+          <h3 class="font-serif font-bold text-sm text-white">Luvon Q Conversational Commerce Walkthrough</h3>
+        </div>
+        <button type="button" onclick="closeTourModal()" class="text-slate-400 hover:text-white p-1 cursor-pointer">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+
+      <!-- Video Screen Frame -->
+      <div class="relative w-full aspect-video rounded-xl overflow-hidden bg-black flex items-center justify-center border border-white/10">
+        <video id="tourVideoElement" controls class="w-full h-full object-contain">
+          <source src="luvon-demo.mp4" type="video/mp4">
+          Your browser does not support video playback.
+        </video>
+      </div>
+
+      <div class="flex items-center justify-between px-2 pt-1 text-xs text-slate-400">
+        <span>Ready to automate your inquiries?</span>
+        <button type="button" onclick="closeTourModal(); openSignInModal();" class="px-4 py-2 bg-brand-600 hover:bg-brand-500 text-white rounded-lg font-bold text-xs shadow cursor-pointer">
+          Get Started Free
+        </button>
+      </div>
+    </div>
+  </div>
+
   <script src="api.js"></script>
   <script src="app.js"></script>
   <script>
@@ -361,6 +433,26 @@
       return Boolean(user && tenant && tenant !== 'anonymous');
     }
 
+    // Product Tour Modal Handlers
+    function openTourModal() {
+      const modal = document.getElementById('tourVideoModal');
+      const video = document.getElementById('tourVideoElement');
+      if (modal) {
+        modal.classList.remove('hidden');
+        if (video) video.play().catch(() => {});
+        renderIcons();
+      }
+    }
+
+    function closeTourModal() {
+      const modal = document.getElementById('tourVideoModal');
+      const video = document.getElementById('tourVideoElement');
+      if (modal) {
+        modal.classList.add('hidden');
+        if (video) video.pause();
+      }
+    }
+
     async function handleHomePagePromptSubmit(e) {
       e.preventDefault();
       const input = document.getElementById('homeAiPromptInput');
@@ -369,7 +461,6 @@
 
       const promptText = input.value.trim();
 
-      // Check if signed in
       if (!isUserAuthenticated()) {
         sessionStorage.setItem('pending_onboard_prompt', promptText);
         openSignInModal();
