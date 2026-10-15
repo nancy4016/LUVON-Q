@@ -34,7 +34,7 @@
   </script>
 
   <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Playfair+Display:ital,wght@0,600;0,700;1,400&display=swap" rel="stylesheet">
   
   <!-- Direct Lucide Production Script -->
@@ -179,11 +179,6 @@
             <button type="button" onclick="openTourModal()" class="px-4 py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold rounded-xl transition-all flex items-center justify-center gap-2 cursor-pointer">
               <i data-lucide="play" class="w-3.5 h-3.5 text-brand-600"></i> Watch 1-Min Tour
             </button>
-          </div>
-          
-          <div class="flex items-center gap-4 pt-2 text-[11px] text-slate-500">
-            <span class="flex items-center gap-1.5"><i data-lucide="check-circle-2" class="w-3.5 h-3.5 text-emerald-600"></i> Isolated catalog</span>
-            <span class="flex items-center gap-1.5"><i data-lucide="check-circle-2" class="w-3.5 h-3.5 text-emerald-600"></i> Live M-Pesa STK</span>
           </div>
         </div>
 
@@ -380,30 +375,114 @@
     </div>
   </div>
 
-  <!-- Modal: 1-Minute Walkthrough Video -->
+  <!-- Modal: 1-Minute Walkthrough Video (Custom Luvon Q Player) -->
   <div id="tourVideoModal" class="fixed inset-0 bg-slate-900/80 backdrop-blur-sm z-50 flex items-center justify-center hidden p-4">
-    <div class="bg-stone-900 rounded-2xl shadow-2xl max-w-3xl w-full p-4 border border-brand-500/30 space-y-3 relative">
-      <div class="flex items-center justify-between px-2">
-        <div class="flex items-center gap-2">
-          <i data-lucide="sparkles" class="w-4 h-4 text-brand-400"></i>
-          <h3 class="font-serif font-bold text-sm text-white">Luvon Q Conversational Commerce Walkthrough</h3>
+    <div class="bg-[#1c1917] rounded-2xl shadow-2xl max-w-3xl w-full p-4 md:p-5 border border-brand-500/30 space-y-3.5 relative">
+      <!-- Top Modal Header -->
+      <div class="flex items-center justify-between px-1">
+        <div class="flex items-center gap-2.5">
+          <div class="w-6 h-6 rounded-md bg-brand-500/15 border border-brand-500/30 flex items-center justify-center">
+            <i data-lucide="sparkles" class="w-3.5 h-3.5 text-brand-500"></i>
+          </div>
+          <h3 class="font-serif font-bold text-sm md:text-base text-brand-50 tracking-wide">
+            Luvon Q Conversational Commerce Walkthrough
+          </h3>
         </div>
-        <button type="button" onclick="closeTourModal()" class="text-slate-400 hover:text-white p-1 cursor-pointer">
+        <button type="button" onclick="closeTourModal()" class="text-stone-400 hover:text-brand-200 p-1 rounded-lg hover:bg-white/5 transition-colors cursor-pointer">
           <i data-lucide="x" class="w-5 h-5"></i>
         </button>
       </div>
 
-      <!-- Video Screen Frame -->
-      <div class="relative w-full aspect-video rounded-xl overflow-hidden bg-black flex items-center justify-center border border-white/10">
-        <video id="tourVideoElement" controls class="w-full h-full object-contain">
+      <!-- Custom Luvon Q Video Player Container -->
+      <div id="luvonVideoContainer" class="relative w-full aspect-video rounded-xl overflow-hidden bg-[#141210] border border-brand-500/20 group select-none shadow-inner">
+        <video 
+          id="tourVideoElement" 
+          class="w-full h-full object-contain cursor-pointer" 
+          playsinline
+          onclick="toggleLuvonPlay()"
+        >
           <source src="luvon-demo.mp4" type="video/mp4">
           Your browser does not support video playback.
         </video>
+
+        <!-- Center Play Overlay (Shown when paused) -->
+        <div 
+          id="luvonCenterPlay" 
+          onclick="toggleLuvonPlay()" 
+          class="absolute inset-0 flex items-center justify-center bg-black/25 transition-opacity duration-200 cursor-pointer hidden"
+        >
+          <div class="w-14 h-14 rounded-full bg-brand-600/95 hover:bg-brand-500 text-white flex items-center justify-center shadow-2xl ring-4 ring-brand-500/30 transition-transform hover:scale-105">
+            <i data-lucide="play" class="w-6 h-6 fill-white text-white translate-x-0.5"></i>
+          </div>
+        </div>
+
+        <!-- Bottom Custom Luvon Q Control Bar (Also covers bottom-right watermark cleanly) -->
+        <div class="absolute bottom-0 inset-x-0 bg-gradient-to-t from-[#141210] via-[#141210]/95 to-transparent pt-8 pb-3 px-4 flex flex-col gap-2.5">
+          <!-- Interactive Gold Scrubber Track -->
+          <div 
+            id="luvonProgressTrack" 
+            onclick="seekLuvonVideo(event)" 
+            class="w-full h-1.5 bg-white/15 hover:h-2 transition-all rounded-full overflow-hidden cursor-pointer relative"
+          >
+            <div 
+              id="luvonProgressBar" 
+              class="h-full bg-gradient-to-r from-brand-600 to-brand-500 w-0 rounded-full relative transition-all duration-75"
+            ></div>
+          </div>
+
+          <!-- Controls & Time Readout Row -->
+          <div class="flex items-center justify-between text-xs text-brand-100 font-sans">
+            <div class="flex items-center gap-3.5">
+              <!-- Play / Pause Button -->
+              <button 
+                type="button" 
+                onclick="toggleLuvonPlay()" 
+                class="text-brand-100 hover:text-brand-500 transition-colors cursor-pointer focus:outline-none"
+                title="Play / Pause"
+              >
+                <i id="luvonPlayIcon" data-lucide="pause" class="w-4 h-4"></i>
+              </button>
+
+              <!-- Mute / Volume Toggle -->
+              <button 
+                type="button" 
+                onclick="toggleLuvonMute()" 
+                class="text-brand-100 hover:text-brand-500 transition-colors cursor-pointer focus:outline-none"
+                title="Mute / Unmute"
+              >
+                <i id="luvonVolumeIcon" data-lucide="volume-2" class="w-4 h-4"></i>
+              </button>
+
+              <!-- Tabular Timestamp -->
+              <div class="text-[11px] font-medium tracking-wider text-brand-200/90 tabular-nums">
+                <span id="luvonCurrentTime">0:00</span>
+                <span class="mx-1 text-brand-500/60">/</span>
+                <span id="luvonDuration">0:45</span>
+              </div>
+            </div>
+
+            <!-- Right Side Brand Pill & Fullscreen -->
+            <div class="flex items-center gap-3">
+              <span class="px-2 py-0.5 rounded bg-brand-900/90 border border-brand-500/30 text-[9px] font-serif font-semibold uppercase tracking-widest text-brand-500">
+                Luvon Q OS
+              </span>
+              <button 
+                type="button" 
+                onclick="toggleLuvonFullscreen()" 
+                class="text-brand-100 hover:text-brand-500 transition-colors cursor-pointer focus:outline-none"
+                title="Fullscreen"
+              >
+                <i data-lucide="maximize" class="w-3.5 h-3.5"></i>
+              </button>
+            </div>
+          </div>
+        </div>
       </div>
 
-      <div class="flex items-center justify-between px-2 pt-1 text-xs text-slate-400">
+      <!-- Modal Footer CTA -->
+      <div class="flex items-center justify-between px-1 pt-1 text-xs text-stone-400">
         <span>Ready to automate your inquiries?</span>
-        <button type="button" onclick="closeTourModal(); openSignInModal();" class="px-4 py-2 bg-brand-600 hover:bg-brand-500 text-white rounded-lg font-bold text-xs shadow cursor-pointer">
+        <button type="button" onclick="closeTourModal(); openSignInModal();" class="px-4 py-2 bg-brand-600 hover:bg-brand-500 text-white rounded-xl font-bold text-xs shadow-md transition-all cursor-pointer">
           Get Started Free
         </button>
       </div>
@@ -433,13 +512,117 @@
       return Boolean(user && tenant && tenant !== 'anonymous');
     }
 
+    // ==========================================
+    // CUSTOM LUVON Q MEDIA PLAYER CONTROLLERS
+    // ==========================================
+    function formatVideoTime(seconds) {
+      if (!seconds || isNaN(seconds)) return "0:00";
+      const mins = Math.floor(seconds / 60);
+      const secs = Math.floor(seconds % 60);
+      return `${mins}:${secs < 10 ? '0' : ''}${secs}`;
+    }
+
+    function updatePlayButtonIcon(isPaused) {
+      const iconEl = document.getElementById('luvonPlayIcon');
+      const centerOverlay = document.getElementById('luvonCenterPlay');
+      if (iconEl) {
+        iconEl.setAttribute('data-lucide', isPaused ? 'play' : 'pause');
+      }
+      if (centerOverlay) {
+        if (isPaused) {
+          centerOverlay.classList.remove('hidden');
+        } else {
+          centerOverlay.classList.add('hidden');
+        }
+      }
+      renderIcons();
+    }
+
+    function toggleLuvonPlay() {
+      const video = document.getElementById('tourVideoElement');
+      if (!video) return;
+      if (video.paused || video.ended) {
+        video.play().catch(() => {});
+        updatePlayButtonIcon(false);
+      } else {
+        video.pause();
+        updatePlayButtonIcon(true);
+      }
+    }
+
+    function toggleLuvonMute() {
+      const video = document.getElementById('tourVideoElement');
+      const volIcon = document.getElementById('luvonVolumeIcon');
+      if (!video) return;
+      video.muted = !video.muted;
+      if (volIcon) {
+        volIcon.setAttribute('data-lucide', video.muted ? 'volume-x' : 'volume-2');
+      }
+      renderIcons();
+    }
+
+    function seekLuvonVideo(e) {
+      const video = document.getElementById('tourVideoElement');
+      const track = document.getElementById('luvonProgressTrack');
+      if (!video || !track || !video.duration) return;
+      const rect = track.getBoundingClientRect();
+      const clickX = Math.max(0, Math.min(e.clientX - rect.left, rect.width));
+      const percentage = clickX / rect.width;
+      video.currentTime = percentage * video.duration;
+    }
+
+    function toggleLuvonFullscreen() {
+      const container = document.getElementById('luvonVideoContainer');
+      if (!container) return;
+      if (!document.fullscreenElement) {
+        container.requestFullscreen?.().catch(() => {});
+      } else {
+        document.exitFullscreen?.().catch(() => {});
+      }
+    }
+
+    function initLuvonVideoEvents() {
+      const video = document.getElementById('tourVideoElement');
+      const progressBar = document.getElementById('luvonProgressBar');
+      const currentTimeEl = document.getElementById('luvonCurrentTime');
+      const durationEl = document.getElementById('luvonDuration');
+
+      if (!video) return;
+
+      video.addEventListener('loadedmetadata', () => {
+        if (durationEl && video.duration) {
+          durationEl.textContent = formatVideoTime(video.duration);
+        }
+      });
+
+      video.addEventListener('timeupdate', () => {
+        if (currentTimeEl) {
+          currentTimeEl.textContent = formatVideoTime(video.currentTime);
+        }
+        if (progressBar && video.duration) {
+          const pct = (video.currentTime / video.duration) * 100;
+          progressBar.style.width = `${pct}%`;
+        }
+      });
+
+      video.addEventListener('play', () => updatePlayButtonIcon(false));
+      video.addEventListener('pause', () => updatePlayButtonIcon(true));
+      video.addEventListener('ended', () => updatePlayButtonIcon(true));
+    }
+
     // Product Tour Modal Handlers
     function openTourModal() {
       const modal = document.getElementById('tourVideoModal');
       const video = document.getElementById('tourVideoElement');
       if (modal) {
         modal.classList.remove('hidden');
-        if (video) video.play().catch(() => {});
+        if (video) {
+          video.play().then(() => {
+            updatePlayButtonIcon(false);
+          }).catch(() => {
+            updatePlayButtonIcon(true);
+          });
+        }
         renderIcons();
       }
     }
@@ -546,9 +729,11 @@
       }
     }
 
-    // Auto-resume stashed prompt after authentication
+    // Initialize custom video player and auto-resume stashed prompt
     document.addEventListener("DOMContentLoaded", () => {
       renderIcons();
+      initLuvonVideoEvents();
+
       const stashedPrompt = sessionStorage.getItem('pending_onboard_prompt');
       if (stashedPrompt && isUserAuthenticated()) {
         sessionStorage.removeItem('pending_onboard_prompt');
