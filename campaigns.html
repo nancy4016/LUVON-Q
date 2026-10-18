@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full bg-[#fbf9f5]">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Campaigns & Automated Publishing | LUVON Q</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              50: '#fcfaf6', 100: '#f5eee1', 200: '#e7e2d8',
+              500: '#a38446', 600: '#8c7038', 700: '#735b2c', 900: '#1c1917'
+            }
+          },
+          fontFamily: {
+            sans: ['Inter', 'sans-serif'],
+            serif: ['Playfair Display', 'serif']
+          }
+        }
+      }
+    }
+  </script>
+  <script src="https://unpkg.com/lucide@0.344.0/dist/umd/lucide.js"></script>
+</head>
+<body class="bg-slate-50 text-slate-800 min-h-screen flex flex-col md:flex-row">
+  
+  <!-- Content Container -->
+  <main class="flex-1 p-6 md:p-8 space-y-6 max-w-6xl mx-auto">
+    <header class="flex justify-between items-center border-b border-brand-200 pb-5">
+      <div>
+        <h1 class="text-2xl font-serif font-bold text-brand-900">Campaigns & Auto-Publishing</h1>
+        <p class="text-xs text-slate-500 mt-1">Schedule and publish posts to Instagram & Facebook with automatic WhatsApp order attribution.</p>
+      </div>
+      <button onclick="document.getElementById('scheduleModal').classList.remove('hidden')" class="px-5 py-2.5 bg-brand-600 hover:bg-brand-700 text-white rounded-xl text-xs font-bold shadow flex items-center gap-2">
+        <i data-lucide="plus" class="w-4 h-4"></i> Create Campaign Post
+      </button>
+    </header>
+
+    <!-- Schedule Form Modal -->
+    <div id="scheduleModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center hidden p-4">
+      <div class="bg-white rounded-2xl shadow-2xl max-w-lg w-full p-6 border border-brand-200 space-y-4">
+        <div class="flex justify-between items-center">
+          <h3 class="font-serif font-bold text-lg text-brand-900">Schedule Post</h3>
+          <button onclick="document.getElementById('scheduleModal').classList.add('hidden')" class="text-slate-400 hover:text-slate-600"><i data-lucide="x" class="w-5 h-5"></i></button>
+        </div>
+
+        <form id="scheduleForm" onsubmit="handleScheduleSubmit(event)" class="space-y-3">
+          <div>
+            <label class="block text-xs font-semibold text-slate-700 mb-1">Target Platform</label>
+            <select id="postPlatform" class="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs">
+              <option value="both">Instagram & Facebook</option>
+              <option value="instagram">Instagram Only (Feed / Reel)</option>
+              <option value="facebook">Facebook Page Only</option>
+            </select>
+          </div>
+
+          <div>
+            <label class="block text-xs font-semibold text-slate-700 mb-1">Public Image or Video URL</label>
+            <input type="url" id="postMediaUrl" required placeholder="https://example.com/assets/product.jpg" class="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs" />
+          </div>
+
+          <div>
+            <label class="block text-xs font-semibold text-slate-700 mb-1">Caption & Offer</label>
+            <textarea id="postCaption" rows="3" required placeholder="Flash sale this weekend! 20% off all sneakers..." class="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs"></textarea>
+          </div>
+
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label class="block text-xs font-semibold text-slate-700 mb-1">Campaign Tag</label>
+              <input type="text" id="postCampaignTag" placeholder="OCTOBER_DROP" class="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs uppercase" />
+            </div>
+            <div>
+              <label class="block text-xs font-semibold text-slate-700 mb-1">Schedule Date & Time</label>
+              <input type="datetime-local" id="postScheduledAt" required class="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs" />
+            </div>
+          </div>
+
+          <button type="submit" class="w-full py-3 bg-brand-600 hover:bg-brand-700 text-white rounded-xl font-bold text-xs shadow mt-2">
+            Schedule Campaign Dispatch
+          </button>
+        </form>
+      </div>
+    </div>
+
+    <!-- Posts Queue & History Table -->
+    <div class="bg-white rounded-2xl border border-brand-200 shadow-sm overflow-hidden">
+      <div class="p-5 border-b border-brand-200">
+        <h3 class="font-bold text-sm text-brand-900">Campaign Dispatch Queue</h3>
+      </div>
+      <table class="w-full text-left text-xs text-slate-600">
+        <thead class="bg-brand-50 border-b border-brand-200 font-semibold text-brand-900 uppercase">
+          <tr>
+            <th class="p-4">Platform</th>
+            <th class="p-4">Caption & Tag</th>
+            <th class="p-4">Scheduled For</th>
+            <th class="p-4">Status</th>
+            <th class="p-4 text-right">Result</th>
+          </tr>
+        </thead>
+        <tbody id="postsTableBody" class="divide-y divide-brand-200/60">
+          <tr><td colspan="5" class="p-6 text-center text-slate-400">Loading campaigns queue...</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </main>
+
+  <script>
+    async function loadPosts() {
+      const tenantId = localStorage.getItem('luvon_active_tenant_id') || 'luvon_q_flagship';
+      const res = await fetch('/api/tenant/campaigns/posts', {
+        headers: { 'x-tenant-id': tenantId }
+      });
+      const posts = await res.json();
+      const tbody = document.getElementById('postsTableBody');
+      if (!posts || posts.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="5" class="p-6 text-center text-slate-400">No scheduled campaigns yet. Click "Create Campaign Post" to begin.</td></tr>`;
+        return;
+      }
+      tbody.innerHTML = posts.map(p => `
+        <tr class="hover:bg-brand-50/50">
+          <td class="p-4 font-semibold uppercase text-brand-900">${p.platform}</td>
+          <td class="p-4"><p class="truncate max-w-xs font-medium text-slate-800">${p.caption}</p><span class="text-[10px] text-brand-600">#${p.campaign_tag || 'PROMO'}</span></td>
+          <td class="p-4 text-slate-600">${new Date(p.scheduled_at).toLocaleString()}</td>
+          <td class="p-4">
+            <span class="px-2 py-1 text-[10px] font-bold rounded-full ${
+              p.status === 'published' ? 'bg-emerald-100 text-emerald-700' :
+              p.status === 'scheduled' ? 'bg-amber-100 text-amber-700' :
+              p.status === 'failed' ? 'bg-rose-100 text-rose-700' : 'bg-slate-100 text-slate-600'
+            }">${p.status.toUpperCase()}</span>
+          </td>
+          <td class="p-4 text-right font-mono text-[11px] text-slate-500">${p.platform_post_id || p.error_message || '—'}</td>
+        </tr>
+      `).join('');
+      if (window.lucide) lucide.createIcons();
+    }
+
+    async function handleScheduleSubmit(e) {
+      e.preventDefault();
+      const tenantId = localStorage.getItem('luvon_active_tenant_id') || 'luvon_q_flagship';
+      const payload = {
+        platform: document.getElementById('postPlatform').value,
+        mediaUrl: document.getElementById('postMediaUrl').value,
+        caption: document.getElementById('postCaption').value,
+        campaignTag: document.getElementById('postCampaignTag').value,
+        scheduledAt: document.getElementById('postScheduledAt').value
+      };
+
+      const res = await fetch('/api/tenant/campaigns/schedule', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-tenant-id': tenantId
+        },
+        body: JSON.stringify(payload)
+      });
+
+      if (res.ok) {
+        document.getElementById('scheduleModal').classList.add('hidden');
+        document.getElementById('scheduleForm').reset();
+        loadPosts();
+      } else {
+        const data = await res.json();
+        alert('Failed: ' + (data.error || 'Check fields'));
+      }
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+      loadPosts();
+      if (window.lucide) lucide.createIcons();
+    });
+  </script>
+</body>
+</html>

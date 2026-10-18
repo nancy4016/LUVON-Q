@@ -76,7 +76,10 @@ function initializeStore() {
           orderPrefix: "LQ",
           enableAlerts: true,
           teamMembers: [],
-          catalog: []
+          catalog: [],
+          metaPageId: process.env.META_PAGE_ID || null,
+          metaPageAccessToken: process.env.META_PAGE_ACCESS_TOKEN || null,
+          metaIgBusinessId: process.env.META_IG_BUSINESS_ID || null
         }
       },
       crmProfiles: {},
@@ -126,7 +129,10 @@ function tenantMiddleware(req, res, next) {
       orderPrefix: "ORD",
       enableAlerts: true,
       teamMembers: [],
-      catalog: []
+      catalog: [],
+      metaPageId: null,
+      metaPageAccessToken: null,
+      metaIgBusinessId: null
     };
     saveStore();
   }
@@ -274,7 +280,6 @@ app.post('/api/ai-onboard', tenantMiddleware, handleAIOnboarding);
 app.post('/api/tenant/sync-profile', tenantMiddleware, async (req, res) => {
   const { userId, email, businessName, avatarUrl } = req.body;
 
-  // Preserve custom business name if already set; otherwise adopt OAuth profile name
   if (businessName && (!req.tenant.businessName || req.tenant.businessName === 'Merchant Store')) {
     req.tenant.businessName = businessName;
   }
@@ -282,7 +287,6 @@ app.post('/api/tenant/sync-profile', tenantMiddleware, async (req, res) => {
   if (email) req.tenant.ownerEmail = email;
   if (avatarUrl) req.tenant.avatarUrl = avatarUrl;
 
-  // If this user was invited to any workspace, mark their team member status as Active
   if (email && req.tenant.teamMembers) {
     const cleanEmail = email.trim().toLowerCase();
     req.tenant.teamMembers = req.tenant.teamMembers.map(m =>
@@ -294,7 +298,6 @@ app.post('/api/tenant/sync-profile', tenantMiddleware, async (req, res) => {
 
   saveStore();
 
-  // Upsert tenant record in Supabase
   await axios.post(`${SUPABASE_URL}/rest/v1/tenants`, {
     id: req.tenant.id,
     owner_id: userId || null,
@@ -532,7 +535,10 @@ app.post('/api/auth/signup', async (req, res) => {
       orderPrefix: 'LQ',
       enableAlerts: true,
       teamMembers: [],
-      catalog: []
+      catalog: [],
+      metaPageId: null,
+      metaPageAccessToken: null,
+      metaIgBusinessId: null
     };
     saveStore();
 
@@ -577,7 +583,10 @@ app.post('/api/auth/signin', async (req, res) => {
         id: tenantId,
         businessName,
         teamMembers: [],
-        catalog: []
+        catalog: [],
+        metaPageId: null,
+        metaPageAccessToken: null,
+        metaIgBusinessId: null
       };
       saveStore();
     }
@@ -717,7 +726,7 @@ Directives:
 
     profile.conversationHistory.push(
       { role: 'user', text, timestamp: new Date().toISOString() },
-      { role: 'model', text, botReply, timestamp: new Date().toISOString() }
+      { role: 'model', text: botReply, timestamp: new Date().toISOString() }
     );
     saveStore();
 
@@ -784,7 +793,238 @@ app.post('/api/tenant/conversations/toggle-pause', tenantMiddleware, (req, res) 
 });
 
 // ==========================================
-// 6. DARAJA SANDBOX GATEWAY
+// 6. META GRAPH API (INSTAGRAM & FACEBOOK PUBLISHING)
+// ==========================================
+const META_GRAPH_VERSION = 'v21.0';
+const META_GRAPH_BASE = `https://graph.facebook.com/${META_GRAPH_VERSION}`;
+
+async function publishToInstagram({ igUserId, pageAccessToken, mediaUrl, caption, mediaType = 'IMAGE' }) {
+  if (!igUserId || !pageAccessToken) {
+    throw new Error('Missing Instagram Business ID or Page Access Token.');
+  }
+
+  const containerPayload = {
+    caption,
+    access_token: pageAccessToken
+  };
+
+  if (mediaType === 'REELS' || mediaType === 'VIDEO') {
+    containerPayload.media_type = 'REELS';
+    containerPayload.video_url = mediaUrl;
+    containerPayload.share_to_feed = true;
+  } else {
+    containerPayload.image_url = mediaUrl;
+  }
+
+  const containerRes = await axios.post(`${META_GRAPH_BASE}/${igUserId}/media`, containerPayload, { timeout: 30000 });
+  const containerId = containerRes.data?.id;
+  if (!containerId) throw new Error('Failed to create Instagram media container');
+
+  // Video and Reels must be encoded by Meta before publishing
+  if (mediaType === 'REELS' || mediaType === 'VIDEO') {
+    let isReady = false;
+    let attempts = 0;
+    while (!isReady && attempts < 20) {
+      await sleep(3000);
+      attempts++;
+      const statusRes = await axios.get(`${META_GRAPH_BASE}/${containerId}`, {
+        params: { fields: 'status_code,status', access_token: pageAccessToken }
+      });
+      const statusCode = statusRes.data?.status_code;
+      if (statusCode === 'FINISHED') {
+        isReady = true;
+      } else if (statusCode === 'ERROR') {
+        throw new Error(`Media container processing failed: ${statusRes.data?.status || 'Unknown error'}`);
+      }
+    }
+    if (!isReady) throw new Error('Instagram media container timed out while processing.');
+  }
+
+  const publishRes = await axios.post(`${META_GRAPH_BASE}/${igUserId}/media_publish`, {
+    creation_id: containerId,
+    access_token: pageAccessToken
+  }, { timeout: 30000 });
+
+  return publishRes.data?.id;
+}
+
+async function publishToFacebook({ pageId, pageAccessToken, mediaUrl, caption }) {
+  if (!pageId || !pageAccessToken) {
+    throw new Error('Missing Facebook Page ID or Page Access Token.');
+  }
+
+  if (mediaUrl) {
+    const res = await axios.post(`${META_GRAPH_BASE}/${pageId}/photos`, {
+      url: mediaUrl,
+      caption: caption,
+      access_token: pageAccessToken
+    }, { timeout: 30000 });
+    return res.data?.post_id || res.data?.id;
+  } else {
+    const res = await axios.post(`${META_GRAPH_BASE}/${pageId}/feed`, {
+      message: caption,
+      access_token: pageAccessToken
+    }, { timeout: 30000 });
+    return res.data?.id;
+  }
+}
+
+// ==========================================
+// 7. CAMPAIGN MANAGEMENT & SCHEDULED POSTING ENDPOINTS
+// ==========================================
+app.get('/api/tenant/campaigns/posts', tenantMiddleware, async (req, res) => {
+  try {
+    const response = await axios.get(
+      `${SUPABASE_URL}/rest/v1/scheduled_posts?tenant_id=eq.${req.tenant.id}&order=scheduled_at.desc`,
+      { headers: supabaseHeaders }
+    );
+    res.json(response.data || []);
+  } catch (err) {
+    res.status(500).json({ error: err.response?.data?.message || err.message });
+  }
+});
+
+app.post('/api/tenant/campaigns/schedule', tenantMiddleware, async (req, res) => {
+  const { platform, mediaType, mediaUrl, caption, scheduledAt, campaignTag } = req.body;
+
+  if (!caption || !scheduledAt) {
+    return res.status(400).json({ error: "Caption and scheduled date/time are required." });
+  }
+
+  // Auto-attach Click-to-WhatsApp attribution link to direct leads to Luvon Q
+  let processedCaption = caption;
+  const escalationPhone = req.tenant.escalationPhone || "254768820142";
+  const tag = (campaignTag || "PROMO").toUpperCase().replace(/\s+/g, '_');
+  const whatsappUrl = `https://wa.me/${escalationPhone}?text=Hello%2C%20I%20saw%20your%20post%20regarding%20${encodeURIComponent(tag)}`;
+
+  if (!processedCaption.includes('wa.me')) {
+    processedCaption += `\n\n💬 Order / Inquire via WhatsApp: ${whatsappUrl}`;
+  }
+
+  try {
+    const postRecord = {
+      tenant_id: req.tenant.id,
+      platform: platform || 'both',
+      media_type: mediaType || 'IMAGE',
+      media_url: mediaUrl || null,
+      caption: processedCaption,
+      campaign_tag: tag,
+      status: 'scheduled',
+      scheduled_at: new Date(scheduledAt).toISOString()
+    };
+
+    const response = await axios.post(
+      `${SUPABASE_URL}/rest/v1/scheduled_posts`,
+      postRecord,
+      { headers: supabaseHeaders }
+    );
+
+    res.status(201).json({ success: true, post: response.data?.[0] || postRecord });
+  } catch (err) {
+    res.status(500).json({ error: err.response?.data?.message || err.message });
+  }
+});
+
+app.post('/api/tenant/campaigns/credentials', tenantMiddleware, async (req, res) => {
+  const { pageId, pageAccessToken, igBusinessId } = req.body;
+
+  if (pageId !== undefined) req.tenant.metaPageId = pageId;
+  if (pageAccessToken !== undefined) req.tenant.metaPageAccessToken = pageAccessToken;
+  if (igBusinessId !== undefined) req.tenant.metaIgBusinessId = igBusinessId;
+  saveStore();
+
+  await axios.patch(
+    `${SUPABASE_URL}/rest/v1/tenants?id=eq.${req.tenant.id}`,
+    {
+      meta_page_id: pageId || null,
+      meta_page_access_token: pageAccessToken || null,
+      meta_ig_business_id: igBusinessId || null
+    },
+    { headers: supabaseHeaders }
+  ).catch(() => {});
+
+  res.json({ success: true, message: "Meta publishing credentials saved successfully." });
+});
+
+// Background Dispatch Cron Worker (Every 60 seconds)
+cron.schedule('* * * * *', async () => {
+  const now = new Date().toISOString();
+
+  try {
+    const { data: duePosts } = await axios.get(
+      `${SUPABASE_URL}/rest/v1/scheduled_posts?status=eq.scheduled&scheduled_at=lte.${now}&limit=10`,
+      { headers: supabaseHeaders }
+    );
+
+    if (!duePosts || duePosts.length === 0) return;
+
+    for (const post of duePosts) {
+      await axios.patch(
+        `${SUPABASE_URL}/rest/v1/scheduled_posts?id=eq.${post.id}`,
+        { status: 'publishing' },
+        { headers: supabaseHeaders }
+      ).catch(() => {});
+
+      const tenant = db.tenants[post.tenant_id] || db.tenants["luvon_q_flagship"];
+      const pageToken = tenant?.metaPageAccessToken || process.env.META_PAGE_ACCESS_TOKEN;
+      const pageId = tenant?.metaPageId || process.env.META_PAGE_ID;
+      const igId = tenant?.metaIgBusinessId || process.env.META_IG_BUSINESS_ID;
+
+      let publishedIds = [];
+      let errorMessage = null;
+
+      try {
+        if ((post.platform === 'instagram' || post.platform === 'both') && igId) {
+          const igMediaId = await publishToInstagram({
+            igUserId: igId,
+            pageAccessToken: pageToken,
+            mediaUrl: post.media_url,
+            caption: post.caption,
+            mediaType: post.media_type
+          });
+          publishedIds.push(`IG:${igMediaId}`);
+        }
+
+        if ((post.platform === 'facebook' || post.platform === 'both') && pageId) {
+          const fbPostId = await publishToFacebook({
+            pageId: pageId,
+            pageAccessToken: pageToken,
+            mediaUrl: post.media_url,
+            caption: post.caption
+          });
+          publishedIds.push(`FB:${fbPostId}`);
+        }
+
+        await axios.patch(
+          `${SUPABASE_URL}/rest/v1/scheduled_posts?id=eq.${post.id}`,
+          {
+            status: 'published',
+            published_at: new Date().toISOString(),
+            platform_post_id: publishedIds.join(' | ') || 'PUBLISHED_DIRECT'
+          },
+          { headers: supabaseHeaders }
+        );
+        console.log(`📢 Dispatched scheduled campaign post [${post.id}] to ${publishedIds.join(', ')}`);
+      } catch (dispatchErr) {
+        errorMessage = dispatchErr.response?.data?.error?.message || dispatchErr.message;
+        console.error(`❌ Post dispatch failed [${post.id}]:`, errorMessage);
+        await axios.patch(
+          `${SUPABASE_URL}/rest/v1/scheduled_posts?id=eq.${post.id}`,
+          {
+            status: 'failed',
+            error_message: errorMessage
+          },
+          { headers: supabaseHeaders }
+        ).catch(() => {});
+      }
+    }
+  } catch (cronErr) {
+    console.error("❌ Campaign scheduler error:", cronErr.message);
+  }
+});
+
+// ==========================================
+// 8. DARAJA SANDBOX GATEWAY
 // ==========================================
 let cachedDarajaToken = null;
 let tokenExpiryTime = 0;
@@ -880,7 +1120,7 @@ async function sendWhatsAppText(tenant, toPhone, text) {
 }
 
 // ==========================================
-// 7. LIVE META WEBHOOK (INBOUND MESSAGES)
+// 9. LIVE META WEBHOOK (INBOUND MESSAGES)
 // ==========================================
 app.get('/webhook', (req, res) => {
   const mode = req.query['hub.mode'];
@@ -978,7 +1218,7 @@ app.get('/', (req, res) => {
 });
 
 // ==========================================
-// 8. SERVER BOOTSTRAP (RENDER PRODUCTION COMPLIANT)
+// 10. SERVER BOOTSTRAP (RENDER PRODUCTION COMPLIANT)
 // ==========================================
 const PORT = process.env.PORT || 10000;
 app.listen(PORT, '0.0.0.0', () => {
