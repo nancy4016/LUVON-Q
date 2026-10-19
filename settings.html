@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>LUVON Q | Workspace Settings</title>
+  <title>LUVON Q | Store & Workspace Settings</title>
   
   <script src="https://cdn.tailwindcss.com"></script>
   <script>
@@ -37,9 +37,9 @@
   <script src="https://unpkg.com/lucide@0.344.0/dist/umd/lucide.js"></script>
 
   <style>
-    svg.lucide {
-      display: inline-block !important;
-      vertical-align: middle !important;
+    svg.lucide, i[data-lucide] svg { 
+      display: inline-block !important; 
+      vertical-align: middle !important; 
       stroke-width: 2 !important;
     }
     i[data-lucide] {
@@ -82,6 +82,9 @@
         <a href="inbox.html" class="nav-link flex items-center gap-3 px-3 py-2.5 rounded-lg text-slate-600 hover:bg-brand-50 hover:text-brand-700 transition-all font-medium text-sm">
           <i data-lucide="message-square" class="w-4 h-4"></i> Omnichannel Inbox
         </a>
+        <a href="campaigns.html" class="nav-link flex items-center gap-3 px-3 py-2.5 rounded-lg text-slate-600 hover:bg-brand-50 hover:text-brand-700 transition-all font-medium text-sm">
+          <i data-lucide="megaphone" class="w-4 h-4"></i> Campaigns & Ads
+        </a>
         <a href="voice.html" class="nav-link flex items-center gap-3 px-3 py-2.5 rounded-lg text-slate-600 hover:bg-brand-50 hover:text-brand-700 transition-all font-medium text-sm">
           <i data-lucide="mic" class="w-4 h-4"></i> Voice & Persona
         </a>
@@ -116,194 +119,216 @@
 
   <!-- Main Content Area -->
   <main class="flex-1 w-full p-4 md:p-8 overflow-y-auto space-y-8">
-    <header class="border-b border-brand-200 pb-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+    <header class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-brand-200 pb-6">
       <div>
-        <h1 class="text-2xl font-serif font-bold text-brand-900">Workspace & Account Settings</h1>
-        <p class="text-xs text-slate-500 mt-1">Configure business profile, order rules, team members, and danger controls</p>
+        <h1 class="text-2xl font-serif font-bold text-brand-900">Workspace & Business Settings</h1>
+        <p class="text-xs text-slate-500 mt-1">Configure business profile, staff access, WhatsApp routing, and Meta publishing keys</p>
       </div>
-      <button onclick="saveAllAccountSettings()" id="saveAllTopBtn" class="px-5 py-2.5 bg-brand-600 hover:bg-brand-700 text-white rounded-xl text-xs font-bold shadow-md transition-all flex items-center gap-2 cursor-pointer self-start sm:self-auto">
+      <button onclick="saveStoreProfile()" id="saveProfileBtn" class="px-5 py-2.5 bg-brand-600 hover:bg-brand-700 text-white rounded-xl text-xs font-bold shadow-md transition-all flex items-center gap-2 cursor-pointer self-start sm:self-auto">
         <i data-lucide="save" class="w-4 h-4"></i> Save All Changes
       </button>
     </header>
 
-    <!-- Section 1: Business Profile & Brand Identity -->
-    <section class="bg-white rounded-2xl border border-brand-200 p-6 shadow-sm space-y-6">
-      <div class="flex items-center justify-between border-b border-brand-100 pb-4">
-        <div>
-          <h2 class="text-lg font-serif font-bold text-brand-900">Merchant Business Identity</h2>
-          <p class="text-xs text-slate-500 mt-0.5">Primary brand details used by the Gemini AI sales host across WhatsApp and IG.</p>
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <!-- 1. Store Profile & Concierge Config -->
+      <section class="bg-white rounded-2xl border border-brand-200 p-6 shadow-sm space-y-4">
+        <div class="flex items-center gap-2.5 border-b border-brand-200 pb-3">
+          <div class="w-7 h-7 rounded-lg bg-brand-100 text-brand-700 flex items-center justify-center font-bold">
+            <i data-lucide="store" class="w-4 h-4"></i>
+          </div>
+          <h2 class="text-base font-serif font-bold text-brand-900">Store Profile & AI Concierge</h2>
         </div>
-        <span class="px-3 py-1 bg-brand-50 border border-brand-200 text-brand-800 text-xs font-semibold rounded-full">Store Profile</span>
-      </div>
 
-      <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
-        <div>
-          <label class="block font-semibold text-slate-700 mb-1">Business Name</label>
-          <input type="text" id="settingBusinessName" placeholder="e.g. ShoeGame Nairobi" class="w-full px-3.5 py-2.5 bg-brand-50 border border-brand-200 rounded-xl focus:outline-none focus:border-brand-600 font-medium text-slate-900" />
-        </div>
-        <div>
-          <label class="block font-semibold text-slate-700 mb-1">Brand Signature / Line</label>
-          <input type="text" id="settingBrandSignature" placeholder="e.g. The Netflix of Sneakers" class="w-full px-3.5 py-2.5 bg-brand-50 border border-brand-200 rounded-xl focus:outline-none focus:border-brand-600 font-medium text-slate-900" />
-        </div>
-        <div>
-          <label class="block font-semibold text-slate-700 mb-1">Industry Category</label>
-          <input type="text" id="settingIndustry" placeholder="e.g. Footwear & Social Commerce" class="w-full px-3.5 py-2.5 bg-brand-50 border border-brand-200 rounded-xl focus:outline-none focus:border-brand-600 font-medium text-slate-900" />
-        </div>
-        <div>
-          <label class="block font-semibold text-slate-700 mb-1">Manager Escalation Phone (254...)</label>
-          <input type="text" id="settingEscalationPhone" placeholder="254700000000" class="w-full px-3.5 py-2.5 bg-brand-50 border border-brand-200 rounded-xl focus:outline-none focus:border-brand-600 font-medium text-slate-900" />
-        </div>
-      </div>
-    </section>
+        <div class="space-y-3.5 text-xs">
+          <div>
+            <label class="block font-semibold text-slate-700 mb-1">Business Name</label>
+            <input type="text" id="businessNameInput" placeholder="e.g. Luvon Barbershop" class="w-full px-3.5 py-2.5 bg-brand-50 border border-brand-200 rounded-xl focus:outline-none focus:border-brand-600 font-semibold text-brand-900" />
+          </div>
 
-    <!-- Section 2: Commerce, Currency & Order Rules -->
-    <section class="bg-white rounded-2xl border border-brand-200 p-6 shadow-sm space-y-6">
-      <div class="flex items-center justify-between border-b border-brand-100 pb-4">
-        <div>
-          <h2 class="text-lg font-serif font-bold text-brand-900">Commerce & Order Defaults</h2>
-          <p class="text-xs text-slate-500 mt-0.5">Define currency identifiers and notification preferences.</p>
-        </div>
-        <span class="px-3 py-1 bg-brand-50 border border-brand-200 text-brand-800 text-xs font-semibold rounded-full">Checkout Config</span>
-      </div>
+          <div>
+            <label class="block font-semibold text-slate-700 mb-1">Industry / Category</label>
+            <input type="text" id="industryInput" placeholder="e.g. Luxury Barber & Grooming" class="w-full px-3.5 py-2.5 bg-brand-50 border border-brand-200 rounded-xl focus:outline-none focus:border-brand-600 text-slate-800" />
+          </div>
 
-      <div class="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
-        <div>
-          <label class="block font-semibold text-slate-700 mb-1">Default Store Currency</label>
-          <select id="settingCurrency" class="w-full px-3.5 py-2.5 bg-brand-50 border border-brand-200 rounded-xl focus:outline-none focus:border-brand-600 font-medium text-slate-900">
-            <option value="KSh">Kenyan Shilling (KSh)</option>
-            <option value="USD">US Dollar ($)</option>
-            <option value="UGX">Ugandan Shilling (UGX)</option>
-            <option value="TZS">Tanzanian Shilling (TZS)</option>
-          </select>
-        </div>
-        <div>
-          <label class="block font-semibold text-slate-700 mb-1">Order ID Prefix</label>
-          <input type="text" id="settingOrderPrefix" placeholder="e.g. SG" class="w-full px-3.5 py-2.5 bg-brand-50 border border-brand-200 rounded-xl focus:outline-none focus:border-brand-600 font-medium text-slate-900" />
-        </div>
-        <div class="flex flex-col justify-end">
-          <label class="flex items-center gap-2 cursor-pointer pb-2.5">
-            <input type="checkbox" id="settingAlertsToggle" class="w-4 h-4 text-brand-600 rounded border-slate-300 focus:ring-brand-500" checked />
-            <span class="font-semibold text-slate-800">WhatsApp alerts on new sale</span>
-          </label>
-        </div>
-      </div>
-    </section>
+          <div>
+            <label class="block font-semibold text-slate-700 mb-1">Brand Signature Tagline</label>
+            <input type="text" id="brandSignatureInput" placeholder="e.g. Kilimani's Premier Grooming Lounge" class="w-full px-3.5 py-2.5 bg-brand-50 border border-brand-200 rounded-xl focus:outline-none focus:border-brand-600 text-slate-800" />
+          </div>
 
-    <!-- Section 3: Team Members & Access -->
-    <section class="bg-white rounded-2xl border border-brand-200 p-6 shadow-sm space-y-6">
-      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-brand-100 pb-4">
-        <div>
-          <h2 class="text-lg font-serif font-bold text-brand-900">Team Members & Access</h2>
-          <p class="text-xs text-slate-500 mt-0.5">Invite sales agents or managers to collaborate in this workspace.</p>
-        </div>
-        <span class="px-3 py-1 bg-brand-50 border border-brand-200 text-brand-800 text-xs font-semibold rounded-full self-start">Collaboration</span>
-      </div>
+          <div>
+            <label class="block font-semibold text-slate-700 mb-1">Human Agent Escalation Phone (WhatsApp & Voice Hand-off)</label>
+            <input type="text" id="escalationPhoneInput" placeholder="254768820142" class="w-full px-3.5 py-2.5 bg-brand-50 border border-brand-200 rounded-xl focus:outline-none focus:border-brand-600 font-mono text-slate-800" />
+            <p class="text-[10px] text-slate-400 mt-1">When buyers request an owner or custom quote, conversation context routes here.</p>
+          </div>
 
-      <form id="invite-member-form" class="flex flex-col sm:flex-row gap-3">
-        <input 
-          type="email" 
-          id="invite-email" 
-          required 
-          placeholder="agent@business.com" 
-          class="flex-1 px-4 py-2.5 text-xs bg-brand-50 border border-brand-200 rounded-xl focus:outline-none focus:border-brand-600"
-        />
-        <select id="invite-role" class="px-3 py-2.5 text-xs bg-brand-50 border border-brand-200 rounded-xl focus:outline-none focus:border-brand-600 font-semibold text-brand-900">
-          <option value="Sales Agent">Sales Agent</option>
-          <option value="Manager">Manager</option>
-          <option value="Viewer">Viewer</option>
-        </select>
-        <button type="submit" id="invite-btn" class="px-5 py-2.5 bg-brand-600 hover:bg-brand-700 text-white rounded-xl text-xs font-bold shadow transition-all flex items-center justify-center gap-2 cursor-pointer flex-shrink-0">
-          <i data-lucide="user-plus" class="w-4 h-4"></i> Invite Member
+          <div class="grid grid-cols-2 gap-3 pt-1">
+            <div>
+              <label class="block font-semibold text-slate-700 mb-1">Currency Code</label>
+              <input type="text" id="currencyInput" value="KSh" class="w-full px-3.5 py-2.5 bg-brand-50 border border-brand-200 rounded-xl focus:outline-none focus:border-brand-600 font-semibold text-brand-900" />
+            </div>
+            <div>
+              <label class="block font-semibold text-slate-700 mb-1">Order Prefix</label>
+              <input type="text" id="orderPrefixInput" value="LQ" class="w-full px-3.5 py-2.5 bg-brand-50 border border-brand-200 rounded-xl focus:outline-none focus:border-brand-600 font-mono text-brand-900 uppercase" />
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 2. Meta Publishing & Instagram Auto-Scheduler Credentials -->
+      <section class="bg-white rounded-2xl border border-brand-200 p-6 shadow-sm space-y-4">
+        <div class="flex items-center gap-2.5 border-b border-brand-200 pb-3">
+          <div class="w-7 h-7 rounded-lg bg-blue-100 text-blue-700 flex items-center justify-center font-bold">
+            <i data-lucide="share-2" class="w-4 h-4"></i>
+          </div>
+          <div>
+            <h2 class="text-base font-serif font-bold text-brand-900">Meta Publishing & Campaign Keys</h2>
+            <p class="text-[10px] text-slate-500">Required for automated Instagram & Facebook feed publishing</p>
+          </div>
+        </div>
+
+        <div class="space-y-3.5 text-xs">
+          <div>
+            <label class="block font-semibold text-slate-700 mb-1">Facebook Page ID</label>
+            <input type="text" id="metaPageIdInput" placeholder="e.g. 104928472910" class="w-full px-3.5 py-2.5 bg-brand-50 border border-brand-200 rounded-xl focus:outline-none focus:border-brand-600 font-mono text-slate-800" />
+          </div>
+
+          <div>
+            <label class="block font-semibold text-slate-700 mb-1">Instagram Business Account ID</label>
+            <input type="text" id="metaIgBusinessIdInput" placeholder="e.g. 178414002948291" class="w-full px-3.5 py-2.5 bg-brand-50 border border-brand-200 rounded-xl focus:outline-none focus:border-brand-600 font-mono text-slate-800" />
+          </div>
+
+          <div>
+            <label class="block font-semibold text-slate-700 mb-1">Permanent Page Access Token</label>
+            <input type="password" id="metaPageAccessTokenInput" placeholder="EAA..." class="w-full px-3.5 py-2.5 bg-brand-50 border border-brand-200 rounded-xl focus:outline-none focus:border-brand-600 font-mono text-slate-800" />
+            <p class="text-[10px] text-slate-400 mt-1">Acquired from Meta Business Manager with <code>instagram_content_publish</code> permissions.</p>
+          </div>
+
+          <div class="pt-2">
+            <button type="button" onclick="saveMetaCredentials()" id="saveMetaBtn" class="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-semibold shadow transition-all flex items-center gap-2 cursor-pointer">
+              <i data-lucide="check" class="w-3.5 h-3.5"></i> Save Meta Publishing Keys
+            </button>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <!-- 3. Team Member Access & Role Management -->
+    <section class="bg-white rounded-2xl border border-brand-200 shadow-sm overflow-hidden">
+      <div class="p-6 border-b border-brand-200 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+        <div>
+          <div class="flex items-center gap-2">
+            <div class="w-7 h-7 rounded-lg bg-emerald-100 text-emerald-800 flex items-center justify-center font-bold">
+              <i data-lucide="users" class="w-4 h-4"></i>
+            </div>
+            <h2 class="text-base font-serif font-bold text-brand-900">Workspace Team Members</h2>
+          </div>
+          <p class="text-xs text-slate-500 mt-1">Invite staff agents to manage the omnichannel inbox and catalog orders</p>
+        </div>
+
+        <button onclick="openInviteModal()" class="px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white rounded-xl text-xs font-semibold shadow transition-all flex items-center gap-2 cursor-pointer">
+          <i data-lucide="user-plus" class="w-3.5 h-3.5"></i> Invite Member
         </button>
-      </form>
+      </div>
 
-      <div class="overflow-x-auto border border-brand-100 rounded-xl">
+      <div class="overflow-x-auto">
         <table class="w-full text-left text-xs text-slate-600">
-          <thead class="bg-brand-50 font-semibold text-brand-900 uppercase tracking-wider border-b border-brand-100">
+          <thead class="bg-brand-50 border-b border-brand-200 font-semibold text-brand-900 uppercase tracking-wider">
             <tr>
-              <th class="p-3.5">Email</th>
-              <th class="p-3.5">Role</th>
-              <th class="p-3.5">Status</th>
-              <th class="p-3.5 text-right">Actions</th>
+              <th class="p-4">Email Address</th>
+              <th class="p-4">Role</th>
+              <th class="p-4">Status</th>
+              <th class="p-4">Invited / Active Date</th>
+              <th class="p-4 text-right">Actions</th>
             </tr>
           </thead>
-          <tbody id="team-table-body" class="divide-y divide-brand-100">
+          <tbody id="team-table-body" class="divide-y divide-brand-200/60">
+            <tr>
+              <td colspan="5" class="p-6 text-center text-slate-400 font-medium">Loading workspace team members...</td>
+            </tr>
           </tbody>
         </table>
       </div>
     </section>
 
-    <!-- Section 4: Webhook Reference -->
-    <section class="bg-white rounded-2xl border border-brand-200 p-6 shadow-sm space-y-4">
-      <h2 class="text-lg font-serif font-bold text-brand-900">Inbound Webhook Endpoint</h2>
-      <p class="text-xs text-slate-500">Provide this callback URL to Meta WhatsApp Cloud API to receive inbound shopper messages.</p>
-      
-      <div class="flex items-center gap-2 bg-brand-50 p-3 rounded-xl border border-brand-200 font-mono text-xs text-brand-900 overflow-x-auto">
-        <span class="flex-1 select-all" id="webhookUrl">https://luvon-engine.onrender.com/webhook</span>
-        <button onclick="navigator.clipboard.writeText('https://luvon-engine.onrender.com/webhook'); window.API.showToast('Webhook copied to clipboard!', 'success');" class="px-3 py-1 bg-brand-600 hover:bg-brand-700 text-white text-[11px] font-sans font-bold rounded-lg cursor-pointer">
-          Copy
-        </button>
+    <!-- 4. Security, Row-Level Isolation & Danger Zone -->
+    <section class="bg-white rounded-2xl border border-brand-200 p-6 shadow-sm space-y-6">
+      <div class="flex items-center gap-2.5 border-b border-brand-200 pb-3">
+        <div class="w-7 h-7 rounded-lg bg-amber-100 text-amber-800 flex items-center justify-center font-bold">
+          <i data-lucide="shield-alert" class="w-4 h-4"></i>
+        </div>
+        <h2 class="text-base font-serif font-bold text-brand-900">Multi-Tenant Isolation & Danger Zone</h2>
       </div>
-    </section>
 
-    <!-- Section 5: Danger Zone -->
-    <section class="bg-rose-50/50 rounded-2xl border border-rose-200 p-6 shadow-sm space-y-4">
-      <div class="flex items-center gap-2 text-rose-800">
-        <i data-lucide="alert-triangle" class="w-5 h-5"></i>
-        <h2 class="text-lg font-serif font-bold">Danger Zone</h2>
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
+        <div class="p-4 bg-brand-50 border border-brand-200 rounded-xl space-y-1">
+          <p class="font-semibold text-brand-900">Active Tenant ID</p>
+          <p id="tenantIdDisplay" class="font-mono text-slate-700 text-xs">Loading...</p>
+          <span class="inline-block mt-1 px-2 py-0.5 bg-emerald-100 text-emerald-800 text-[10px] font-bold rounded">Supabase RLS Enforced</span>
+        </div>
+
+        <div class="p-4 bg-brand-50 border border-brand-200 rounded-xl space-y-1">
+          <p class="font-semibold text-brand-900">Inbound Meta Webhook URL</p>
+          <p class="font-mono text-slate-700 text-[11px] truncate">https://luvonq.changelens.africa/webhook</p>
+          <span class="inline-block mt-1 px-2 py-0.5 bg-emerald-100 text-emerald-800 text-[10px] font-bold rounded">Live WhatsApp & IG Direct</span>
+        </div>
       </div>
-      <p class="text-xs text-rose-700 leading-relaxed max-w-2xl">
-        Permanently delete your merchant workspace, remove all catalog items, drop customer conversation histories, and terminate access. This action is irreversible.
-      </p>
 
-      <div class="pt-2">
-        <button onclick="openDeleteModal()" class="px-5 py-2.5 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs font-bold shadow transition-all flex items-center gap-2 cursor-pointer">
-          <i data-lucide="trash-2" class="w-4 h-4"></i> Delete Merchant Account & Data
+      <div class="p-5 border border-rose-200 bg-rose-50/50 rounded-2xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+        <div>
+          <h3 class="font-bold text-sm text-rose-900">Permanent Account & Workspace Termination</h3>
+          <p class="text-xs text-rose-700 mt-0.5">Permanently delete this merchant workspace, orders, catalog items, and team records.</p>
+        </div>
+        <button type="button" onclick="confirmDeleteAccount()" class="px-5 py-2.5 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs font-bold shadow-md transition-all cursor-pointer flex-shrink-0">
+          Delete Workspace
         </button>
       </div>
     </section>
   </main>
 
-  <!-- Modal: Confirm Delete -->
-  <div id="deleteModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center hidden p-4">
-    <div class="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6 border border-rose-200 space-y-4">
-      <div class="flex items-center justify-between text-rose-700">
-        <div class="flex items-center gap-2">
-          <i data-lucide="alert-octagon" class="w-5 h-5"></i>
-          <h3 class="font-serif font-bold text-base">Terminate Workspace</h3>
+  <!-- Modal: Invite Team Member -->
+  <div id="inviteModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center hidden p-4">
+    <div class="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6 border border-brand-200 space-y-4">
+      <div class="flex items-center justify-between">
+        <div class="flex items-center gap-2.5">
+          <div class="w-8 h-8 rounded-lg bg-brand-100 text-brand-700 flex items-center justify-center font-bold">
+            <i data-lucide="user-plus" class="w-4 h-4"></i>
+          </div>
+          <div>
+            <h3 class="font-serif font-bold text-base text-brand-900">Invite Team Member</h3>
+            <p class="text-[11px] text-slate-500">Dispatches an invite to join your merchant workspace</p>
+          </div>
         </div>
-        <button onclick="closeDeleteModal()" class="text-slate-400 hover:text-slate-600 cursor-pointer">
+        <button onclick="closeInviteModal()" class="text-slate-400 hover:text-slate-600 cursor-pointer">
           <i data-lucide="x" class="w-5 h-5"></i>
         </button>
       </div>
 
-      <p class="text-xs text-slate-600 leading-relaxed">
-        This will permanently wipe all catalog inventory, customer memory graphs, and M-Pesa order attribution data for this workspace.
-      </p>
+      <form onsubmit="handleSendInvite(event)" class="space-y-3.5">
+        <div>
+          <label class="block text-xs font-semibold text-slate-700 mb-1">Staff Email Address</label>
+          <input type="email" id="inviteEmail" required placeholder="agent@store.com" class="w-full px-3.5 py-2.5 bg-brand-50 border border-brand-200 rounded-xl text-xs focus:outline-none focus:border-brand-600" />
+        </div>
 
-      <div class="space-y-1.5">
-        <label class="text-[11px] font-bold text-slate-700">Type <span class="text-rose-600 font-mono">DELETE</span> to confirm:</label>
-        <input 
-          type="text" 
-          id="confirmDeleteInput" 
-          placeholder="DELETE" 
-          class="w-full p-2.5 text-xs bg-slate-50 border border-slate-300 rounded-xl font-mono focus:outline-none focus:border-rose-600"
-        />
-      </div>
+        <div>
+          <label class="block text-xs font-semibold text-slate-700 mb-1">Workspace Role</label>
+          <select id="inviteRole" class="w-full px-3.5 py-2.5 bg-brand-50 border border-brand-200 rounded-xl text-xs focus:outline-none focus:border-brand-600 font-medium text-slate-800">
+            <option value="Sales Concierge">Sales Concierge (Inbox & Orders)</option>
+            <option value="Inventory Manager">Inventory Manager (Stock & Catalog)</option>
+            <option value="Administrator">Workspace Administrator</option>
+          </select>
+        </div>
 
-      <div class="flex items-center justify-end gap-2 pt-2">
-        <button onclick="closeDeleteModal()" class="px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-xl cursor-pointer">
-          Cancel
-        </button>
-        <button onclick="executeAccountDeletion()" id="confirmDeleteBtn" class="px-5 py-2.5 bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold rounded-xl shadow cursor-pointer">
-          Permanently Delete
-        </button>
-      </div>
+        <div class="flex items-center justify-end gap-2 pt-2">
+          <button type="button" onclick="closeInviteModal()" class="px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-xl cursor-pointer">Cancel</button>
+          <button type="submit" id="submitInviteBtn" class="px-5 py-2.5 bg-brand-600 hover:bg-brand-700 text-white rounded-xl text-xs font-bold shadow transition-all cursor-pointer flex items-center gap-2">
+            <i data-lucide="send" class="w-3.5 h-3.5"></i> Send Invitation
+          </button>
+        </div>
+      </form>
     </div>
   </div>
 
   <script src="api.js"></script>
-  <script src="settings.js"></script>
   <script>
     function toggleMobileMenu() {
       const nav = document.getElementById("sidebarNav");
@@ -318,7 +343,248 @@
         lucide.createIcons();
       }
     }
-    document.addEventListener("DOMContentLoaded", renderIcons);
+
+    function openInviteModal() {
+      const modal = document.getElementById('inviteModal');
+      if (modal) {
+        modal.classList.remove('hidden');
+        renderIcons();
+      }
+    }
+
+    function closeInviteModal() {
+      const modal = document.getElementById('inviteModal');
+      if (modal) modal.classList.add('hidden');
+    }
+
+    async function loadWorkspaceData() {
+      const tenantId = window.API?.getTenantId() || localStorage.getItem('luvon_active_tenant_id') || 'luvon_q_flagship';
+      const tenantDisplay = document.getElementById('tenantIdDisplay');
+      if (tenantDisplay) tenantDisplay.textContent = tenantId;
+
+      try {
+        const res = await fetch('/api/tenant/settings', {
+          headers: { 'x-tenant-id': tenantId }
+        });
+        if (res.ok) {
+          const data = await res.json();
+          const t = data.tenant || {};
+          if (t.businessName) document.getElementById('businessNameInput').value = t.businessName;
+          if (t.industry) document.getElementById('industryInput').value = t.industry;
+          if (t.brandSignature) document.getElementById('brandSignatureInput').value = t.brandSignature;
+          if (t.escalationPhone) document.getElementById('escalationPhoneInput').value = t.escalationPhone;
+          if (t.currency) document.getElementById('currencyInput').value = t.currency;
+          if (t.orderPrefix) document.getElementById('orderPrefixInput').value = t.orderPrefix;
+
+          if (t.metaPageId) document.getElementById('metaPageIdInput').value = t.metaPageId;
+          if (t.metaIgBusinessId) document.getElementById('metaIgBusinessIdInput').value = t.metaIgBusinessId;
+          if (t.metaPageAccessToken) document.getElementById('metaPageAccessTokenInput').value = t.metaPageAccessToken;
+        }
+      } catch (e) {
+        console.warn('Could not load workspace settings:', e.message);
+      }
+
+      await loadTeamMembers();
+      renderIcons();
+    }
+
+    async function loadTeamMembers() {
+      const tenantId = window.API?.getTenantId() || localStorage.getItem('luvon_active_tenant_id') || 'luvon_q_flagship';
+      const tbody = document.getElementById('team-table-body');
+      if (!tbody) return;
+
+      try {
+        const res = await fetch('/api/tenant/team', {
+          headers: { 'x-tenant-id': tenantId }
+        });
+        const data = await res.json();
+        const members = data.members || [];
+
+        if (members.length === 0) {
+          tbody.innerHTML = `
+            <tr>
+              <td colspan="5" class="p-6 text-center text-slate-400 font-medium">
+                No staff members invited yet. Use the "+ Invite Member" button to add colleagues.
+              </td>
+            </tr>
+          `;
+          return;
+        }
+
+        tbody.innerHTML = members.map(m => `
+          <tr class="hover:bg-brand-50/40 transition-colors border-b border-slate-100">
+            <td class="p-4 font-semibold text-brand-900">${m.email}</td>
+            <td class="p-4 text-slate-700">${m.role || 'Sales Agent'}</td>
+            <td class="p-4">
+              <span class="px-2 py-0.5 rounded-full text-[10px] font-bold ${m.status === 'Active' ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'}">
+                ${m.status || 'Pending'}
+              </span>
+            </td>
+            <td class="p-4 text-slate-500">${m.invitedAt ? new Date(m.invitedAt).toLocaleDateString() : '—'}</td>
+            <td class="p-4 text-right">
+              <button onclick="removeTeamMember('${m.id}')" class="text-rose-600 hover:text-rose-800 font-semibold text-xs cursor-pointer">Remove</button>
+            </td>
+          </tr>
+        `).join('');
+      } catch (err) {
+        tbody.innerHTML = `<tr><td colspan="5" class="p-6 text-center text-rose-600">${err.message}</td></tr>`;
+      }
+    }
+
+    async function handleSendInvite(e) {
+      e.preventDefault();
+      const email = document.getElementById('inviteEmail').value.trim();
+      const role = document.getElementById('inviteRole').value;
+      const btn = document.getElementById('submitInviteBtn');
+      const tenantId = window.API?.getTenantId() || localStorage.getItem('luvon_active_tenant_id') || 'luvon_q_flagship';
+
+      btn.disabled = true;
+      btn.innerHTML = `<i data-lucide="loader-2" class="w-3.5 h-3.5 animate-spin"></i> Disagreeing...`;
+      renderIcons();
+
+      try {
+        const res = await fetch('/api/tenant/team/invite', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-tenant-id': tenantId
+          },
+          body: JSON.stringify({ email, role })
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Failed to dispatch invite');
+
+        alert(data.message || `Invitation sent to ${email}`);
+        closeInviteModal();
+        document.getElementById('inviteEmail').value = '';
+        await loadTeamMembers();
+      } catch (err) {
+        alert(err.message);
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = `<i data-lucide="send" class="w-3.5 h-3.5"></i> Send Invitation`;
+        renderIcons();
+      }
+    }
+
+    async function removeTeamMember(memberId) {
+      if (!confirm('Are you sure you want to revoke this staff member access?')) return;
+      const tenantId = window.API?.getTenantId() || localStorage.getItem('luvon_active_tenant_id') || 'luvon_q_flagship';
+
+      try {
+        const res = await fetch(`/api/tenant/team/${memberId}`, {
+          method: 'DELETE',
+          headers: { 'x-tenant-id': tenantId }
+        });
+        if (!res.ok) throw new Error('Revoke failed');
+        await loadTeamMembers();
+      } catch (err) {
+        alert(err.message);
+      }
+    }
+
+    async function saveStoreProfile() {
+      const btn = document.getElementById('saveProfileBtn');
+      const tenantId = window.API?.getTenantId() || localStorage.getItem('luvon_active_tenant_id') || 'luvon_q_flagship';
+
+      const payload = {
+        businessName: document.getElementById('businessNameInput').value.trim(),
+        industry: document.getElementById('industryInput').value.trim(),
+        brandSignature: document.getElementById('brandSignatureInput').value.trim(),
+        escalationPhone: document.getElementById('escalationPhoneInput').value.trim(),
+        currency: document.getElementById('currencyInput').value.trim(),
+        orderPrefix: document.getElementById('orderPrefixInput').value.trim()
+      };
+
+      btn.disabled = true;
+      btn.innerHTML = `<i data-lucide="loader-2" class="w-4 h-4 animate-spin"></i> Saving...`;
+      renderIcons();
+
+      try {
+        const res = await fetch('/api/tenant/settings/profile', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-tenant-id': tenantId
+          },
+          body: JSON.stringify(payload)
+        });
+        if (!res.ok) throw new Error('Save failed');
+        localStorage.setItem('luvon_business_name', payload.businessName);
+        alert('Settings saved successfully!');
+      } catch (err) {
+        alert(err.message);
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = `<i data-lucide="save" class="w-4 h-4"></i> Save All Changes`;
+        renderIcons();
+      }
+    }
+
+    async function saveMetaCredentials() {
+      const btn = document.getElementById('saveMetaBtn');
+      const tenantId = window.API?.getTenantId() || localStorage.getItem('luvon_active_tenant_id') || 'luvon_q_flagship';
+
+      const payload = {
+        pageId: document.getElementById('metaPageIdInput').value.trim(),
+        igBusinessId: document.getElementById('metaIgBusinessIdInput').value.trim(),
+        pageAccessToken: document.getElementById('metaPageAccessTokenInput').value.trim()
+      };
+
+      btn.disabled = true;
+      btn.textContent = 'Saving Keys...';
+
+      try {
+        const res = await fetch('/api/tenant/campaigns/credentials', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-tenant-id': tenantId
+          },
+          body: JSON.stringify(payload)
+        });
+        if (!res.ok) throw new Error('Could not save Meta keys');
+        alert('Meta Graph credentials configured successfully.');
+      } catch (err) {
+        alert(err.message);
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = `<i data-lucide="check" class="w-3.5 h-3.5"></i> Save Meta Publishing Keys`;
+        renderIcons();
+      }
+    }
+
+    async function confirmDeleteAccount() {
+      const conf = prompt('To permanently terminate this workspace and delete all data, type DELETE exactly:');
+      if (conf !== 'DELETE') {
+        alert('Action canceled. Input did not match DELETE.');
+        return;
+      }
+
+      const tenantId = window.API?.getTenantId() || localStorage.getItem('luvon_active_tenant_id');
+      try {
+        const res = await fetch('/api/tenant/account', {
+          method: 'DELETE',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-tenant-id': tenantId
+          },
+          body: JSON.stringify({ confirmation: 'DELETE' })
+        });
+        if (!res.ok) throw new Error('Deletion failed');
+        localStorage.clear();
+        sessionStorage.clear();
+        alert('Workspace deleted permanently.');
+        window.location.href = 'index.html';
+      } catch (err) {
+        alert(err.message);
+      }
+    }
+
+    document.addEventListener("DOMContentLoaded", () => {
+      renderIcons();
+      loadWorkspaceData();
+    });
     window.addEventListener("load", renderIcons);
     setTimeout(renderIcons, 250);
   </script>
