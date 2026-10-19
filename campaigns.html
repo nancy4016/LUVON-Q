@@ -179,12 +179,13 @@
               <th class="p-4">Campaign Tag</th>
               <th class="p-4">Scheduled For</th>
               <th class="p-4">Status</th>
-              <th class="p-4 text-right">Meta Post ID</th>
+              <th class="p-4">Meta Post ID</th>
+              <th class="p-4 text-right">Actions</th>
             </tr>
           </thead>
           <tbody id="campaigns-table-body" class="divide-y divide-brand-200/60">
             <tr>
-              <td colspan="7" class="p-8 text-center text-slate-400">Loading campaign posts...</td>
+              <td colspan="8" class="p-8 text-center text-slate-400">Loading campaign posts...</td>
             </tr>
           </tbody>
         </table>
@@ -192,7 +193,7 @@
     </section>
   </main>
 
-  <!-- Modal: Schedule Post with Real-Time Luvon Gold Progress -->
+  <!-- Modal: Schedule Post with Real-Time Progress -->
   <div id="schedulePostModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center hidden p-4">
     <div class="bg-white rounded-2xl shadow-2xl max-w-lg w-full p-6 border border-brand-200 space-y-4 max-h-[90vh] overflow-y-auto">
       <div class="flex items-center justify-between">
@@ -307,7 +308,7 @@
           </div>
         </div>
 
-        <!-- Luvon Gold Real-Time Upload Progress Indicator -->
+        <!-- Luvon Gold Upload Progress Indicator -->
         <div id="luvonUploadProgressCard" class="hidden p-3.5 bg-brand-900 text-white rounded-xl border border-brand-500/40 shadow-inner space-y-2">
           <div class="flex items-center justify-between text-xs font-medium">
             <span id="luvonUploadStatusText" class="flex items-center gap-2 text-brand-200">
@@ -459,7 +460,7 @@
       const video = document.getElementById('campaignVideoPreview');
       const payloadInput = document.getElementById('postMediaPayload');
 
-      // For luvon-demo.mp4 or video assets, reference the canonical hosted route to avoid 413 base64 overhead
+      // Canonical hosted route resolution for local demo assets
       if (file.name === 'luvon-demo.mp4' || isVideo) {
         payloadInput.value = `${window.location.origin}/luvon-demo.mp4`;
       }
@@ -525,7 +526,7 @@
         if (!Array.isArray(posts) || posts.length === 0) {
           tbody.innerHTML = `
             <tr>
-              <td colspan="7" class="p-8 text-center text-slate-400 font-medium">
+              <td colspan="8" class="p-8 text-center text-slate-400 font-medium">
                 No campaign posts queued yet. Click "+ Create Campaign Post" above to schedule your first post.
               </td>
             </tr>
@@ -552,21 +553,51 @@
             : `<span class="text-slate-400">—</span>`;
 
           return `
-            <tr class="hover:bg-brand-50/40 transition-colors border-b border-slate-100">
+            <tr class="hover:bg-brand-50/40 transition-colors border-b border-slate-100" id="post-row-${post.id}">
               <td class="p-4 font-semibold uppercase text-brand-900">${post.platform}</td>
               <td class="p-4">${mediaPreview}</td>
               <td class="p-4 max-w-xs truncate font-medium text-slate-700" title="${post.caption}">${post.caption}</td>
               <td class="p-4 font-mono text-[11px] text-brand-700 font-semibold">${post.campaign_tag || 'PROMO'}</td>
               <td class="p-4 text-slate-600">${dateStr}</td>
               <td class="p-4">${statusBadge}</td>
-              <td class="p-4 text-right font-mono text-[11px] text-slate-500">${post.platform_post_id || post.error_message || '—'}</td>
+              <td class="p-4 font-mono text-[11px] text-slate-500">${post.platform_post_id || post.error_message || '—'}</td>
+              <td class="p-4 text-right">
+                <button 
+                  type="button"
+                  onclick="deleteCampaignPost('${post.id}')"
+                  class="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer inline-flex items-center gap-1"
+                  title="Delete Post"
+                >
+                  <i data-lucide="trash-2" class="w-4 h-4"></i>
+                </button>
+              </td>
             </tr>
           `;
         }).join('');
 
         renderIcons();
       } catch (err) {
-        tbody.innerHTML = `<tr><td colspan="7" class="p-6 text-center text-rose-600 font-medium">${err.message}</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="8" class="p-6 text-center text-rose-600 font-medium">${err.message}</td></tr>`;
+      }
+    }
+
+    // Delete post handler
+    async function deleteCampaignPost(postId) {
+      if (!confirm('Are you sure you want to delete this scheduled post?')) return;
+      const tenantId = localStorage.getItem('luvon_active_tenant_id') || 'luvon_q_flagship';
+
+      try {
+        const res = await fetch(`/api/tenant/campaigns/posts/${postId}`, {
+          method: 'DELETE',
+          headers: { 'x-tenant-id': tenantId }
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Failed to delete post');
+
+        // Refresh table and counters
+        await loadCampaignPosts();
+      } catch (err) {
+        alert(err.message);
       }
     }
 
@@ -625,7 +656,6 @@
       xhr.setRequestHeader('Content-Type', 'application/json');
       xhr.setRequestHeader('x-tenant-id', tenantId);
 
-      // Real-time Upload Progress Tracking
       xhr.upload.onprogress = function(event) {
         if (event.lengthComputable) {
           const percent = Math.round((event.loaded / event.total) * 90);
@@ -642,7 +672,6 @@
         try {
           responseData = JSON.parse(xhr.responseText);
         } catch (jsonErr) {
-          // Detect HTML error responses gracefully
           console.error('Non-JSON response from server:', xhr.responseText);
         }
 

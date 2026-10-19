@@ -25,7 +25,12 @@ console.log("🗄️ Supabase REST Host:", SUPABASE_URL);
 console.log("🛡️ Supabase Service Role Key:", SUPABASE_SERVICE_ROLE_KEY ? "CONFIGURED" : "❌ MISSING");
 
 const app = express();
-app.use(express.json());
+
+// ==========================================
+// HIGH CAPACITY BODY PARSER & STATIC ASSETS
+// ==========================================
+app.use(express.json({ limit: '50mb' }));
+app.use(express.urlencoded({ limit: '50mb', extended: true }));
 app.use(express.static(path.join(__dirname)));
 
 app.use((req, res, next) => {
@@ -884,6 +889,22 @@ app.get('/api/tenant/campaigns/posts', tenantMiddleware, async (req, res) => {
   }
 });
 
+// Delete a scheduled, published, or failed post with tenant isolation check
+app.delete('/api/tenant/campaigns/posts/:id', tenantMiddleware, async (req, res) => {
+  const { id } = req.params;
+  if (!id) return res.status(400).json({ error: "Post ID is required." });
+
+  try {
+    await axios.delete(
+      `${SUPABASE_URL}/rest/v1/scheduled_posts?id=eq.${id}&tenant_id=eq.${req.tenant.id}`,
+      { headers: supabaseHeaders }
+    );
+    res.json({ success: true, message: "Campaign post deleted successfully." });
+  } catch (err) {
+    res.status(500).json({ error: err.response?.data?.message || err.message });
+  }
+});
+
 app.post('/api/tenant/campaigns/schedule', tenantMiddleware, async (req, res) => {
   const { platform, mediaType, mediaUrl, caption, scheduledAt, campaignTag } = req.body;
 
@@ -901,12 +922,19 @@ app.post('/api/tenant/campaigns/schedule', tenantMiddleware, async (req, res) =>
     processedCaption += `\n\n💬 Order / Inquire via WhatsApp: ${whatsappUrl}`;
   }
 
+  // Canonical hosted route resolution for local video demo
+  let cleanMediaUrl = mediaUrl || null;
+  const serverBaseUrl = (process.env.SERVER_URL || "https://luvonq.changelens.africa").replace(/\/$/, "");
+  if (!cleanMediaUrl && (mediaType === 'REELS' || mediaType === 'VIDEO')) {
+    cleanMediaUrl = `${serverBaseUrl}/luvon-demo.mp4`;
+  }
+
   try {
     const postRecord = {
       tenant_id: req.tenant.id,
       platform: platform || 'both',
       media_type: mediaType || 'IMAGE',
-      media_url: mediaUrl || null,
+      media_url: cleanMediaUrl,
       caption: processedCaption,
       campaign_tag: tag,
       status: 'scheduled',
@@ -1218,7 +1246,20 @@ app.get('/', (req, res) => {
 });
 
 // ==========================================
-// 10. SERVER BOOTSTRAP (RENDER PRODUCTION COMPLIANT)
+// 10. GLOBAL ERROR HANDLER (ENSURES STRICT JSON RESPONSES)
+// ==========================================
+app.use((err, req, res, next) => {
+  if (err.type === 'entity.too.large') {
+    return res.status(413).json({
+      error: "Creative file exceeds maximum size limit (50MB). Please select a compressed image or video."
+    });
+  }
+  console.error("❌ Internal Server Exception:", err.message);
+  res.status(err.status || 500).json({ error: err.message || "An unexpected error occurred." });
+});
+
+// ==========================================
+// 11. SERVER BOOTSTRAP (RENDER PRODUCTION COMPLIANT)
 // ==========================================
 const PORT = process.env.PORT || 10000;
 app.listen(PORT, '0.0.0.0', () => {
