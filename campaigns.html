@@ -124,10 +124,10 @@
         <p class="text-xs text-slate-500 mt-1">Autonomous Meta scheduling with Click-to-WhatsApp order attribution</p>
       </div>
       <div class="flex items-center gap-3">
-        <button onclick="openCredentialsModal()" class="px-4 py-2 text-xs font-semibold text-slate-700 bg-white border border-slate-200 hover:bg-slate-50 rounded-xl transition-all flex items-center gap-2 cursor-pointer shadow-sm">
+        <button onclick="checkAuthAndOpen(openCredentialsModal)" class="px-4 py-2 text-xs font-semibold text-slate-700 bg-white border border-slate-200 hover:bg-slate-50 rounded-xl transition-all flex items-center gap-2 cursor-pointer shadow-sm">
           <i data-lucide="key" class="w-3.5 h-3.5 text-brand-600"></i> Meta Credentials
         </button>
-        <button onclick="openScheduleModal()" class="px-4 py-2 text-xs font-semibold text-white bg-brand-600 hover:bg-brand-700 rounded-xl transition-all flex items-center gap-2 cursor-pointer shadow-sm">
+        <button onclick="checkAuthAndOpen(openScheduleModal)" class="px-4 py-2 text-xs font-semibold text-white bg-brand-600 hover:bg-brand-700 rounded-xl transition-all flex items-center gap-2 cursor-pointer shadow-sm">
           <i data-lucide="plus" class="w-3.5 h-3.5"></i> Create Campaign Post
         </button>
       </div>
@@ -192,9 +192,9 @@
     </section>
   </main>
 
-  <!-- Modal: Schedule Post -->
+  <!-- Modal: Schedule Post with Drag-and-Drop & Visual Preview -->
   <div id="schedulePostModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center hidden p-4">
-    <div class="bg-white rounded-2xl shadow-2xl max-w-lg w-full p-6 border border-brand-200 space-y-4">
+    <div class="bg-white rounded-2xl shadow-2xl max-w-lg w-full p-6 border border-brand-200 space-y-4 max-h-[90vh] overflow-y-auto">
       <div class="flex items-center justify-between">
         <div class="flex items-center gap-2.5">
           <div class="w-8 h-8 rounded-lg bg-brand-100 text-brand-700 flex items-center justify-center font-bold">
@@ -222,7 +222,7 @@
           </div>
           <div>
             <label class="block text-xs font-semibold text-slate-700 mb-1">Media Type</label>
-            <select id="postMediaType" class="w-full p-2.5 bg-brand-50 border border-brand-200 rounded-xl text-xs text-slate-800 focus:outline-none focus:border-brand-600">
+            <select id="postMediaType" onchange="handleMediaTypeChange(this.value)" class="w-full p-2.5 bg-brand-50 border border-brand-200 rounded-xl text-xs text-slate-800 focus:outline-none focus:border-brand-600">
               <option value="IMAGE">Photo / Graphic</option>
               <option value="REELS">Reels / Video (MP4)</option>
               <option value="TEXT">Text Status (FB Only)</option>
@@ -230,15 +230,50 @@
           </div>
         </div>
 
-        <div>
-          <label class="block text-xs font-semibold text-slate-700 mb-1">Public Media URL (HTTPS)</label>
-          <input 
-            type="url" 
-            id="postMediaUrl" 
-            placeholder="https://example.com/assets/shoe-drop.jpg" 
-            class="w-full p-2.5 bg-brand-50 border border-brand-200 rounded-xl text-xs text-slate-800 focus:outline-none focus:border-brand-600"
-          />
-          <p class="text-[10px] text-slate-400 mt-1">Must be a public HTTPS link accessible by Meta's crawler.</p>
+        <!-- Modern Media Drop Zone -->
+        <div id="mediaUploadContainer">
+          <label class="block text-xs font-semibold text-slate-700 mb-1">Campaign Creative Asset</label>
+          <div 
+            id="campaignDropZone" 
+            onclick="document.getElementById('campaignFileInput').click()"
+            ondragover="handleDragOver(event, this)"
+            ondragleave="handleDragLeave(event, this)"
+            ondrop="handleCampaignFileDrop(event)"
+            class="relative border-2 border-dashed border-brand-300 hover:border-brand-600 bg-brand-50/50 hover:bg-brand-50 rounded-2xl p-5 text-center cursor-pointer transition-all group"
+          >
+            <input 
+              type="file" 
+              id="campaignFileInput" 
+              accept="image/*,video/mp4" 
+              class="hidden" 
+              onchange="handleCampaignFileSelect(this)" 
+            />
+
+            <!-- Empty Drop Prompt -->
+            <div id="campaignDropPrompt" class="space-y-2">
+              <div class="w-10 h-10 mx-auto rounded-full bg-brand-100 text-brand-700 flex items-center justify-center group-hover:scale-110 transition-transform">
+                <i data-lucide="cloud-upload" class="w-5 h-5"></i>
+              </div>
+              <p class="text-xs font-semibold text-brand-900">Drag & Drop media here, or <span class="text-brand-600 underline">browse</span></p>
+              <p class="text-[10px] text-slate-400">Supports PNG, JPG, WebP, or MP4 Video (Max 50MB)</p>
+            </div>
+
+            <!-- Visual Preview Container -->
+            <div id="campaignMediaPreviewWrapper" class="hidden relative rounded-xl overflow-hidden max-h-56 mx-auto border border-brand-200">
+              <img id="campaignImagePreview" src="" alt="Preview" class="w-full h-auto object-cover max-h-56 mx-auto hidden" />
+              <video id="campaignVideoPreview" controls class="w-full h-auto max-h-56 mx-auto hidden"></video>
+              <button 
+                type="button" 
+                onclick="clearCampaignMedia(event)" 
+                class="absolute top-2 right-2 p-1.5 bg-black/70 hover:bg-rose-600 text-white rounded-full transition-colors cursor-pointer"
+                title="Remove Media"
+              >
+                <i data-lucide="x" class="w-3.5 h-3.5"></i>
+              </button>
+            </div>
+          </div>
+          <!-- Hidden storage for payload URL / base64 -->
+          <input type="hidden" id="postMediaPayload" />
         </div>
 
         <div>
@@ -247,7 +282,7 @@
             id="postCaption" 
             rows="3" 
             required
-            placeholder="Exclusive weekend drop! Premium Air Jordan 1s now in stock. Order directly via WhatsApp below..." 
+            placeholder="Exclusive drop! Premium Air Jordans now in stock. Tap below to chat with our AI on WhatsApp..." 
             class="w-full p-2.5 bg-brand-50 border border-brand-200 rounded-xl text-xs text-slate-800 focus:outline-none focus:border-brand-600"
           ></textarea>
         </div>
@@ -338,6 +373,20 @@
       }
     }
 
+    function checkAuthAndOpen(modalOpenerFn) {
+      const activeTenant = localStorage.getItem('luvon_active_tenant_id');
+      const user = localStorage.getItem('luvon_user');
+      if (!activeTenant || activeTenant === 'anonymous' || !user) {
+        if (typeof openSignInModal === 'function') {
+          openSignInModal();
+        } else {
+          alert('Please sign in to manage or schedule campaigns.');
+        }
+        return;
+      }
+      modalOpenerFn();
+    }
+
     function openScheduleModal() {
       const modal = document.getElementById('schedulePostModal');
       if (modal) {
@@ -362,6 +411,88 @@
     function closeCredentialsModal() {
       const modal = document.getElementById('metaCredentialsModal');
       if (modal) modal.classList.add('hidden');
+    }
+
+    // ==========================================
+    // DRAG-AND-DROP & PREVIEW LOGIC
+    // ==========================================
+    function handleDragOver(e, el) {
+      e.preventDefault();
+      el.classList.add('border-brand-600', 'bg-brand-100/50');
+    }
+
+    function handleDragLeave(e, el) {
+      e.preventDefault();
+      el.classList.remove('border-brand-600', 'bg-brand-100/50');
+    }
+
+    function handleCampaignFileDrop(e) {
+      e.preventDefault();
+      const dropZone = document.getElementById('campaignDropZone');
+      dropZone.classList.remove('border-brand-600', 'bg-brand-100/50');
+      if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+        processUploadedFile(e.dataTransfer.files[0]);
+      }
+    }
+
+    function handleCampaignFileSelect(input) {
+      if (input.files && input.files[0]) {
+        processUploadedFile(input.files[0]);
+      }
+    }
+
+    function processUploadedFile(file) {
+      const reader = new FileReader();
+      const isVideo = file.type.startsWith('video/');
+
+      reader.onload = function(e) {
+        const payloadInput = document.getElementById('postMediaPayload');
+        const prompt = document.getElementById('campaignDropPrompt');
+        const wrapper = document.getElementById('campaignMediaPreviewWrapper');
+        const img = document.getElementById('campaignImagePreview');
+        const video = document.getElementById('campaignVideoPreview');
+
+        payloadInput.value = e.target.result;
+        prompt.classList.add('hidden');
+        wrapper.classList.remove('hidden');
+
+        if (isVideo) {
+          img.classList.add('hidden');
+          video.src = e.target.result;
+          video.classList.remove('hidden');
+          document.getElementById('postMediaType').value = 'REELS';
+        } else {
+          video.classList.add('hidden');
+          img.src = e.target.result;
+          img.classList.remove('hidden');
+          document.getElementById('postMediaType').value = 'IMAGE';
+        }
+        renderIcons();
+      };
+      reader.readAsDataURL(file);
+    }
+
+    function clearCampaignMedia(e) {
+      if (e) e.stopPropagation();
+      document.getElementById('campaignFileInput').value = '';
+      document.getElementById('postMediaPayload').value = '';
+      document.getElementById('campaignImagePreview').src = '';
+      document.getElementById('campaignVideoPreview').src = '';
+      document.getElementById('campaignImagePreview').classList.add('hidden');
+      document.getElementById('campaignVideoPreview').classList.add('hidden');
+      document.getElementById('campaignMediaPreviewWrapper').classList.add('hidden');
+      document.getElementById('campaignDropPrompt').classList.remove('hidden');
+      renderIcons();
+    }
+
+    function handleMediaTypeChange(val) {
+      const container = document.getElementById('mediaUploadContainer');
+      if (val === 'TEXT') {
+        container.classList.add('opacity-40', 'pointer-events-none');
+        clearCampaignMedia();
+      } else {
+        container.classList.remove('opacity-40', 'pointer-events-none');
+      }
     }
 
     async function loadCampaignPosts() {
@@ -441,7 +572,7 @@
       const payload = {
         platform: document.getElementById('postPlatform').value,
         mediaType: document.getElementById('postMediaType').value,
-        mediaUrl: document.getElementById('postMediaUrl').value.trim() || null,
+        mediaUrl: document.getElementById('postMediaPayload').value.trim() || null,
         caption: document.getElementById('postCaption').value.trim(),
         campaignTag: document.getElementById('postCampaignTag').value.trim() || 'PROMO',
         scheduledAt: document.getElementById('postScheduledAt').value
@@ -471,7 +602,7 @@
 
         closeScheduleModal();
         document.getElementById('postCaption').value = '';
-        document.getElementById('postMediaUrl').value = '';
+        clearCampaignMedia();
         loadCampaignPosts();
       } catch (err) {
         alert(err.message);
@@ -521,7 +652,6 @@
       renderIcons();
       loadCampaignPosts();
       
-      // Default datetime-local input to 1 hour from now
       const dateInput = document.getElementById('postScheduledAt');
       if (dateInput) {
         const defaultTime = new Date(Date.now() + 60 * 60 * 1000);

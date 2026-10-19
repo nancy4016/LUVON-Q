@@ -128,7 +128,7 @@
         <h1 class="text-2xl font-serif font-bold text-brand-900">Live Inventory & Catalog Manager</h1>
         <p class="text-xs text-slate-500 mt-1">Manage stock availability and products synced to conversational AI agents</p>
       </div>
-      <button id="open-modal-btn" class="px-5 py-2.5 bg-brand-600 hover:bg-brand-700 text-white rounded-xl text-xs font-semibold shadow transition-all flex items-center gap-2 cursor-pointer">
+      <button id="open-modal-btn" onclick="checkAuthAndOpenProductModal()" class="px-5 py-2.5 bg-brand-600 hover:bg-brand-700 text-white rounded-xl text-xs font-semibold shadow transition-all flex items-center gap-2 cursor-pointer">
         <i data-lucide="plus" class="w-4 h-4"></i> Add New Product
       </button>
     </header>
@@ -152,7 +152,7 @@
       </div>
     </div>
 
-    <!-- Product Table -->
+    <!-- Product Grid / Table -->
     <div class="bg-white rounded-xl border border-brand-200 shadow-sm overflow-hidden">
       <div class="overflow-x-auto">
         <table class="w-full text-left text-xs text-slate-600">
@@ -173,23 +173,23 @@
     </div>
   </main>
 
-  <!-- Add Product Modal Overlay -->
+  <!-- Add Product Modal Overlay with Modern Drag-and-Drop -->
   <div id="product-modal" class="fixed inset-0 z-50 hidden bg-brand-900/60 backdrop-blur-sm flex items-center justify-center p-4">
-    <div class="bg-white rounded-2xl border border-brand-200 max-w-lg w-full p-6 shadow-2xl space-y-5 animate-in fade-in zoom-in duration-200">
-      <div class="flex items-center justify-between border-b border-brand-200 pb-4">
+    <div class="bg-white rounded-2xl border border-brand-200 max-w-lg w-full p-6 shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto">
+      <div class="flex items-center justify-between border-b border-brand-200 pb-3">
         <h3 class="font-serif font-bold text-lg text-brand-900">Add New Catalog Item</h3>
         <button id="close-modal-btn" class="text-slate-400 hover:text-brand-900 transition-colors cursor-pointer">
           <i data-lucide="x" class="w-5 h-5"></i>
         </button>
       </div>
 
-      <form id="product-form" class="space-y-4">
+      <form id="product-form" class="space-y-3.5">
         <div>
           <label class="block text-xs font-semibold text-brand-900 mb-1">Item Name</label>
           <input type="text" id="prod-name" required placeholder="e.g. Air Force 1 White" class="w-full px-4 py-2.5 text-xs bg-brand-50 border border-brand-200 rounded-xl focus:outline-none focus:border-brand-600 font-medium" />
         </div>
 
-        <div class="grid grid-cols-2 gap-4">
+        <div class="grid grid-cols-2 gap-3">
           <div>
             <label class="block text-xs font-semibold text-brand-900 mb-1">Price (KSh)</label>
             <input type="number" id="prod-price" required placeholder="2500" class="w-full px-4 py-2.5 text-xs bg-brand-50 border border-brand-200 rounded-xl focus:outline-none focus:border-brand-600 font-medium" />
@@ -213,14 +213,54 @@
           </select>
         </div>
 
+        <!-- Modern Product Image Drag-and-Drop Zone -->
         <div>
-          <label class="block text-xs font-semibold text-brand-900 mb-1">Image URL (Optional)</label>
-          <input type="url" id="prod-image" placeholder="https://images.unsplash.com/..." class="w-full px-4 py-2.5 text-xs bg-brand-50 border border-brand-200 rounded-xl focus:outline-none focus:border-brand-600 font-medium" />
+          <label class="block text-xs font-semibold text-brand-900 mb-1">Product Media Asset</label>
+          <div 
+            id="productDropZone" 
+            onclick="document.getElementById('productFileInput').click()"
+            ondragover="handleCatalogDragOver(event, this)"
+            ondragleave="handleCatalogDragLeave(event, this)"
+            ondrop="handleCatalogFileDrop(event)"
+            class="relative border-2 border-dashed border-brand-300 hover:border-brand-600 bg-brand-50/50 hover:bg-brand-50 rounded-2xl p-4 text-center cursor-pointer transition-all group"
+          >
+            <input 
+              type="file" 
+              id="productFileInput" 
+              accept="image/*" 
+              class="hidden" 
+              onchange="handleCatalogFileSelect(this)" 
+            />
+
+            <!-- Empty Drop Prompt -->
+            <div id="productDropPrompt" class="space-y-1.5">
+              <div class="w-9 h-9 mx-auto rounded-full bg-brand-100 text-brand-700 flex items-center justify-center group-hover:scale-110 transition-transform">
+                <i data-lucide="image-plus" class="w-4 h-4"></i>
+              </div>
+              <p class="text-xs font-semibold text-brand-900">Drag & Drop photo here, or <span class="text-brand-600 underline">browse</span></p>
+              <p class="text-[10px] text-slate-400">PNG, JPG, or WebP</p>
+            </div>
+
+            <!-- Preview Container -->
+            <div id="productMediaPreviewWrapper" class="hidden relative rounded-xl overflow-hidden max-h-44 mx-auto border border-brand-200">
+              <img id="productImagePreview" src="" alt="Preview" class="w-full h-auto object-cover max-h-44 mx-auto" />
+              <button 
+                type="button" 
+                onclick="clearCatalogMedia(event)" 
+                class="absolute top-2 right-2 p-1.5 bg-black/70 hover:bg-rose-600 text-white rounded-full transition-colors cursor-pointer"
+                title="Remove Media"
+              >
+                <i data-lucide="x" class="w-3.5 h-3.5"></i>
+              </button>
+            </div>
+          </div>
+          <!-- Hidden storage for payload URL / base64 -->
+          <input type="hidden" id="prod-image-payload" />
         </div>
 
-        <div class="pt-4 flex items-center justify-end gap-3">
+        <div class="pt-3 flex items-center justify-end gap-3 border-t border-brand-200">
           <button type="button" id="cancel-modal-btn" class="px-4 py-2.5 text-xs font-semibold text-slate-600 hover:bg-brand-50 rounded-xl transition-all cursor-pointer">Cancel</button>
-          <button type="submit" class="px-5 py-2.5 bg-brand-600 hover:bg-brand-700 text-white text-xs font-semibold rounded-xl shadow transition-all cursor-pointer">Save to Catalog</button>
+          <button type="submit" id="saveProductBtn" class="px-5 py-2.5 bg-brand-600 hover:bg-brand-700 text-white text-xs font-semibold rounded-xl shadow transition-all cursor-pointer">Save to Catalog</button>
         </div>
       </form>
     </div>
@@ -242,6 +282,75 @@
         lucide.createIcons();
       }
     }
+
+    function checkAuthAndOpenProductModal() {
+      const activeTenant = localStorage.getItem('luvon_active_tenant_id');
+      const user = localStorage.getItem('luvon_user');
+      if (!activeTenant || activeTenant === 'anonymous' || !user) {
+        if (typeof openSignInModal === 'function') {
+          openSignInModal();
+        } else {
+          alert('Please sign in to access and manage your private store catalog.');
+        }
+        return;
+      }
+      const modal = document.getElementById('product-modal');
+      if (modal) modal.classList.remove('hidden');
+      renderIcons();
+    }
+
+    // ==========================================
+    // CATALOG IMAGE DRAG-AND-DROP & PREVIEW
+    // ==========================================
+    function handleCatalogDragOver(e, el) {
+      e.preventDefault();
+      el.classList.add('border-brand-600', 'bg-brand-100/50');
+    }
+
+    function handleCatalogDragLeave(e, el) {
+      e.preventDefault();
+      el.classList.remove('border-brand-600', 'bg-brand-100/50');
+    }
+
+    function handleCatalogFileDrop(e) {
+      e.preventDefault();
+      const dropZone = document.getElementById('productDropZone');
+      dropZone.classList.remove('border-brand-600', 'bg-brand-100/50');
+      if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+        processCatalogFile(e.dataTransfer.files[0]);
+      }
+    }
+
+    function handleCatalogFileSelect(input) {
+      if (input.files && input.files[0]) {
+        processCatalogFile(input.files[0]);
+      }
+    }
+
+    function processCatalogFile(file) {
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        document.getElementById('prod-image-payload').value = e.target.result;
+        document.getElementById('productDropPrompt').classList.add('hidden');
+        const wrapper = document.getElementById('productMediaPreviewWrapper');
+        const img = document.getElementById('productImagePreview');
+        img.src = e.target.result;
+        wrapper.classList.remove('hidden');
+        renderIcons();
+      };
+      reader.readAsDataURL(file);
+    }
+
+    function clearCatalogMedia(e) {
+      if (e) e.stopPropagation();
+      document.getElementById('productFileInput').value = '';
+      document.getElementById('prod-image-payload').value = '';
+      document.getElementById('productImagePreview').src = '';
+      document.getElementById('productMediaPreviewWrapper').classList.add('hidden');
+      document.getElementById('productDropPrompt').classList.remove('hidden');
+      renderIcons();
+    }
+
     document.addEventListener("DOMContentLoaded", renderIcons);
     window.addEventListener("load", renderIcons);
     setTimeout(renderIcons, 250);
