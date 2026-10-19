@@ -1,4 +1,4 @@
-// api.js - Luvon Q Production Client Bridge
+// api.js - Luvon Q Production Client Bridge & Luxury Feedback System
 (function () {
   const BASE_URL = (typeof window !== 'undefined' && window.location.origin && window.location.origin.includes('http') && !window.location.origin.includes('localhost'))
     ? window.location.origin
@@ -8,46 +8,191 @@
   const SUPABASE_ANON_KEY = 'sb_publishable_DhTvZ4K5YCYLXErehDkBFQ_noylBgEH';
 
   function getActiveTenantId() {
-    return localStorage.getItem('luvon_active_tenant_id') || 'luvon_q_flagship';
+    return localStorage.getItem('luvon_active_tenant_id') || 
+           localStorage.getItem('luvon_tenant_id') || 
+           'luvon_q_flagship';
   }
 
-  function showNotification(message, type = 'info') {
+  function setTenantId(tenantId) {
+    if (!tenantId) return;
+    localStorage.setItem('luvon_active_tenant_id', tenantId);
+    localStorage.setItem('luvon_tenant_id', tenantId);
+  }
+
+  // ========================================================
+  // LUVON LUXURY NOTIFICATION (TOAST) ENGINE
+  // ========================================================
+  function initToastContainer() {
     let container = document.getElementById('luvon-toast-container');
     if (!container) {
       container = document.createElement('div');
       container.id = 'luvon-toast-container';
-      container.className = 'fixed bottom-5 right-5 z-50 flex flex-col gap-2.5 max-w-sm pointer-events-none';
+      container.className = 'fixed bottom-6 right-6 z-[99999] flex flex-col gap-3 pointer-events-none max-w-sm w-full px-4';
       document.body.appendChild(container);
     }
+    return container;
+  }
 
+  function showToast(message, type = 'info') {
+    const container = initToastContainer();
     const toast = document.createElement('div');
-    toast.className = `p-4 rounded-xl shadow-2xl flex items-center gap-3 text-xs font-semibold border pointer-events-auto transition-all duration-300 transform translate-y-3 opacity-0 ${
-      type === 'success' 
-        ? 'bg-stone-900 text-brand-100 border-brand-500/50' 
-        : type === 'error'
-        ? 'bg-rose-950 text-rose-100 border-rose-800'
-        : 'bg-stone-900 text-stone-200 border-stone-800'
-    }`;
 
-    const indicatorHtml = type === 'success' 
-      ? '<span class="w-2 h-2 rounded-full bg-brand-500 flex-shrink-0 animate-ping"></span>' 
-      : type === 'error'
-      ? '<span class="w-2 h-2 rounded-full bg-rose-500 flex-shrink-0"></span>'
-      : '<span class="w-2 h-2 rounded-full bg-slate-400 flex-shrink-0"></span>';
+    let borderStyle = 'border-brand-500/40';
+    let bgStyle = 'bg-[#1c1917]/95 text-white';
+    let iconSvg = '<i data-lucide="info" class="w-4 h-4 text-brand-400"></i>';
 
-    toast.innerHTML = `${indicatorHtml}<div class="flex-1 leading-snug">${message}</div>`;
+    if (type === 'success') {
+      borderStyle = 'border-emerald-500/50';
+      iconSvg = '<i data-lucide="check-circle-2" class="w-4 h-4 text-emerald-400"></i>';
+    } else if (type === 'error') {
+      borderStyle = 'border-rose-500/50';
+      iconSvg = '<i data-lucide="alert-circle" class="w-4 h-4 text-rose-400"></i>';
+    } else if (type === 'warning') {
+      borderStyle = 'border-amber-500/50';
+      iconSvg = '<i data-lucide="alert-triangle" class="w-4 h-4 text-amber-400"></i>';
+    }
+
+    toast.className = `pointer-events-auto transform transition-all duration-300 ease-out translate-y-4 opacity-0 flex items-center gap-3 p-4 rounded-2xl shadow-2xl backdrop-blur-md border ${borderStyle} ${bgStyle} font-sans text-xs`;
+    toast.innerHTML = `
+      <div class="flex-shrink-0 flex items-center justify-center">${iconSvg}</div>
+      <div class="flex-1 font-medium leading-relaxed">${message}</div>
+      <button type="button" class="text-white/40 hover:text-white p-1 transition-colors cursor-pointer" onclick="this.parentElement.remove()">
+        <i data-lucide="x" class="w-3.5 h-3.5"></i>
+      </button>
+    `;
+
     container.appendChild(toast);
+    if (window.lucide && typeof window.lucide.createIcons === 'function') {
+      lucide.createIcons({ root: toast });
+    }
 
     requestAnimationFrame(() => {
-      toast.classList.remove('translate-y-3', 'opacity-0');
+      toast.classList.remove('translate-y-4', 'opacity-0');
       toast.classList.add('translate-y-0', 'opacity-100');
     });
 
     setTimeout(() => {
-      toast.classList.add('opacity-0', 'translate-y-3');
-      setTimeout(() => toast.remove(), 350);
-    }, 4500);
+      toast.classList.add('opacity-0', 'translate-y-2');
+      setTimeout(() => toast.remove(), 300);
+    }, 4200);
   }
+
+  // ========================================================
+  // LUVON LUXURY CONFIRMATION MODAL (REPLACES confirm())
+  // ========================================================
+  function showConfirmModal({ title = "Are you sure?", message, confirmText = "Confirm", isDanger = false }) {
+    return new Promise((resolve) => {
+      const modal = document.createElement('div');
+      modal.className = 'fixed inset-0 z-[999999] bg-stone-950/70 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-200';
+      
+      const btnColor = isDanger 
+        ? 'bg-rose-600 hover:bg-rose-700 text-white' 
+        : 'bg-brand-600 hover:bg-brand-500 text-white';
+
+      modal.innerHTML = `
+        <div class="bg-white rounded-2xl border border-brand-200/80 shadow-2xl max-w-sm w-full p-6 space-y-4 transform transition-all">
+          <div class="flex items-center gap-3">
+            <div class="w-9 h-9 rounded-xl ${isDanger ? 'bg-rose-100 text-rose-700' : 'bg-brand-100 text-brand-700'} flex items-center justify-center flex-shrink-0">
+              <i data-lucide="${isDanger ? 'alert-triangle' : 'help-circle'}" class="w-5 h-5"></i>
+            </div>
+            <div>
+              <h3 class="font-serif font-bold text-base text-brand-900">${title}</h3>
+              <p class="text-xs text-slate-500 mt-0.5">${message || 'Please confirm to proceed with this operation.'}</p>
+            </div>
+          </div>
+          <div class="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
+            <button id="modal-cancel-btn" class="px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-xl transition-all cursor-pointer">
+              Cancel
+            </button>
+            <button id="modal-confirm-btn" class="px-5 py-2 text-xs font-bold rounded-xl shadow-md transition-all cursor-pointer ${btnColor}">
+              ${confirmText}
+            </button>
+          </div>
+        </div>
+      `;
+
+      document.body.appendChild(modal);
+      if (window.lucide && typeof window.lucide.createIcons === 'function') {
+        lucide.createIcons({ root: modal });
+      }
+
+      modal.querySelector('#modal-cancel-btn').onclick = () => {
+        modal.remove();
+        resolve(false);
+      };
+      modal.querySelector('#modal-confirm-btn').onclick = () => {
+        modal.remove();
+        resolve(true);
+      };
+    });
+  }
+
+  // ========================================================
+  // LUVON LUXURY INPUT PROMPT MODAL (REPLACES prompt())
+  // ========================================================
+  function showPromptModal({ title, subtitle, placeholder = "Type here...", confirmText = "Submit", isDanger = false }) {
+    return new Promise((resolve) => {
+      const modal = document.createElement('div');
+      modal.className = 'fixed inset-0 z-[999999] bg-stone-950/70 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-200';
+
+      const btnColor = isDanger 
+        ? 'bg-rose-600 hover:bg-rose-700 text-white' 
+        : 'bg-brand-600 hover:bg-brand-500 text-white';
+
+      modal.innerHTML = `
+        <div class="bg-white rounded-2xl border border-brand-200/80 shadow-2xl max-w-sm w-full p-6 space-y-4">
+          <div class="space-y-1">
+            <h3 class="font-serif font-bold text-base text-brand-900">${title}</h3>
+            ${subtitle ? `<p class="text-xs text-slate-500">${subtitle}</p>` : ''}
+          </div>
+          <input 
+            type="text" 
+            id="prompt-input-value" 
+            placeholder="${placeholder}" 
+            class="w-full px-3.5 py-2.5 bg-brand-50 border border-brand-200 rounded-xl text-xs font-medium text-slate-900 focus:outline-none focus:border-brand-600"
+          />
+          <div class="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
+            <button id="prompt-cancel-btn" class="px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-xl cursor-pointer">
+              Cancel
+            </button>
+            <button id="prompt-confirm-btn" class="px-5 py-2 text-xs font-bold rounded-xl shadow-md cursor-pointer ${btnColor}">
+              ${confirmText}
+            </button>
+          </div>
+        </div>
+      `;
+
+      document.body.appendChild(modal);
+      if (window.lucide && typeof window.lucide.createIcons === 'function') {
+        lucide.createIcons({ root: modal });
+      }
+
+      const input = modal.querySelector('#prompt-input-value');
+      input.focus();
+
+      modal.querySelector('#prompt-cancel-btn').onclick = () => {
+        modal.remove();
+        resolve(null);
+      };
+
+      const handleConfirm = () => {
+        const val = input.value;
+        modal.remove();
+        resolve(val);
+      };
+
+      modal.querySelector('#prompt-confirm-btn').onclick = handleConfirm;
+      input.onkeydown = (e) => {
+        if (e.key === 'Enter') handleConfirm();
+        if (e.key === 'Escape') { modal.remove(); resolve(null); }
+      };
+    });
+  }
+
+  // Intercept standard window.alert so even legacy calls look premium
+  window.alert = function(msg) {
+    showToast(msg, 'info');
+  };
 
   async function apiCall(endpoint, options = {}) {
     const cleanEndpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
@@ -73,11 +218,10 @@
   // ==========================================
   function initiateOAuth(provider) {
     if (!['google', 'github'].includes(provider)) {
-      showNotification(`Unsupported login provider: ${provider}`, 'error');
+      showToast(`Unsupported login provider: ${provider}`, 'error');
       return;
     }
 
-    // Preserve any draft onboarding prompt before leaving page
     const homeInput = document.getElementById('homeAiPromptInput');
     if (homeInput && homeInput.value.trim()) {
       sessionStorage.setItem('pending_onboard_prompt', homeInput.value.trim());
@@ -86,7 +230,6 @@
     const currentOrigin = window.location.origin;
     const redirectUrl = `${currentOrigin}/index.html`;
 
-    // Direct redirect through Supabase Auth OAuth flow
     const oauthUrl = `${SUPABASE_URL}/auth/v1/authorize?provider=${provider}&redirect_to=${encodeURIComponent(redirectUrl)}`;
     window.location.href = oauthUrl;
   }
@@ -105,10 +248,8 @@
 
       if (!accessToken) return false;
 
-      // Clean the URL hash immediately so the token is not kept in browser history
       window.history.replaceState({}, document.title, window.location.pathname);
 
-      // Verify user identity with Supabase Auth endpoint
       const userRes = await fetch(`${SUPABASE_URL}/auth/v1/user`, {
         headers: {
           'apikey': SUPABASE_ANON_KEY,
@@ -120,11 +261,9 @@
       const user = await userRes.json();
       const meta = user.user_metadata || {};
 
-      // Determine or provision merchant workspace
       const businessName = meta.tenant_name || meta.full_name || meta.name || meta.user_name || (user.email ? user.email.split('@')[0] : 'My Store');
       const tenantId = meta.tenant_id || `tenant_${user.id.replace(/-/g, '').slice(0, 10)}`;
 
-      // Save authenticated session in local state
       localStorage.setItem('luvon_user', JSON.stringify(user));
       localStorage.setItem('luvon_active_tenant_id', tenantId);
       localStorage.setItem('luvon_business_name', businessName);
@@ -134,7 +273,6 @@
         localStorage.setItem('luvon_refresh_token', refreshToken);
       }
 
-      // Sync active merchant on backend engine
       await fetch(`${BASE_URL}/api/tenant/sync-profile`, {
         method: 'POST',
         headers: {
@@ -151,13 +289,12 @@
 
       updateAuthUI(user, businessName);
 
-      showNotification(`Welcome, ${businessName}! Successfully signed in.`, 'success');
+      showToast(`Welcome, ${businessName}! Successfully signed in.`, 'success');
 
-      // Check if an AI store generation prompt was pending before redirect
       const pendingPrompt = sessionStorage.getItem('pending_onboard_prompt');
       if (pendingPrompt && typeof runAIBusinessSetup === 'function') {
         sessionStorage.removeItem('pending_onboard_prompt');
-        showNotification('Configuring store catalog with your prompt...', 'info');
+        showToast('Configuring store catalog with your prompt...', 'info');
         runAIBusinessSetup(pendingPrompt).catch(() => {});
       } else {
         setTimeout(() => {
@@ -169,7 +306,7 @@
 
       return true;
     } catch (err) {
-      showNotification(`Auth Error: ${err.message}`, 'error');
+      showToast(`Auth Error: ${err.message}`, 'error');
       return false;
     }
   }
@@ -247,7 +384,7 @@
 
       if (currentAuthMode === 'signup' && data.requiresVerification) {
         closeSignInModal();
-        showNotification(`Confirmation email sent to ${email}. Please verify your email before signing in!`, 'info');
+        showToast(`Confirmation email sent to ${email}. Please verify your email before signing in!`, 'info');
         switchAuthTab('signin');
         return;
       }
@@ -257,7 +394,7 @@
 
       closeSignInModal();
       updateAuthUI(data.user, data.businessName);
-      showNotification(`Welcome, ${data.businessName || 'Merchant'}!`, 'success');
+      showToast(`Welcome, ${data.businessName || 'Merchant'}!`, 'success');
 
       if (currentAuthMode === 'signup') {
         openOnboardingModal();
@@ -265,7 +402,7 @@
         setTimeout(() => window.location.reload(), 600);
       }
     } catch (err) {
-      showNotification(err.message, 'error');
+      showToast(err.message, 'error');
     } finally {
       if (submitBtn) {
         submitBtn.disabled = false;
@@ -292,7 +429,7 @@
     localStorage.removeItem('luvon_access_token');
     localStorage.removeItem('luvon_refresh_token');
     updateAuthUI(null);
-    showNotification('Signed out successfully.', 'info');
+    showToast('Signed out successfully.', 'info');
     setTimeout(() => window.location.reload(), 500);
   }
 
@@ -342,22 +479,25 @@
       if (!res.ok) throw new Error(data.error || 'AI store configuration failed');
 
       localStorage.setItem('luvon_business_name', data.businessName);
-      showNotification(`Store Generated! Business: ${data.businessName} with ${data.catalog?.length || 0} catalog items.`, 'success');
+      showToast(`Store Generated! Business: ${data.businessName} with ${data.catalog?.length || 0} catalog items.`, 'success');
       
       closeOnboardingModal();
       setTimeout(() => window.location.reload(), 1200);
     } catch (err) {
-      showNotification(`AI Setup Notice: ${err.message}`, 'error');
+      showToast(`AI Setup Notice: ${err.message}`, 'error');
       throw err;
     }
   }
 
   window.API = {
     getTenantId: getActiveTenantId,
+    setTenantId,
     runAIBusinessSetup,
     openOnboardingModal,
     closeOnboardingModal,
-    showToast: showNotification,
+    showToast,
+    showConfirmModal,
+    showPromptModal,
     getInventory: () => apiCall('/inventory'),
     saveInventoryItem: (item) => apiCall('/inventory', { method: 'POST', body: JSON.stringify(item) }),
     getMetrics: () => apiCall('/metrics'),

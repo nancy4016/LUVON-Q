@@ -393,7 +393,7 @@
         if (typeof openSignInModal === 'function') {
           openSignInModal();
         } else {
-          alert('Please sign in to manage or schedule campaigns.');
+          window.API.showToast('Please sign in to manage or schedule campaigns.', 'warning');
         }
         return;
       }
@@ -460,7 +460,6 @@
       const video = document.getElementById('campaignVideoPreview');
       const payloadInput = document.getElementById('postMediaPayload');
 
-      // Canonical hosted route resolution for local demo assets
       if (file.name === 'luvon-demo.mp4' || isVideo) {
         payloadInput.value = `${window.location.origin}/luvon-demo.mp4`;
       }
@@ -581,9 +580,15 @@
       }
     }
 
-    // Delete post handler
     async function deleteCampaignPost(postId) {
-      if (!confirm('Are you sure you want to delete this scheduled post?')) return;
+      const confirmed = await window.API.showConfirmModal({
+        title: "Delete Scheduled Post?",
+        message: "This will remove the campaign post from your queue permanently.",
+        confirmText: "Delete Post",
+        isDanger: true
+      });
+      if (!confirmed) return;
+
       const tenantId = localStorage.getItem('luvon_active_tenant_id') || 'luvon_q_flagship';
 
       try {
@@ -594,10 +599,10 @@
         const data = await res.json();
         if (!res.ok) throw new Error(data.error || 'Failed to delete post');
 
-        // Refresh table and counters
+        window.API.showToast("Campaign post deleted successfully.", "success");
         await loadCampaignPosts();
       } catch (err) {
-        alert(err.message);
+        window.API.showToast(err.message, "error");
       }
     }
 
@@ -611,7 +616,6 @@
       if (pEl) pEl.textContent = published;
     }
 
-    // Schedule submission with real-time percentage progress bar
     function handleScheduleFormSubmit(e) {
       e.preventDefault();
       const btn = document.getElementById('submitScheduleBtn');
@@ -632,11 +636,10 @@
       };
 
       if (!payload.caption || !payload.scheduledAt) {
-        alert('Caption and schedule time are required.');
+        window.API.showToast('Caption and schedule time are required.', 'warning');
         return;
       }
 
-      // Show Progress Bar
       const progressCard = document.getElementById('luvonUploadProgressCard');
       const progressBar = document.getElementById('luvonProgressBarFill');
       const percentText = document.getElementById('luvonUploadPercent');
@@ -671,13 +674,12 @@
         let responseData = null;
         try {
           responseData = JSON.parse(xhr.responseText);
-        } catch (jsonErr) {
-          console.error('Non-JSON response from server:', xhr.responseText);
-        }
+        } catch (jsonErr) {}
 
         if (xhr.status >= 200 && xhr.status < 300 && responseData && responseData.success) {
           statusText.innerHTML = `<i data-lucide="check" class="w-3.5 h-3.5 text-emerald-400"></i> Campaign queued successfully!`;
           renderIcons();
+          window.API.showToast("Campaign scheduled successfully!", "success");
           setTimeout(() => {
             progressCard.classList.add('hidden');
             closeScheduleModal();
@@ -686,8 +688,8 @@
             loadCampaignPosts();
           }, 800);
         } else {
-          const errorMsg = responseData?.error || (xhr.status === 413 ? 'Creative file too large for server proxy.' : `Server returned status ${xhr.status}`);
-          alert(`Queue failed: ${errorMsg}`);
+          const errorMsg = responseData?.error || (xhr.status === 413 ? 'Creative file too large for server.' : `Server returned status ${xhr.status}`);
+          window.API.showToast(`Queue failed: ${errorMsg}`, 'error');
           progressCard.classList.add('hidden');
         }
 
@@ -697,7 +699,7 @@
       };
 
       xhr.onerror = function() {
-        alert('Network connection error while contacting Luvon Q server.');
+        window.API.showToast('Network connection error while contacting server.', 'error');
         progressCard.classList.add('hidden');
         btn.disabled = false;
         btn.innerHTML = `<i data-lucide="calendar" class="w-4 h-4"></i> Queue Campaign`;
@@ -732,10 +734,10 @@
         });
 
         if (!res.ok) throw new Error('Could not save credentials');
-        alert('Meta publishing credentials configured successfully.');
+        window.API.showToast('Meta publishing credentials configured successfully!', 'success');
         closeCredentialsModal();
       } catch (err) {
-        alert(err.message);
+        window.API.showToast(err.message, 'error');
       } finally {
         btn.disabled = false;
         btn.textContent = 'Save Keys';

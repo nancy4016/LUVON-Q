@@ -254,7 +254,6 @@
               </button>
             </div>
           </div>
-          <!-- Hidden storage for payload URL / base64 -->
           <input type="hidden" id="prod-image-payload" />
         </div>
 
@@ -290,7 +289,7 @@
         if (typeof openSignInModal === 'function') {
           openSignInModal();
         } else {
-          alert('Please sign in to access and manage your private store catalog.');
+          window.API.showToast('Please sign in to access and manage your private store catalog.', 'warning');
         }
         return;
       }

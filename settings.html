@@ -439,7 +439,7 @@
       const tenantId = window.API?.getTenantId() || localStorage.getItem('luvon_active_tenant_id') || 'luvon_q_flagship';
 
       btn.disabled = true;
-      btn.innerHTML = `<i data-lucide="loader-2" class="w-3.5 h-3.5 animate-spin"></i> Disagreeing...`;
+      btn.innerHTML = `<i data-lucide="loader-2" class="w-3.5 h-3.5 animate-spin"></i> Sending...`;
       renderIcons();
 
       try {
@@ -454,12 +454,12 @@
         const data = await res.json();
         if (!res.ok) throw new Error(data.error || 'Failed to dispatch invite');
 
-        alert(data.message || `Invitation sent to ${email}`);
+        window.API.showToast(data.message || `Invitation sent to ${email}`, 'success');
         closeInviteModal();
         document.getElementById('inviteEmail').value = '';
         await loadTeamMembers();
       } catch (err) {
-        alert(err.message);
+        window.API.showToast(err.message, 'error');
       } finally {
         btn.disabled = false;
         btn.innerHTML = `<i data-lucide="send" class="w-3.5 h-3.5"></i> Send Invitation`;
@@ -468,7 +468,14 @@
     }
 
     async function removeTeamMember(memberId) {
-      if (!confirm('Are you sure you want to revoke this staff member access?')) return;
+      const confirmed = await window.API.showConfirmModal({
+        title: "Revoke Staff Member?",
+        message: "This will revoke dashboard and omnichannel inbox access for this colleague.",
+        confirmText: "Revoke Access",
+        isDanger: true
+      });
+      if (!confirmed) return;
+
       const tenantId = window.API?.getTenantId() || localStorage.getItem('luvon_active_tenant_id') || 'luvon_q_flagship';
 
       try {
@@ -477,9 +484,10 @@
           headers: { 'x-tenant-id': tenantId }
         });
         if (!res.ok) throw new Error('Revoke failed');
+        window.API.showToast("Team member access revoked.", "success");
         await loadTeamMembers();
       } catch (err) {
-        alert(err.message);
+        window.API.showToast(err.message, 'error');
       }
     }
 
@@ -511,9 +519,9 @@
         });
         if (!res.ok) throw new Error('Save failed');
         localStorage.setItem('luvon_business_name', payload.businessName);
-        alert('Settings saved successfully!');
+        window.API.showToast('Settings saved successfully!', 'success');
       } catch (err) {
-        alert(err.message);
+        window.API.showToast(err.message, 'error');
       } finally {
         btn.disabled = false;
         btn.innerHTML = `<i data-lucide="save" class="w-4 h-4"></i> Save All Changes`;
@@ -544,9 +552,9 @@
           body: JSON.stringify(payload)
         });
         if (!res.ok) throw new Error('Could not save Meta keys');
-        alert('Meta Graph credentials configured successfully.');
+        window.API.showToast('Meta Graph credentials configured successfully.', 'success');
       } catch (err) {
-        alert(err.message);
+        window.API.showToast(err.message, 'error');
       } finally {
         btn.disabled = false;
         btn.innerHTML = `<i data-lucide="check" class="w-3.5 h-3.5"></i> Save Meta Publishing Keys`;
@@ -555,9 +563,16 @@
     }
 
     async function confirmDeleteAccount() {
-      const conf = prompt('To permanently terminate this workspace and delete all data, type DELETE exactly:');
-      if (conf !== 'DELETE') {
-        alert('Action canceled. Input did not match DELETE.');
+      const input = await window.API.showPromptModal({
+        title: "Terminate Workspace",
+        subtitle: "Type DELETE exactly to confirm permanent workspace termination.",
+        placeholder: "DELETE",
+        confirmText: "Terminate Account",
+        isDanger: true
+      });
+
+      if (input !== 'DELETE') {
+        if (input !== null) window.API.showToast("Action canceled. Input did not match DELETE.", "warning");
         return;
       }
 
@@ -574,10 +589,10 @@
         if (!res.ok) throw new Error('Deletion failed');
         localStorage.clear();
         sessionStorage.clear();
-        alert('Workspace deleted permanently.');
-        window.location.href = 'index.html';
+        window.API.showToast('Workspace permanently deleted.', 'info');
+        setTimeout(() => window.location.href = 'index.html', 1000);
       } catch (err) {
-        alert(err.message);
+        window.API.showToast(err.message, 'error');
       }
     }
 
