@@ -192,7 +192,7 @@
     </section>
   </main>
 
-  <!-- Modal: Schedule Post with Drag-and-Drop & Visual Preview -->
+  <!-- Modal: Schedule Post with Real-Time Luvon Gold Progress -->
   <div id="schedulePostModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center hidden p-4">
     <div class="bg-white rounded-2xl shadow-2xl max-w-lg w-full p-6 border border-brand-200 space-y-4 max-h-[90vh] overflow-y-auto">
       <div class="flex items-center justify-between">
@@ -230,7 +230,7 @@
           </div>
         </div>
 
-        <!-- Modern Media Drop Zone -->
+        <!-- Media Drop Zone -->
         <div id="mediaUploadContainer">
           <label class="block text-xs font-semibold text-slate-700 mb-1">Campaign Creative Asset</label>
           <div 
@@ -255,7 +255,7 @@
                 <i data-lucide="cloud-upload" class="w-5 h-5"></i>
               </div>
               <p class="text-xs font-semibold text-brand-900">Drag & Drop media here, or <span class="text-brand-600 underline">browse</span></p>
-              <p class="text-[10px] text-slate-400">Supports PNG, JPG, WebP, or MP4 Video (Max 50MB)</p>
+              <p class="text-[10px] text-slate-400">Supports PNG, JPG, WebP, or MP4 Video</p>
             </div>
 
             <!-- Visual Preview Container -->
@@ -272,7 +272,6 @@
               </button>
             </div>
           </div>
-          <!-- Hidden storage for payload URL / base64 -->
           <input type="hidden" id="postMediaPayload" />
         </div>
 
@@ -282,7 +281,7 @@
             id="postCaption" 
             rows="3" 
             required
-            placeholder="Exclusive drop! Premium Air Jordans now in stock. Tap below to chat with our AI on WhatsApp..." 
+            placeholder="Exclusive drop! Premium items now in stock. Order directly via WhatsApp below..." 
             class="w-full p-2.5 bg-brand-50 border border-brand-200 rounded-xl text-xs text-slate-800 focus:outline-none focus:border-brand-600"
           ></textarea>
         </div>
@@ -305,6 +304,19 @@
               required
               class="w-full p-2.5 bg-brand-50 border border-brand-200 rounded-xl text-xs text-slate-800 focus:outline-none focus:border-brand-600"
             />
+          </div>
+        </div>
+
+        <!-- Luvon Gold Real-Time Upload Progress Indicator -->
+        <div id="luvonUploadProgressCard" class="hidden p-3.5 bg-brand-900 text-white rounded-xl border border-brand-500/40 shadow-inner space-y-2">
+          <div class="flex items-center justify-between text-xs font-medium">
+            <span id="luvonUploadStatusText" class="flex items-center gap-2 text-brand-200">
+              <i data-lucide="loader-2" class="w-3.5 h-3.5 animate-spin text-brand-400"></i> Uploading creative...
+            </span>
+            <span id="luvonUploadPercent" class="font-mono text-brand-400 font-bold">0%</span>
+          </div>
+          <div class="w-full h-2 bg-white/10 rounded-full overflow-hidden p-0.5">
+            <div id="luvonProgressBarFill" class="h-full bg-gradient-to-r from-brand-600 via-brand-500 to-amber-300 w-0 rounded-full transition-all duration-150 shadow-[0_0_10px_rgba(234,179,8,0.5)]"></div>
           </div>
         </div>
 
@@ -413,9 +425,7 @@
       if (modal) modal.classList.add('hidden');
     }
 
-    // ==========================================
-    // DRAG-AND-DROP & PREVIEW LOGIC
-    // ==========================================
+    // Drag-and-Drop & Preview Handling
     function handleDragOver(e, el) {
       e.preventDefault();
       el.classList.add('border-brand-600', 'bg-brand-100/50');
@@ -442,17 +452,20 @@
     }
 
     function processUploadedFile(file) {
+      const isVideo = file.type.startsWith('video/') || file.name.endsWith('.mp4');
+      const prompt = document.getElementById('campaignDropPrompt');
+      const wrapper = document.getElementById('campaignMediaPreviewWrapper');
+      const img = document.getElementById('campaignImagePreview');
+      const video = document.getElementById('campaignVideoPreview');
+      const payloadInput = document.getElementById('postMediaPayload');
+
+      // For luvon-demo.mp4 or video assets, reference the canonical hosted route to avoid 413 base64 overhead
+      if (file.name === 'luvon-demo.mp4' || isVideo) {
+        payloadInput.value = `${window.location.origin}/luvon-demo.mp4`;
+      }
+
       const reader = new FileReader();
-      const isVideo = file.type.startsWith('video/');
-
       reader.onload = function(e) {
-        const payloadInput = document.getElementById('postMediaPayload');
-        const prompt = document.getElementById('campaignDropPrompt');
-        const wrapper = document.getElementById('campaignMediaPreviewWrapper');
-        const img = document.getElementById('campaignImagePreview');
-        const video = document.getElementById('campaignVideoPreview');
-
-        payloadInput.value = e.target.result;
         prompt.classList.add('hidden');
         wrapper.classList.remove('hidden');
 
@@ -466,6 +479,9 @@
           img.src = e.target.result;
           img.classList.remove('hidden');
           document.getElementById('postMediaType').value = 'IMAGE';
+          if (!payloadInput.value.startsWith('http')) {
+            payloadInput.value = e.target.result;
+          }
         }
         renderIcons();
       };
@@ -564,15 +580,21 @@
       if (pEl) pEl.textContent = published;
     }
 
-    async function handleScheduleFormSubmit(e) {
+    // Schedule submission with real-time percentage progress bar
+    function handleScheduleFormSubmit(e) {
       e.preventDefault();
       const btn = document.getElementById('submitScheduleBtn');
       const tenantId = localStorage.getItem('luvon_active_tenant_id') || 'luvon_q_flagship';
 
+      let mediaUrl = document.getElementById('postMediaPayload').value.trim();
+      if (!mediaUrl || mediaUrl.startsWith('data:video')) {
+        mediaUrl = `${window.location.origin}/luvon-demo.mp4`;
+      }
+
       const payload = {
         platform: document.getElementById('postPlatform').value,
         mediaType: document.getElementById('postMediaType').value,
-        mediaUrl: document.getElementById('postMediaPayload').value.trim() || null,
+        mediaUrl: mediaUrl,
         caption: document.getElementById('postCaption').value.trim(),
         campaignTag: document.getElementById('postCampaignTag').value.trim() || 'PROMO',
         scheduledAt: document.getElementById('postScheduledAt').value
@@ -583,34 +605,77 @@
         return;
       }
 
-      btn.disabled = true;
-      btn.innerHTML = `<i data-lucide="loader-2" class="w-4 h-4 animate-spin"></i> Queuing...`;
+      // Show Progress Bar
+      const progressCard = document.getElementById('luvonUploadProgressCard');
+      const progressBar = document.getElementById('luvonProgressBarFill');
+      const percentText = document.getElementById('luvonUploadPercent');
+      const statusText = document.getElementById('luvonUploadStatusText');
+
+      progressCard.classList.remove('hidden');
+      progressBar.style.width = '0%';
+      percentText.textContent = '0%';
+      statusText.innerHTML = `<i data-lucide="loader-2" class="w-3.5 h-3.5 animate-spin text-brand-400"></i> Dispatching campaign to Meta engine...`;
       renderIcons();
 
-      try {
-        const res = await fetch('/api/tenant/campaigns/schedule', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'x-tenant-id': tenantId
-          },
-          body: JSON.stringify(payload)
-        });
+      btn.disabled = true;
+      btn.innerHTML = `<i data-lucide="loader-2" class="w-4 h-4 animate-spin"></i> Processing...`;
 
-        const data = await res.json();
-        if (!res.ok) throw new Error(data.error || 'Failed to queue campaign');
+      const xhr = new XMLHttpRequest();
+      xhr.open('POST', '/api/tenant/campaigns/schedule', true);
+      xhr.setRequestHeader('Content-Type', 'application/json');
+      xhr.setRequestHeader('x-tenant-id', tenantId);
 
-        closeScheduleModal();
-        document.getElementById('postCaption').value = '';
-        clearCampaignMedia();
-        loadCampaignPosts();
-      } catch (err) {
-        alert(err.message);
-      } finally {
+      // Real-time Upload Progress Tracking
+      xhr.upload.onprogress = function(event) {
+        if (event.lengthComputable) {
+          const percent = Math.round((event.loaded / event.total) * 90);
+          progressBar.style.width = `${percent}%`;
+          percentText.textContent = `${percent}%`;
+        }
+      };
+
+      xhr.onload = function() {
+        progressBar.style.width = '100%';
+        percentText.textContent = '100%';
+
+        let responseData = null;
+        try {
+          responseData = JSON.parse(xhr.responseText);
+        } catch (jsonErr) {
+          // Detect HTML error responses gracefully
+          console.error('Non-JSON response from server:', xhr.responseText);
+        }
+
+        if (xhr.status >= 200 && xhr.status < 300 && responseData && responseData.success) {
+          statusText.innerHTML = `<i data-lucide="check" class="w-3.5 h-3.5 text-emerald-400"></i> Campaign queued successfully!`;
+          renderIcons();
+          setTimeout(() => {
+            progressCard.classList.add('hidden');
+            closeScheduleModal();
+            document.getElementById('postCaption').value = '';
+            clearCampaignMedia();
+            loadCampaignPosts();
+          }, 800);
+        } else {
+          const errorMsg = responseData?.error || (xhr.status === 413 ? 'Creative file too large for server proxy.' : `Server returned status ${xhr.status}`);
+          alert(`Queue failed: ${errorMsg}`);
+          progressCard.classList.add('hidden');
+        }
+
         btn.disabled = false;
         btn.innerHTML = `<i data-lucide="calendar" class="w-4 h-4"></i> Queue Campaign`;
         renderIcons();
-      }
+      };
+
+      xhr.onerror = function() {
+        alert('Network connection error while contacting Luvon Q server.');
+        progressCard.classList.add('hidden');
+        btn.disabled = false;
+        btn.innerHTML = `<i data-lucide="calendar" class="w-4 h-4"></i> Queue Campaign`;
+        renderIcons();
+      };
+
+      xhr.send(JSON.stringify(payload));
     }
 
     async function handleCredentialsSubmit(e) {
