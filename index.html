@@ -55,7 +55,43 @@
   </style>
   <link rel="stylesheet" href="styles.css" />
 </head>
+    <style>
+        @keyframes loadingBar {
+            0% { width: 0%; transform: translateX(0%); }
+            50% { width: 100%; transform: translateX(0%); }
+            100% { width: 0%; transform: translateX(100%); }
+        }
+        .animate-loadingBar {
+            animation: loadingBar 1.8s ease-in-out infinite;
+        }
+    </style>
+</head>
+
 <body class="bg-slate-50 text-slate-800 min-h-screen flex flex-col md:flex-row overflow-x-hidden">
+<!-- Premium White Animated Splash Screen Preloader -->
+<!-- Premium White Animated Splash Screen Preloader -->
+<div id="sitePreloader" class="fixed inset-0 z-[9999] flex flex-col items-center justify-center bg-white transition-all duration-700 ease-in-out">
+    <div class="flex flex-col items-center space-y-8">
+        <!-- Animated Container for Logo (Increased Scale) -->
+        <div class="relative flex items-center justify-center animate-bounce duration-1000">
+            <!-- Enlarged glowing background pulse ring behind your logo -->
+            <div class="absolute w-40 h-40 rounded-full bg-brand-500/10 animate-ping opacity-75"></div>
+            
+            <!-- Upgraded Larger Logo Wrapper (Changed from w-24 h-24 to w-36 h-36) -->
+            <div class="relative w-36 h-36 bg-white rounded-full flex items-center justify-center shadow-2xl transform transition-transform hover:scale-110 p-4 border border-slate-100">
+                <img src="Luvon q logo.png" alt="Luvon Q Logo" class="h-24 w-auto object-contain" />
+            </div>
+        </div>
+
+        <!-- Sleek Modern Minimalist Progress Indicator Bar -->
+        <div class="w-44 h-1 bg-slate-100 rounded-full overflow-hidden shadow-inner">
+            <div class="h-full bg-gradient-to-r from-amber-600 to-amber-400 w-0 rounded-full animate-loadingBar"></div>
+        </div>
+        
+        <!-- "INITIALIZING PORTAL" TEXT REMOVED FOR CLEAN MINIMALIST VIBE -->
+    </div>
+</div>
+
 
   <!-- Mobile Top Nav -->
   <header class="md:hidden bg-white/90 backdrop-blur-md border-b border-slate-200 p-4 flex items-center justify-between sticky top-0 z-30 w-full">
@@ -113,31 +149,15 @@
 <!-- Unique, High-Contrast Solid Gold User Session Indicator -->
 <!-- Unique, High-Contrast Luxury Gold User Session Indicator -->
 <!-- Unique, High-Contrast Solid Gold User Session Indicator -->
-<div id="activeTenantCard" class="hidden mt-auto pt-4 border-t border-[#bf862d]/20 w-full px-2">
-    <div class="flex items-center justify-between gap-3 px-3 py-2.5 rounded-xl bg-[#bf862d] w-full shadow-md">
-        <div class="flex items-center gap-3 min-w-0">
-            <!-- Sleek Dark Status Pulse Indicator -->
-            <div class="hidden relative flex h-2.5 w-2.5 flex-shrink-0">
-                <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-slate-900 opacity-75"></span>
-                <span class="relative inline-flex rounded-full h-2.5 w-2.5 bg-slate-900"></span>
-            </div>
-            <div class="flex flex-col min-w-0">
-                <span class="text-[9px] text-slate-900 font-sans tracking-widest font-extrabold uppercase leading-none mb-0.5">SIGNED IN AS</span>
-                <span id="tenantName" class="text-sm font-black text-black truncate font-sans tracking-wide">Loading...</span>
-            </div>
+<!-- Dynamically Styled Round User Avatar Block -->
+<div id="activeTenantCard" class="hidden mt-auto pt-4 border-t border-[#bf862d]/20 w-full px-2 flex justify-center items-center">
+    <div class="flex items-center justify-center py-2">
+        <!-- The Round Initial Badge with Theme Colors -->
+        <div id="userAvatarCircle" class="w-11 h-11 rounded-full bg-slate-900 text-[#bf862d] flex items-center justify-center font-black text-xl shadow-md border-2 border-[#bf862d]/30 cursor-pointer transition-transform hover:scale-105" onclick="toggleSignOut()">
+            <span id="userInitial">N</span>
         </div>
-        <!-- High-Contrast Logout Button -->
-        <button onclick="toggleSignOut()" class="text-slate-900 hover:text-rose-950 transition-colors duration-200 p-1 flex-shrink-0 cursor-pointer" title="Log out">
-            <i data-lucide="log-out" class="w-4 h-4 stroke-[2.5]"></i>
-        </button>
     </div>
 </div>
-
-
-
-
-
-    </div>
   </aside>
 
   <!-- Main Content Area -->
@@ -788,5 +808,28 @@
     setTimeout(renderIcons, 250);
     setTimeout(renderIcons, 600);
   </script>
+  <script>
+window.addEventListener('load', function() {
+    const preloader = document.getElementById('sitePreloader');
+    if (preloader) {
+        // FORCE A 3-SECOND DELAY (3000 milliseconds) so the animation stays on screen
+        setTimeout(() => {
+            // 1. Add opacity-0 to smoothly fade the elements out visually
+            preloader.classList.add('opacity-0', 'pointer-events-none');
+            
+            // 2. Add an elegant slight slide-up lift effect while hiding
+            preloader.style.transform = 'translateY(-30px)';
+            
+            // 3. Completely destroy the element from DOM layout structure after animation ends
+            setTimeout(() => {
+                preloader.remove();
+            }, 700); // 700ms matches the transition-all duration class perfectly
+            
+        }, 3000); // Change 3000 to 4000 if you want it to stay for 4 seconds!
+    }
+});
+
+</script>
+
 </body>
 </html>

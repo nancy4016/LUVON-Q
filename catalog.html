@@ -108,25 +108,16 @@
       </button>
       <!-- Unique, High-Contrast Gold User Session Indicator -->
 <!-- Unique, High-Contrast Solid Gold User Session Indicator -->
-<div id="activeTenantCard" class="hidden mt-auto pt-4 border-t border-[#bf862d]/20 w-full px-2">
-    <div class="flex items-center justify-between gap-3 px-3 py-2.5 rounded-xl bg-[#bf862d] w-full shadow-md">
-        <div class="flex items-center gap-3 min-w-0">
-            <!-- Sleek Dark Status Pulse Indicator -->
-            <div class="hidden relative flex h-2.5 w-2.5 flex-shrink-0">
-                <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-slate-900 opacity-75"></span>
-                <span class="relative inline-flex rounded-full h-2.5 w-2.5 bg-slate-900"></span>
-            </div>
-            <div class="flex flex-col min-w-0">
-                <span class="text-[9px] text-slate-900 font-sans tracking-widest font-extrabold uppercase leading-none mb-0.5">SIGNED IN AS</span>
-                <span id="tenantName" class="text-sm font-black text-black truncate font-sans tracking-wide">Loading...</span>
-            </div>
+<!-- Dynamically Styled Round User Avatar Block -->
+<div id="activeTenantCard" class="hidden mt-auto pt-4 border-t border-[#bf862d]/20 w-full px-2 flex justify-center items-center">
+    <div class="flex items-center justify-center py-2">
+        <!-- The Round Initial Badge with Theme Colors -->
+        <div id="userAvatarCircle" class="w-11 h-11 rounded-full bg-slate-900 text-[#bf862d] flex items-center justify-center font-black text-xl shadow-md border-2 border-[#bf862d]/30 cursor-pointer transition-transform hover:scale-105" onclick="toggleSignOut()">
+            <span id="userInitial">N</span>
         </div>
-        <!-- High-Contrast Logout Button -->
-        <button onclick="toggleSignOut()" class="text-slate-900 hover:text-rose-950 transition-colors duration-200 p-1 flex-shrink-0 cursor-pointer" title="Log out">
-            <i data-lucide="log-out" class="w-4 h-4 stroke-[2.5]"></i>
-        </button>
     </div>
 </div>
+
 
 
   </aside>
