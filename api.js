@@ -40,6 +40,108 @@
   }
 
   // ========================================================
+  // DUAL-ACCOUNT VAULT & PERSISTENCE (MAX 2 ACCOUNTS)
+  // ========================================================
+  function getAccountsVault() {
+    try {
+      return JSON.parse(localStorage.getItem('luvon_accounts_vault')) || [];
+    } catch (e) {
+      return [];
+    }
+  }
+
+  function saveCurrentAccountToVault() {
+    const userStr = localStorage.getItem('luvon_user');
+    const tenantId = localStorage.getItem('luvon_active_tenant_id');
+    if (!userStr || !tenantId || tenantId === 'anonymous') return;
+
+    const user = JSON.parse(userStr);
+    const email = localStorage.getItem('luvon_user_email') || user.email || '';
+    const businessName = localStorage.getItem('luvon_business_name') || 'Merchant Store';
+    const avatarUrl = localStorage.getItem('luvon_user_avatar') || null;
+    const accessToken = localStorage.getItem('luvon_access_token') || '';
+    const refreshToken = localStorage.getItem('luvon_refresh_token') || '';
+
+    const currentAcc = {
+      tenantId,
+      email,
+      businessName,
+      avatarUrl,
+      user,
+      accessToken,
+      refreshToken
+    };
+
+    let vault = getAccountsVault();
+    vault = vault.filter(acc => acc.email !== email && acc.tenantId !== tenantId);
+    vault.unshift(currentAcc);
+    vault = vault.slice(0, 2); // strictly max 2 accounts
+    localStorage.setItem('luvon_accounts_vault', JSON.stringify(vault));
+  }
+
+  function switchAccount() {
+    saveCurrentAccountToVault();
+    const vault = getAccountsVault();
+    const currentEmail = localStorage.getItem('luvon_user_email');
+    
+    // Find the other paired account
+    const alternateAcc = vault.find(acc => acc.email !== currentEmail);
+
+    if (alternateAcc && alternateAcc.accessToken) {
+      // Instant seamless switch
+      localStorage.setItem('luvon_user', JSON.stringify(alternateAcc.user));
+      localStorage.setItem('luvon_active_tenant_id', alternateAcc.tenantId);
+      localStorage.setItem('luvon_business_name', alternateAcc.businessName);
+      localStorage.setItem('luvon_user_email', alternateAcc.email);
+      localStorage.setItem('luvon_access_token', alternateAcc.accessToken);
+      if (alternateAcc.avatarUrl) {
+        localStorage.setItem('luvon_user_avatar', alternateAcc.avatarUrl);
+      } else {
+        localStorage.removeItem('luvon_user_avatar');
+      }
+      if (alternateAcc.refreshToken) {
+        localStorage.setItem('luvon_refresh_token', alternateAcc.refreshToken);
+      }
+
+      showToast(`Switched account to ${alternateAcc.businessName}`, 'success');
+      setTimeout(() => window.location.reload(), 300);
+    } else {
+      // Second account doesn't exist yet -> open seamless modal for 2nd account
+      showToast('Connect your 2nd account to enable instant switching.', 'info');
+      // Clear active session pointers without destroying vault
+      localStorage.removeItem('luvon_user');
+      localStorage.removeItem('luvon_active_tenant_id');
+      localStorage.removeItem('luvon_business_name');
+      localStorage.removeItem('luvon_user_email');
+      localStorage.removeItem('luvon_user_avatar');
+      localStorage.removeItem('luvon_access_token');
+      localStorage.removeItem('luvon_refresh_token');
+      window.location.replace('/index.html?auth=required');
+    }
+  }
+
+  function toggleSignOut() {
+    const currentEmail = localStorage.getItem('luvon_user_email');
+    let vault = getAccountsVault();
+    vault = vault.filter(acc => acc.email !== currentEmail);
+    localStorage.setItem('luvon_accounts_vault', JSON.stringify(vault));
+
+    localStorage.removeItem('luvon_user');
+    localStorage.removeItem('luvon_active_tenant_id');
+    localStorage.removeItem('luvon_business_name');
+    localStorage.removeItem('luvon_user_email');
+    localStorage.removeItem('luvon_user_avatar');
+    localStorage.removeItem('luvon_access_token');
+    localStorage.removeItem('luvon_refresh_token');
+
+    updateAuthUI(null);
+    showToast('Signed out successfully.', 'info');
+    setTimeout(() => {
+      window.location.replace('/index.html');
+    }, 400);
+  }
+
+  // ========================================================
   // LUVON LUXURY NOTIFICATION (TOAST) ENGINE
   // ========================================================
   function initToastContainer() {
@@ -98,7 +200,7 @@
   }
 
   // ========================================================
-  // LUVON LUXURY CONFIRMATION MODAL (REPLACES confirm())
+  // LUVON LUXURY CONFIRMATION MODAL
   // ========================================================
   function showConfirmModal({ title = "Are you sure?", message, confirmText = "Confirm", isDanger = false }) {
     return new Promise((resolve) => {
@@ -148,7 +250,7 @@
   }
 
   // ========================================================
-  // LUVON LUXURY INPUT PROMPT MODAL (REPLACES prompt())
+  // LUVON LUXURY INPUT PROMPT MODAL
   // ========================================================
   function showPromptModal({ title, subtitle, placeholder = "Type here...", confirmText = "Submit", isDanger = false }) {
     return new Promise((resolve) => {
@@ -209,7 +311,6 @@
     });
   }
 
-  // Intercept standard window.alert
   window.alert = function(msg) {
     showToast(msg, 'info');
   };
@@ -242,6 +343,8 @@
       showToast(`Unsupported login provider: ${provider}`, 'error');
       return;
     }
+
+    saveCurrentAccountToVault();
 
     const homeInput = document.getElementById('homeAiPromptInput');
     if (homeInput && homeInput.value.trim()) {
@@ -300,6 +403,8 @@
       if (refreshToken) {
         localStorage.setItem('luvon_refresh_token', refreshToken);
       }
+
+      saveCurrentAccountToVault();
 
       await fetch(`${BASE_URL}/api/tenant/sync-profile`, {
         method: 'POST',
@@ -427,6 +532,8 @@
         localStorage.removeItem('luvon_user_avatar');
       }
 
+      saveCurrentAccountToVault();
+
       closeSignInModal();
       updateAuthUI(data.user, data.businessName);
       showToast(`Welcome, ${data.businessName || 'Merchant'}!`, 'success');
@@ -456,35 +563,8 @@
     }
   }
 
-  function toggleSignOut() {
-    localStorage.removeItem('luvon_user');
-    localStorage.removeItem('luvon_active_tenant_id');
-    localStorage.removeItem('luvon_business_name');
-    localStorage.removeItem('luvon_user_email');
-    localStorage.removeItem('luvon_user_avatar');
-    localStorage.removeItem('luvon_access_token');
-    localStorage.removeItem('luvon_refresh_token');
-    updateAuthUI(null);
-    showToast('Signed out successfully.', 'info');
-    setTimeout(() => {
-      window.location.replace('/index.html');
-    }, 400);
-  }
-
-  function switchAccount() {
-    localStorage.removeItem('luvon_user');
-    localStorage.removeItem('luvon_active_tenant_id');
-    localStorage.removeItem('luvon_business_name');
-    localStorage.removeItem('luvon_user_email');
-    localStorage.removeItem('luvon_user_avatar');
-    localStorage.removeItem('luvon_access_token');
-    localStorage.removeItem('luvon_refresh_token');
-    updateAuthUI(null);
-    window.location.replace('/index.html?auth=required');
-  }
-
   // ==========================================
-  // DYNAMIC AVATAR & SIDEBAR HYDRATION
+  // BORDERLESS AVATAR & SIDEBAR HYDRATION
   // ==========================================
   function updateAuthUI(user, businessName) {
     const signInBtn = document.getElementById('portalSignInBtn');
@@ -500,17 +580,20 @@
         userAvatarCircle.onclick = function() {
           window.location.href = 'settings.html#profile';
         };
-        userAvatarCircle.title = "View Account & Workspace Profile";
+        userAvatarCircle.title = "View Account Profile";
 
         const avatarUrl = localStorage.getItem('luvon_user_avatar');
         const name = businessName || localStorage.getItem('luvon_business_name') || 'Merchant';
         const initial = name.trim().charAt(0).toUpperCase() || 'M';
 
         if (avatarUrl) {
+          // Strictly NO border rings
+          userAvatarCircle.className = "w-11 h-11 rounded-full overflow-hidden flex items-center justify-center cursor-pointer transition-transform hover:scale-105 shadow-md bg-stone-900";
           userAvatarCircle.innerHTML = `
-            <img src="${avatarUrl}" alt="${name}" class="w-full h-full rounded-full object-cover border border-brand-500/30" />
+            <img src="${avatarUrl}" alt="${name}" class="w-full h-full object-cover rounded-full" />
           `;
         } else {
+          userAvatarCircle.className = "w-11 h-11 rounded-full bg-slate-900 text-[#bf862d] flex items-center justify-center font-black text-xl shadow-md cursor-pointer transition-transform hover:scale-105";
           userAvatarCircle.innerHTML = `<span id="userInitial">${initial}</span>`;
         }
       }
