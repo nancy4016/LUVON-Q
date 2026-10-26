@@ -1,4 +1,4 @@
-// api.js - Luvon Q Production Client Bridge & Luxury Feedback System
+// api.js - Luvon Q Production Client Bridge & Dual-Account Vault System
 (function () {
   const BASE_URL = (typeof window !== 'undefined' && window.location.origin && window.location.origin.includes('http') && !window.location.origin.includes('localhost'))
     ? window.location.origin
@@ -73,57 +73,64 @@
     };
 
     let vault = getAccountsVault();
-    vault = vault.filter(acc => acc.email !== email && acc.tenantId !== tenantId);
+    vault = vault.filter(acc => acc.email.toLowerCase() !== email.toLowerCase());
     vault.unshift(currentAcc);
-    vault = vault.slice(0, 2); // strictly max 2 accounts
+    vault = vault.slice(0, 2); // Strictly max 2 accounts
     localStorage.setItem('luvon_accounts_vault', JSON.stringify(vault));
   }
 
-  function switchAccount() {
+  function switchAccount(targetEmail) {
     saveCurrentAccountToVault();
     const vault = getAccountsVault();
-    const currentEmail = localStorage.getItem('luvon_user_email');
+    const currentEmail = (localStorage.getItem('luvon_user_email') || '').toLowerCase();
     
-    // Find the other paired account
-    const alternateAcc = vault.find(acc => acc.email !== currentEmail);
+    // Locate the other paired account
+    const target = targetEmail 
+      ? vault.find(acc => acc.email.toLowerCase() === targetEmail.toLowerCase())
+      : vault.find(acc => acc.email.toLowerCase() !== currentEmail);
 
-    if (alternateAcc && alternateAcc.accessToken) {
+    if (target && target.accessToken) {
       // Instant seamless switch
-      localStorage.setItem('luvon_user', JSON.stringify(alternateAcc.user));
-      localStorage.setItem('luvon_active_tenant_id', alternateAcc.tenantId);
-      localStorage.setItem('luvon_business_name', alternateAcc.businessName);
-      localStorage.setItem('luvon_user_email', alternateAcc.email);
-      localStorage.setItem('luvon_access_token', alternateAcc.accessToken);
-      if (alternateAcc.avatarUrl) {
-        localStorage.setItem('luvon_user_avatar', alternateAcc.avatarUrl);
+      localStorage.setItem('luvon_user', JSON.stringify(target.user));
+      localStorage.setItem('luvon_active_tenant_id', target.tenantId);
+      localStorage.setItem('luvon_business_name', target.businessName);
+      localStorage.setItem('luvon_user_email', target.email);
+      localStorage.setItem('luvon_access_token', target.accessToken);
+      if (target.avatarUrl) {
+        localStorage.setItem('luvon_user_avatar', target.avatarUrl);
       } else {
         localStorage.removeItem('luvon_user_avatar');
       }
-      if (alternateAcc.refreshToken) {
-        localStorage.setItem('luvon_refresh_token', alternateAcc.refreshToken);
+      if (target.refreshToken) {
+        localStorage.setItem('luvon_refresh_token', target.refreshToken);
       }
 
-      showToast(`Switched account to ${alternateAcc.businessName}`, 'success');
-      setTimeout(() => window.location.reload(), 300);
+      showToast(`Switched account to ${target.businessName || target.email}`, 'success');
+      setTimeout(() => window.location.reload(), 200);
     } else {
-      // Second account doesn't exist yet -> open seamless modal for 2nd account
-      showToast('Connect your 2nd account to enable instant switching.', 'info');
-      // Clear active session pointers without destroying vault
-      localStorage.removeItem('luvon_user');
-      localStorage.removeItem('luvon_active_tenant_id');
-      localStorage.removeItem('luvon_business_name');
-      localStorage.removeItem('luvon_user_email');
-      localStorage.removeItem('luvon_user_avatar');
-      localStorage.removeItem('luvon_access_token');
-      localStorage.removeItem('luvon_refresh_token');
-      window.location.replace('/index.html?auth=required');
+      // Second account not paired yet -> launch connection flow for 2nd account
+      if (vault.length >= 2) {
+        showToast('Maximum 2 accounts connected. Please remove an account in Settings first.', 'warning');
+        return;
+      }
+      sessionStorage.setItem('luvon_adding_secondary_account', 'true');
+      showToast('Connect your second account (Max 2 accounts).', 'info');
+      openSignInModal();
     }
   }
 
-  function toggleSignOut() {
-    const currentEmail = localStorage.getItem('luvon_user_email');
+  function unlinkAccount(targetEmail) {
     let vault = getAccountsVault();
-    vault = vault.filter(acc => acc.email !== currentEmail);
+    vault = vault.filter(acc => acc.email.toLowerCase() !== targetEmail.toLowerCase());
+    localStorage.setItem('luvon_accounts_vault', JSON.stringify(vault));
+    showToast('Account unlinked from quick switch.', 'info');
+    setTimeout(() => window.location.reload(), 200);
+  }
+
+  function toggleSignOut() {
+    const currentEmail = (localStorage.getItem('luvon_user_email') || '').toLowerCase();
+    let vault = getAccountsVault();
+    vault = vault.filter(acc => acc.email.toLowerCase() !== currentEmail);
     localStorage.setItem('luvon_accounts_vault', JSON.stringify(vault));
 
     localStorage.removeItem('luvon_user');
@@ -138,7 +145,7 @@
     showToast('Signed out successfully.', 'info');
     setTimeout(() => {
       window.location.replace('/index.html');
-    }, 400);
+    }, 300);
   }
 
   // ========================================================
@@ -354,7 +361,8 @@
     const currentOrigin = window.location.origin;
     const redirectUrl = `${currentOrigin}/index.html`;
 
-    const oauthUrl = `${SUPABASE_URL}/auth/v1/authorize?provider=${provider}&redirect_to=${encodeURIComponent(redirectUrl)}`;
+    // Added prompt=select_account so Google allows selecting a 2nd account
+    const oauthUrl = `${SUPABASE_URL}/auth/v1/authorize?provider=${provider}&redirect_to=${encodeURIComponent(redirectUrl)}&prompt=select_account`;
     window.location.href = oauthUrl;
   }
 
@@ -405,6 +413,7 @@
       }
 
       saveCurrentAccountToVault();
+      sessionStorage.removeItem('luvon_adding_secondary_account');
 
       await fetch(`${BASE_URL}/api/tenant/sync-profile`, {
         method: 'POST',
@@ -421,20 +430,7 @@
       }).catch(() => {});
 
       updateAuthUI(user, businessName);
-      showToast(`Welcome, ${businessName}! Successfully signed in.`, 'success');
-
-      const pendingPrompt = sessionStorage.getItem('pending_onboard_prompt');
-      if (pendingPrompt && typeof runAIBusinessSetup === 'function') {
-        sessionStorage.removeItem('pending_onboard_prompt');
-        showToast('Configuring store catalog with your prompt...', 'info');
-        runAIBusinessSetup(pendingPrompt).catch(() => {});
-      } else {
-        setTimeout(() => {
-          if (typeof loadLiveDashboardData === 'function') {
-            loadLiveDashboardData();
-          }
-        }, 500);
-      }
+      showToast(`Welcome, ${businessName}! Successfully authenticated.`, 'success');
 
       return true;
     } catch (err) {
@@ -504,6 +500,8 @@
     }
 
     try {
+      saveCurrentAccountToVault();
+
       const endpoint = currentAuthMode === 'signup' ? '/auth/signup' : '/auth/signin';
       const res = await fetch(`${BASE_URL}/api${endpoint}`, {
         method: 'POST',
@@ -514,9 +512,9 @@
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Authentication failed');
 
-      if (currentAuthMode === 'signup' && data.requiresVerification) {
+      if (currentAuthMode === 'signup') {
         closeSignInModal();
-        showToast(`Confirmation email sent to ${email}. Please verify your email before signing in!`, 'info');
+        showToast(`Confirmation email dispatched to ${email}. Please verify your email before signing in.`, 'info');
         switchAuthTab('signin');
         return;
       }
@@ -524,6 +522,7 @@
       localStorage.setItem('luvon_user', JSON.stringify(data.user || { email }));
       localStorage.setItem('luvon_active_tenant_id', data.tenantId);
       localStorage.setItem('luvon_business_name', data.businessName || fullName);
+      localStorage.setItem('luvon_user_email', email);
 
       const avatar = data.user?.user_metadata?.avatar_url || data.user?.user_metadata?.picture;
       if (avatar) {
@@ -533,16 +532,13 @@
       }
 
       saveCurrentAccountToVault();
+      sessionStorage.removeItem('luvon_adding_secondary_account');
 
       closeSignInModal();
       updateAuthUI(data.user, data.businessName);
       showToast(`Welcome, ${data.businessName || 'Merchant'}!`, 'success');
 
-      if (currentAuthMode === 'signup') {
-        openOnboardingModal();
-      } else {
-        setTimeout(() => window.location.reload(), 600);
-      }
+      setTimeout(() => window.location.reload(), 300);
     } catch (err) {
       showToast(err.message, 'error');
     } finally {
@@ -557,6 +553,7 @@
     const activeTenant = localStorage.getItem('luvon_active_tenant_id');
     const businessName = localStorage.getItem('luvon_business_name');
     if (isAuthenticated()) {
+      saveCurrentAccountToVault();
       updateAuthUI({ id: activeTenant }, businessName || 'Merchant Store');
     } else {
       updateAuthUI(null);
@@ -576,7 +573,6 @@
       if (tenantCard) tenantCard.classList.remove('hidden');
 
       if (userAvatarCircle) {
-        // Redirection on click to profile section in Settings
         userAvatarCircle.onclick = function() {
           window.location.href = 'settings.html#profile';
         };
@@ -587,7 +583,7 @@
         const initial = name.trim().charAt(0).toUpperCase() || 'M';
 
         if (avatarUrl) {
-          // Strictly NO border rings
+          // Clean borderless profile circle
           userAvatarCircle.className = "w-11 h-11 rounded-full overflow-hidden flex items-center justify-center cursor-pointer transition-transform hover:scale-105 shadow-md bg-stone-900";
           userAvatarCircle.innerHTML = `
             <img src="${avatarUrl}" alt="${name}" class="w-full h-full object-cover rounded-full" />
@@ -651,9 +647,9 @@
     isAuthenticated,
     getTenantId: getActiveTenantId,
     setTenantId,
-    runAIBusinessSetup,
-    openOnboardingModal,
-    closeOnboardingModal,
+    getAccountsVault,
+    switchAccount,
+    unlinkAccount,
     showToast,
     showConfirmModal,
     showPromptModal,
@@ -669,9 +665,7 @@
   window.handleCustomerAuth = handleCustomerAuth;
   window.toggleSignOut = toggleSignOut;
   window.switchAccount = switchAccount;
-  window.runAIBusinessSetup = runAIBusinessSetup;
-  window.openOnboardingModal = openOnboardingModal;
-  window.closeOnboardingModal = closeOnboardingModal;
+  window.unlinkAccount = unlinkAccount;
   window.initiateOAuth = initiateOAuth;
 
   document.addEventListener('DOMContentLoaded', async () => {
