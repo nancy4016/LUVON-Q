@@ -6,10 +6,10 @@ const axios = require('axios');
 const FormData = require('form-data');
 const cron = require('node-cron');
 
-// 1. SUPABASE REST & AUTH INTEGRATION VIA AXIOS
-const SUPABASE_URL = process.env.SUPABASE_URL || 'https://kmwwgmzypjnjfkpoyims.supabase.co';
-const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY || 'sb_publishable_DhTvZ4K5YCYLXErehDkBFQ_noylBgEH';
-const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
+// 1. SUPABASE REST & AUTH INTEGRATION (STRICT ENV ONLY)
+const SUPABASE_URL = (process.env.SUPABASE_URL || "").trim();
+const SUPABASE_ANON_KEY = (process.env.SUPABASE_ANON_KEY || "").trim();
+const SUPABASE_SERVICE_ROLE_KEY = (process.env.SUPABASE_SERVICE_ROLE_KEY || "").trim();
 
 const supabaseHeaders = {
   'apikey': SUPABASE_ANON_KEY,
@@ -19,15 +19,11 @@ const supabaseHeaders = {
 };
 
 const geminiApiKey = (process.env.GEMINI_API_KEY || "").trim();
-console.log("🔑 WhatsApp Token Prefix:", process.env.WHATSAPP_ACCESS_TOKEN ? process.env.WHATSAPP_ACCESS_TOKEN.substring(0, 14) + "..." : "❌ NO TOKEN LOADED");
-console.log("✨ Gemini Key Prefix:", geminiApiKey ? geminiApiKey.substring(0, 10) + "..." : "❌ NO GEMINI KEY LOADED");
-console.log("🗄️ Supabase REST Host:", SUPABASE_URL);
-console.log("🛡️ Supabase Service Role Key:", SUPABASE_SERVICE_ROLE_KEY ? "CONFIGURED" : "❌ MISSING");
 
 const app = express();
 
 // ==========================================
-// HIGH CAPACITY BODY PARSER & STATIC ASSETS
+// BODY PARSER & STATIC ASSETS
 // ==========================================
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ limit: '50mb', extended: true }));
@@ -44,10 +40,11 @@ app.use((req, res, next) => {
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 const DEFAULT_FEMALE_VOICE_ID = "EXAVITQu4vr4xnSDxMaL";
 
-const HC_SHORTCODE = process.env.DARAJA_BUSINESS_SHORTCODE || "174379";
-const HC_PASSKEY = process.env.DARAJA_PASSKEY || "bfb279f9aa9bdbcf158e97dd71a467cd2e0c893059b10f78e6b72ada1ed2c919";
-const HC_CONSUMER_KEY = process.env.DARAJA_CONSUMER_KEY || "5U68vQHgUCU7HpYSQZXegh2pFmzG1uBPTMNFcw5obW96GPVn";
-const HC_CONSUMER_SECRET = process.env.DARAJA_CONSUMER_SECRET || "2qwVKez82Raza13QyV9Ti8GqNLWKgGPWrJVpr1eot3OGNWluJAO1QaAjr1WaDsII";
+// DARAJA CREDENTIALS (STRICT ENV ONLY)
+const HC_SHORTCODE = (process.env.DARAJA_BUSINESS_SHORTCODE || "174379").trim();
+const HC_PASSKEY = (process.env.DARAJA_PASSKEY || "").trim();
+const HC_CONSUMER_KEY = (process.env.DARAJA_CONSUMER_KEY || "").trim();
+const HC_CONSUMER_SECRET = (process.env.DARAJA_CONSUMER_SECRET || "").trim();
 
 // ==========================================
 // 1. MULTI-TENANT PERSISTENT STORE
@@ -76,7 +73,7 @@ function initializeStore() {
           languagePreference: "mirror_user",
           elevenLabsVoiceId: process.env.ELEVENLABS_VOICE_ID || DEFAULT_FEMALE_VOICE_ID,
           escalationPhone: process.env.AGENT_PHONE_NUMBER || "254700000000",
-          whatsappPhoneId: process.env.WHATSAPP_PHONE_NUMBER_ID || "1350863544770006",
+          whatsappPhoneId: process.env.WHATSAPP_PHONE_NUMBER_ID || "",
           currency: "KSh",
           orderPrefix: "LQ",
           enableAlerts: true,
@@ -104,7 +101,7 @@ function saveStore() {
     db.processedMessageIds = (db.processedMessageIds || []).slice(-2000);
     fs.writeFileSync(DB_FILE, JSON.stringify(db, null, 2));
   } catch (e) {
-    console.error("❌ Failed to save store:", e.message);
+    console.error("Failed to save store:", e.message);
   }
 }
 
@@ -118,10 +115,11 @@ function resolveTenant(channelId) {
   return db.tenants["luvon_q_flagship"];
 }
 
+// STRICT SERVER-SIDE ROUTE GUARD
 function tenantMiddleware(req, res, next) {
   let tenantId = req.headers['x-tenant-id'];
   if (!tenantId || tenantId === 'anonymous') {
-    tenantId = 'luvon_q_flagship';
+    return res.status(401).json({ error: "Unauthorized. Please sign in to access store operations." });
   }
 
   if (!db.tenants[tenantId]) {
@@ -146,20 +144,175 @@ function tenantMiddleware(req, res, next) {
 }
 
 // ==========================================
-// 2. AI CONVERSATIONAL ENGINE (GEMINI CASCADE & RETRY)
+// 2. BACKEND OAUTH PROXY & AUTH VERIFICATION
+// ==========================================
+app.get('/api/auth/oauth/:provider', (req, res) => {
+  const { provider } = req.params;
+  const redirectUrl = req.query.redirect_to || `${req.protocol}://${req.get('host')}/index.html`;
+
+  if (!SUPABASE_URL) {
+    return res.status(500).send("SUPABASE_URL is not configured in .env on the server.");
+  }
+
+  const oauthUrl = `${SUPABASE_URL}/auth/v1/authorize?provider=${provider}&redirect_to=${encodeURIComponent(redirectUrl)}&prompt=select_account`;
+  res.redirect(oauthUrl);
+});
+
+app.post('/api/auth/verify-token', async (req, res) => {
+  const { accessToken } = req.body;
+  if (!accessToken) return res.status(400).json({ error: "Access token is required." });
+
+  try {
+    const userRes = await axios.get(`${SUPABASE_URL}/auth/v1/user`, {
+      headers: {
+        'apikey': SUPABASE_ANON_KEY,
+        'Authorization': `Bearer ${accessToken}`
+      }
+    });
+
+    const user = userRes.data;
+    const meta = user.user_metadata || {};
+    const businessName = meta.tenant_name || meta.full_name || meta.name || meta.user_name || (user.email ? user.email.split('@')[0] : 'My Store');
+    const tenantId = meta.tenant_id || `tenant_${user.id.replace(/-/g, '').slice(0, 10)}`;
+    const avatarUrl = meta.avatar_url || meta.picture || null;
+
+    if (!db.tenants[tenantId]) {
+      db.tenants[tenantId] = {
+        id: tenantId,
+        businessName,
+        industry: "Retail & Services",
+        tone: "luxury_chic",
+        currency: "KSh",
+        orderPrefix: "ORD",
+        enableAlerts: true,
+        teamMembers: [],
+        catalog: [],
+        metaPageId: null,
+        metaPageAccessToken: null,
+        metaIgBusinessId: null
+      };
+      saveStore();
+    }
+
+    res.json({
+      success: true,
+      user,
+      tenantId,
+      businessName,
+      avatarUrl
+    });
+  } catch (err) {
+    const msg = err.response?.data?.error_description || err.response?.data?.msg || err.message;
+    res.status(401).json({ error: msg });
+  }
+});
+
+app.post('/api/auth/signup', async (req, res) => {
+  const { email, password, fullName } = req.body;
+  if (!email || !password) return res.status(400).json({ error: "Email and password required" });
+
+  try {
+    const authRes = await axios.post(`${SUPABASE_URL}/auth/v1/signup`, {
+      email,
+      password,
+      data: { full_name: fullName }
+    }, { headers: supabaseHeaders });
+
+    const user = authRes.data.user || authRes.data;
+    const session = authRes.data.session || null;
+    const requiresVerification = !session && (!user.confirmed_at && !user.email_confirmed_at);
+    const tenantId = 'tenant_' + (user.id ? user.id.replace(/-/g, '').slice(0, 10) : Date.now());
+
+    await axios.post(`${SUPABASE_URL}/rest/v1/tenants`, {
+      id: tenantId,
+      owner_id: user.id,
+      business_name: fullName || 'New Business',
+      brand_signature: (fullName || 'New Business') + ' Official',
+      industry: 'Retail & Services'
+    }, { headers: supabaseHeaders }).catch(() => {});
+
+    db.tenants[tenantId] = {
+      id: tenantId,
+      businessName: fullName || 'New Business',
+      brandSignature: (fullName || 'New Business') + ' Official',
+      industry: 'Retail & Services',
+      tone: 'luxury_chic',
+      currency: 'KSh',
+      orderPrefix: 'LQ',
+      enableAlerts: true,
+      teamMembers: [],
+      catalog: [],
+      metaPageId: null,
+      metaPageAccessToken: null,
+      metaIgBusinessId: null
+    };
+    saveStore();
+
+    res.json({
+      success: true,
+      requiresVerification,
+      user,
+      tenantId,
+      businessName: fullName
+    });
+  } catch (err) {
+    const msg = err.response?.data?.msg || err.response?.data?.error_description || err.message;
+    res.status(400).json({ error: msg });
+  }
+});
+
+app.post('/api/auth/signin', async (req, res) => {
+  const { email, password } = req.body;
+  if (!email || !password) return res.status(400).json({ error: "Email and password required" });
+
+  try {
+    const authRes = await axios.post(`${SUPABASE_URL}/auth/v1/token?grant_type=password`, {
+      email,
+      password
+    }, { headers: supabaseHeaders });
+
+    const user = authRes.data.user;
+    let businessName = user.user_metadata?.full_name || 'My Store';
+    let tenantId = 'tenant_' + user.id.replace(/-/g, '').slice(0, 10);
+
+    const tenantRes = await axios.get(`${SUPABASE_URL}/rest/v1/tenants?owner_id=eq.${user.id}&limit=1`, {
+      headers: supabaseHeaders
+    }).catch(() => null);
+
+    if (tenantRes?.data?.[0]) {
+      tenantId = tenantRes.data[0].id;
+      businessName = tenantRes.data[0].business_name;
+    }
+
+    if (!db.tenants[tenantId]) {
+      db.tenants[tenantId] = {
+        id: tenantId,
+        businessName,
+        teamMembers: [],
+        catalog: [],
+        metaPageId: null,
+        metaPageAccessToken: null,
+        metaIgBusinessId: null
+      };
+      saveStore();
+    }
+
+    res.json({ success: true, user, tenantId, businessName });
+  } catch (err) {
+    const msg = err.response?.data?.error_description || err.response?.data?.msg || err.message;
+    res.status(400).json({ error: msg });
+  }
+});
+
+// ==========================================
+// 3. AI CONVERSATIONAL ENGINE (GEMINI CASCADE)
 // ==========================================
 async function callGeminiAPI(systemPrompt, userText) {
-  const models = [
-    'gemini-3.8-flash',
-    'gemini-3.1-pro-preview',
-    'gemini-2.5-flash',
-    'gemini-2.0-flash'
-  ];
+  const models = ['gemini-2.5-flash', 'gemini-2.0-flash'];
 
   for (const model of models) {
     for (let attempt = 0; attempt < 2; attempt++) {
       try {
-        console.log(`✨ Invoking Google Gemini model [${model}] (Attempt ${attempt + 1})...`);
         const response = await axios.post(
           `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${geminiApiKey}`,
           {
@@ -176,8 +329,6 @@ async function callGeminiAPI(systemPrompt, userText) {
         }
       } catch (err) {
         const errorMsg = err.response?.data?.error?.message || err.message;
-        console.warn(`⚠️ Model [${model}] attempt ${attempt + 1} failed: ${errorMsg}`);
-        
         if (errorMsg.includes('high demand') || err.response?.status === 429 || err.response?.status === 503) {
           await sleep(1500);
         } else {
@@ -187,7 +338,7 @@ async function callGeminiAPI(systemPrompt, userText) {
     }
   }
 
-  return "Niaje! Tuko hapa kukusaidia. System yetu inafanya update kidogo—unatafuta sneakers gani specifically nikusaidie right now?";
+  return "Niaje! Tuko hapa kukusaidia. System yetu inafanya update kidogo—unatafuta nini specifically nikusaidie right now?";
 }
 
 async function handleAIOnboarding(req, res) {
@@ -271,7 +422,6 @@ Return STRICT RAW JSON only. Do not wrap in markdown or backticks.
       catalog: req.tenant.catalog
     });
   } catch (err) {
-    console.error("❌ AI Onboard Failure:", err.message);
     return res.status(500).json({ error: "Our AI store architect is experiencing high demand. Please try again." });
   }
 }
@@ -280,7 +430,7 @@ app.post('/api/tenant/ai-onboard', tenantMiddleware, handleAIOnboarding);
 app.post('/api/ai-onboard', tenantMiddleware, handleAIOnboarding);
 
 // ==========================================
-// 3. SETTINGS, OAUTH SYNC & WORKSPACE ENDPOINTS
+// 4. SETTINGS & WORKSPACE ENDPOINTS
 // ==========================================
 app.post('/api/tenant/sync-profile', tenantMiddleware, async (req, res) => {
   const { userId, email, businessName, avatarUrl } = req.body;
@@ -342,10 +492,7 @@ app.post('/api/tenant/settings/profile', tenantMiddleware, async (req, res) => {
 });
 
 app.get('/api/tenant/team', tenantMiddleware, (req, res) => {
-  res.json({
-    success: true,
-    members: req.tenant.teamMembers || []
-  });
+  res.json({ success: true, members: req.tenant.teamMembers || [] });
 });
 
 app.post('/api/tenant/team/invite', tenantMiddleware, async (req, res) => {
@@ -398,14 +545,6 @@ app.post('/api/tenant/team/invite', tenantMiddleware, async (req, res) => {
     return res.json({ success: true, member: newMember, message: `Invitation dispatched to ${cleanEmail}` });
   } catch (authErr) {
     const errorDetails = authErr.response?.data?.msg || authErr.response?.data?.error_description || authErr.message;
-    console.error("❌ Supabase Auth Invite Rejected:", errorDetails);
-    
-    if (authErr.response?.status === 401 || authErr.response?.status === 403) {
-      return res.status(500).json({ 
-        error: "Supabase denied invite dispatch. SUPABASE_SERVICE_ROLE_KEY must be configured on Render." 
-      });
-    }
-
     return res.status(400).json({ error: `Invite failed: ${errorDetails}` });
   }
 });
@@ -427,46 +566,8 @@ app.post('/api/tenant/team/accept', tenantMiddleware, (req, res) => {
     });
   }
 
-  if (found) {
-    saveStore();
-  }
-
+  if (found) saveStore();
   res.json({ success: true, status: 'Active' });
-});
-
-app.post('/api/tenant/team/resend', tenantMiddleware, async (req, res) => {
-  const { memberId } = req.body;
-  const member = (req.tenant.teamMembers || []).find(m => m.id === memberId);
-
-  if (!member) {
-    return res.status(404).json({ error: "Team member not found." });
-  }
-
-  const keyToUse = SUPABASE_SERVICE_ROLE_KEY || SUPABASE_ANON_KEY;
-  try {
-    await axios.post(
-      `${SUPABASE_URL}/auth/v1/invite`,
-      { 
-        email: member.email,
-        data: {
-          role: member.role,
-          tenant_id: req.tenant.id,
-          tenant_name: req.tenant.businessName
-        }
-      },
-      {
-        headers: {
-          'apikey': keyToUse,
-          'Authorization': `Bearer ${keyToUse}`,
-          'Content-Type': 'application/json'
-        }
-      }
-    );
-    return res.json({ success: true, message: `Invitation resent to ${member.email}` });
-  } catch (err) {
-    const errorDetails = err.response?.data?.msg || err.message;
-    return res.status(400).json({ error: `Could not resend: ${errorDetails}` });
-  }
 });
 
 app.delete('/api/tenant/team/:memberId', tenantMiddleware, (req, res) => {
@@ -499,107 +600,6 @@ app.delete('/api/tenant/account', tenantMiddleware, async (req, res) => {
     res.json({ success: true, message: "Workspace and associated records deleted permanently." });
   } catch (err) {
     res.status(500).json({ error: err.message });
-  }
-});
-
-// ==========================================
-// 4. SUPABASE SERVER AUTH PROXY
-// ==========================================
-app.post('/api/auth/signup', async (req, res) => {
-  const { email, password, fullName } = req.body;
-  if (!email || !password) return res.status(400).json({ error: "Email and password required" });
-
-  try {
-    const authRes = await axios.post(`${SUPABASE_URL}/auth/v1/signup`, {
-      email,
-      password,
-      data: { full_name: fullName }
-    }, { headers: supabaseHeaders });
-
-    const user = authRes.data.user || authRes.data;
-    const session = authRes.data.session || null;
-
-    const requiresVerification = !session && (!user.confirmed_at && !user.email_confirmed_at);
-    const tenantId = 'tenant_' + (user.id ? user.id.replace(/-/g, '').slice(0, 10) : Date.now());
-
-    await axios.post(`${SUPABASE_URL}/rest/v1/tenants`, {
-      id: tenantId,
-      owner_id: user.id,
-      business_name: fullName || 'New Business',
-      brand_signature: (fullName || 'New Business') + ' Official',
-      industry: 'Retail & Services'
-    }, { headers: supabaseHeaders }).catch(() => {});
-
-    db.tenants[tenantId] = {
-      id: tenantId,
-      businessName: fullName || 'New Business',
-      brandSignature: (fullName || 'New Business') + ' Official',
-      industry: 'Retail & Services',
-      tone: 'luxury_chic',
-      currency: 'KSh',
-      orderPrefix: 'LQ',
-      enableAlerts: true,
-      teamMembers: [],
-      catalog: [],
-      metaPageId: null,
-      metaPageAccessToken: null,
-      metaIgBusinessId: null
-    };
-    saveStore();
-
-    res.json({
-      success: true,
-      requiresVerification,
-      user,
-      tenantId,
-      businessName: fullName
-    });
-  } catch (err) {
-    const msg = err.response?.data?.msg || err.response?.data?.error_description || err.message;
-    res.status(400).json({ error: msg });
-  }
-});
-
-app.post('/api/auth/signin', async (req, res) => {
-  const { email, password } = req.body;
-  if (!email || !password) return res.status(400).json({ error: "Email and password required" });
-
-  try {
-    const authRes = await axios.post(`${SUPABASE_URL}/auth/v1/token?grant_type=password`, {
-      email,
-      password
-    }, { headers: supabaseHeaders });
-
-    const user = authRes.data.user;
-    let businessName = user.user_metadata?.full_name || 'My Store';
-    let tenantId = 'tenant_' + user.id.replace(/-/g, '').slice(0, 10);
-
-    const tenantRes = await axios.get(`${SUPABASE_URL}/rest/v1/tenants?owner_id=eq.${user.id}&limit=1`, {
-      headers: supabaseHeaders
-    }).catch(() => null);
-
-    if (tenantRes?.data?.[0]) {
-      tenantId = tenantRes.data[0].id;
-      businessName = tenantRes.data[0].business_name;
-    }
-
-    if (!db.tenants[tenantId]) {
-      db.tenants[tenantId] = {
-        id: tenantId,
-        businessName,
-        teamMembers: [],
-        catalog: [],
-        metaPageId: null,
-        metaPageAccessToken: null,
-        metaIgBusinessId: null
-      };
-      saveStore();
-    }
-
-    res.json({ success: true, user, tenantId, businessName });
-  } catch (err) {
-    const msg = err.response?.data?.error_description || err.response?.data?.msg || err.message;
-    res.status(400).json({ error: msg });
   }
 });
 
@@ -713,7 +713,7 @@ app.post('/api/tenant/conversations/simulate-inquiry', tenantMiddleware, async (
   const { customerId, text } = req.body;
   if (!text) return res.status(400).json({ error: "Text inquiry is required" });
 
-  const phone = customerId ? customerId.toString().replace(/\+/g, '').trim() : "254708374149";
+  const phone = customerId ? customerId.toString().replace(/\+/g, '').trim() : "254700000000";
   const { profile } = getOrCreateCustomerSession(req.tenant, phone, 'whatsapp');
 
   try {
@@ -769,7 +769,7 @@ app.post('/api/tenant/payments/daraja', tenantMiddleware, (req, res) => {
 
 app.post('/api/tenant/payments/test-stk', tenantMiddleware, async (req, res) => {
   const { testPhone } = req.body;
-  let cleanPhone = String(testPhone || "254708374149").replace(/\D/g, '').trim();
+  let cleanPhone = String(testPhone || "254700000000").replace(/\D/g, '').trim();
   if (cleanPhone.startsWith('0')) cleanPhone = '254' + cleanPhone.slice(1);
   if (!cleanPhone.startsWith('254')) cleanPhone = '254' + cleanPhone;
 
@@ -798,7 +798,7 @@ app.post('/api/tenant/conversations/toggle-pause', tenantMiddleware, (req, res) 
 });
 
 // ==========================================
-// 6. META GRAPH API (INSTAGRAM & FACEBOOK PUBLISHING)
+// 6. META GRAPH API (INSTAGRAM & FACEBOOK)
 // ==========================================
 const META_GRAPH_VERSION = 'v21.0';
 const META_GRAPH_BASE = `https://graph.facebook.com/${META_GRAPH_VERSION}`;
@@ -825,7 +825,6 @@ async function publishToInstagram({ igUserId, pageAccessToken, mediaUrl, caption
   const containerId = containerRes.data?.id;
   if (!containerId) throw new Error('Failed to create Instagram media container');
 
-  // Video and Reels must be encoded by Meta before publishing
   if (mediaType === 'REELS' || mediaType === 'VIDEO') {
     let isReady = false;
     let attempts = 0;
@@ -875,7 +874,7 @@ async function publishToFacebook({ pageId, pageAccessToken, mediaUrl, caption })
 }
 
 // ==========================================
-// 7. CAMPAIGN MANAGEMENT & SCHEDULED POSTING ENDPOINTS
+// 7. CAMPAIGN MANAGEMENT & DISPATCH
 // ==========================================
 app.get('/api/tenant/campaigns/posts', tenantMiddleware, async (req, res) => {
   try {
@@ -889,7 +888,6 @@ app.get('/api/tenant/campaigns/posts', tenantMiddleware, async (req, res) => {
   }
 });
 
-// Delete a scheduled, published, or failed post with tenant isolation check
 app.delete('/api/tenant/campaigns/posts/:id', tenantMiddleware, async (req, res) => {
   const { id } = req.params;
   if (!id) return res.status(400).json({ error: "Post ID is required." });
@@ -912,9 +910,8 @@ app.post('/api/tenant/campaigns/schedule', tenantMiddleware, async (req, res) =>
     return res.status(400).json({ error: "Caption and scheduled date/time are required." });
   }
 
-  // Auto-attach Click-to-WhatsApp attribution link to direct leads to Luvon Q
   let processedCaption = caption;
-  const escalationPhone = req.tenant.escalationPhone || "254768820142";
+  const escalationPhone = req.tenant.escalationPhone || process.env.AGENT_PHONE_NUMBER || "254700000000";
   const tag = (campaignTag || "PROMO").toUpperCase().replace(/\s+/g, '_');
   const whatsappUrl = `https://wa.me/${escalationPhone}?text=Hello%2C%20I%20saw%20your%20post%20regarding%20${encodeURIComponent(tag)}`;
 
@@ -922,7 +919,6 @@ app.post('/api/tenant/campaigns/schedule', tenantMiddleware, async (req, res) =>
     processedCaption += `\n\n💬 Order / Inquire via WhatsApp: ${whatsappUrl}`;
   }
 
-  // Canonical hosted route resolution for local video demo
   let cleanMediaUrl = mediaUrl || null;
   const serverBaseUrl = (process.env.SERVER_URL || "https://luvonq.changelens.africa").replace(/\/$/, "");
   if (!cleanMediaUrl && (mediaType === 'REELS' || mediaType === 'VIDEO')) {
@@ -1032,10 +1028,8 @@ cron.schedule('* * * * *', async () => {
           },
           { headers: supabaseHeaders }
         );
-        console.log(`📢 Dispatched scheduled campaign post [${post.id}] to ${publishedIds.join(', ')}`);
       } catch (dispatchErr) {
         errorMessage = dispatchErr.response?.data?.error?.message || dispatchErr.message;
-        console.error(`❌ Post dispatch failed [${post.id}]:`, errorMessage);
         await axios.patch(
           `${SUPABASE_URL}/rest/v1/scheduled_posts?id=eq.${post.id}`,
           {
@@ -1047,12 +1041,12 @@ cron.schedule('* * * * *', async () => {
       }
     }
   } catch (cronErr) {
-    console.error("❌ Campaign scheduler error:", cronErr.message);
+    console.error("Campaign scheduler error:", cronErr.message);
   }
 });
 
 // ==========================================
-// 8. DARAJA SANDBOX GATEWAY
+// 8. DARAJA GATEWAY (STRICT ENV ONLY)
 // ==========================================
 let cachedDarajaToken = null;
 let tokenExpiryTime = 0;
@@ -1060,6 +1054,10 @@ let tokenExpiryTime = 0;
 async function getHardcodedDarajaToken(forceRefresh = false) {
   const now = Date.now();
   if (!forceRefresh && cachedDarajaToken && now < tokenExpiryTime) return cachedDarajaToken;
+
+  if (!HC_CONSUMER_KEY || !HC_CONSUMER_SECRET) {
+    throw new Error("Missing DARAJA_CONSUMER_KEY or DARAJA_CONSUMER_SECRET in .env");
+  }
 
   const auth = Buffer.from(`${HC_CONSUMER_KEY}:${HC_CONSUMER_SECRET}`).toString('base64');
   const response = await axios.get('https://sandbox.safaricom.co.ke/oauth/v1/generate?grant_type=client_credentials', {
@@ -1080,12 +1078,17 @@ async function executeDarajaSTK(tenant, phoneNumber, amount, itemRef, isRetry = 
     const eatDate = new Date(Date.now() + (3 * 60 * 60 * 1000));
     const pad = (n) => String(n).padStart(2, '0');
     const timestamp = `${eatDate.getUTCFullYear()}${pad(eatDate.getUTCMonth() + 1)}${pad(eatDate.getUTCDate())}${pad(eatDate.getUTCHours())}${pad(eatDate.getUTCMinutes())}${pad(eatDate.getUTCSeconds())}`;
+    
+    if (!HC_SHORTCODE || !HC_PASSKEY) {
+      throw new Error("Missing DARAJA_BUSINESS_SHORTCODE or DARAJA_PASSKEY in .env");
+    }
+
     const password = Buffer.from(`${HC_SHORTCODE}${HC_PASSKEY}${timestamp}`).toString('base64');
 
     let cleanPhone = String(phoneNumber || '').replace(/\D/g, '').trim();
     if (cleanPhone.startsWith('0')) cleanPhone = '254' + cleanPhone.slice(1);
     if (!cleanPhone.startsWith('254')) cleanPhone = '254' + cleanPhone;
-    if (cleanPhone.length !== 12) cleanPhone = "254708374149";
+    if (cleanPhone.length !== 12) cleanPhone = "254700000000";
 
     const serverBaseUrl = (process.env.SERVER_URL || "https://luvonq.changelens.africa").replace(/\/$/, "");
     const res = await axios.post(
@@ -1137,7 +1140,7 @@ async function sendWhatsAppText(tenant, toPhone, text) {
   let cleanPhone = String(toPhone || '').replace(/\D/g, '').trim();
   if (cleanPhone.startsWith('0')) cleanPhone = '254' + cleanPhone.slice(1);
   if (!cleanPhone.startsWith('254')) cleanPhone = '254' + cleanPhone;
-  const phoneId = tenant.whatsappPhoneId || process.env.WHATSAPP_PHONE_NUMBER_ID || "1350863544770006";
+  const phoneId = tenant.whatsappPhoneId || process.env.WHATSAPP_PHONE_NUMBER_ID || "";
 
   const res = await axios.post(
     `https://graph.facebook.com/v20.0/${phoneId}/messages`,
@@ -1148,7 +1151,7 @@ async function sendWhatsAppText(tenant, toPhone, text) {
 }
 
 // ==========================================
-// 9. LIVE META WEBHOOK (INBOUND MESSAGES)
+// 9. LIVE META WEBHOOK
 // ==========================================
 app.get('/webhook', (req, res) => {
   const mode = req.query['hub.mode'];
@@ -1156,7 +1159,6 @@ app.get('/webhook', (req, res) => {
   const challenge = req.query['hub.challenge'];
 
   if (mode && token === process.env.WHATSAPP_VERIFY_TOKEN) {
-    console.log("✅ Webhook verified by Meta handshake.");
     return res.status(200).send(challenge);
   }
   res.sendStatus(403);
@@ -1183,15 +1185,10 @@ app.post('/webhook', async (req, res) => {
     db.processedMessageIds.push(messageId);
 
     const fromPhone = message.from || value?.contacts?.[0]?.wa_id;
-    if (!fromPhone) {
-      console.warn("⚠️ Received message payload without sender phone number.");
-      return;
-    }
+    if (!fromPhone) return;
 
     const userText = message.text?.body || "";
     const recipientPhoneId = value?.metadata?.phone_number_id;
-
-    console.log(`📩 Inbound WhatsApp [from: ${fromPhone}, phoneId: ${recipientPhoneId}]: "${userText}"`);
 
     const tenant = resolveTenant(recipientPhoneId);
     const { profile } = getOrCreateCustomerSession(tenant, fromPhone, 'whatsapp');
@@ -1204,10 +1201,7 @@ app.post('/webhook', async (req, res) => {
     profile.lastInteraction = new Date().toISOString();
     saveStore();
 
-    if (profile.isPaused) {
-      console.log(`⏸️ Bot paused for ${fromPhone}. Awaiting human agent response.`);
-      return;
-    }
+    if (profile.isPaused) return;
 
     const systemPrompt = `
 You are the elite AI sales concierge for **${tenant.businessName}**, an e-commerce brand in Nairobi.
@@ -1230,10 +1224,8 @@ Directives:
     saveStore();
 
     await sendWhatsAppText(tenant, fromPhone, botReply);
-    console.log(`🚀 AI Reply dispatched to ${fromPhone}: "${botReply}"`);
-
   } catch (webhookErr) {
-    console.error("❌ Webhook processing error:", webhookErr.response?.data || webhookErr.message);
+    console.error("Webhook processing error:", webhookErr.response?.data || webhookErr.message);
   }
 });
 
@@ -1246,7 +1238,7 @@ app.get('/', (req, res) => {
 });
 
 // ==========================================
-// 10. GLOBAL ERROR HANDLER (ENSURES STRICT JSON RESPONSES)
+// 10. GLOBAL ERROR HANDLER
 // ==========================================
 app.use((err, req, res, next) => {
   if (err.type === 'entity.too.large') {
@@ -1254,16 +1246,15 @@ app.use((err, req, res, next) => {
       error: "Creative file exceeds maximum size limit (50MB). Please select a compressed image or video."
     });
   }
-  console.error("❌ Internal Server Exception:", err.message);
   res.status(err.status || 500).json({ error: err.message || "An unexpected error occurred." });
 });
 
 // ==========================================
-// 11. SERVER BOOTSTRAP (RENDER PRODUCTION COMPLIANT)
+// 11. SERVER BOOTSTRAP
 // ==========================================
 const PORT = process.env.PORT || 10000;
 app.listen(PORT, '0.0.0.0', () => {
-  console.log(`🚀 Luvon Q Multi-Tenant Engine running on port ${PORT} (0.0.0.0)`);
+  console.log(`Luvon Q Multi-Tenant Engine running on port ${PORT} (0.0.0.0)`);
 });
 
 module.exports = app;

@@ -4,23 +4,6 @@
     ? window.location.origin
     : '';
 
-  let SUPABASE_URL = '';
-  let SUPABASE_ANON_KEY = '';
-
-  // Asynchronously fetch public connection parameters from server environment (Zero Hardcoded Keys)
-  async function loadPublicConfig() {
-    try {
-      const res = await fetch(`${BASE_URL}/api/config/public`);
-      if (res.ok) {
-        const data = await res.json();
-        SUPABASE_URL = data.supabaseUrl || '';
-        SUPABASE_ANON_KEY = data.supabaseAnonKey || '';
-      }
-    } catch (e) {
-      console.warn('Could not retrieve public authentication config');
-    }
-  }
-
   function isAuthenticated() {
     const user = localStorage.getItem('luvon_user');
     const tenantId = localStorage.getItem('luvon_active_tenant_id') || localStorage.getItem('luvon_tenant_id');
@@ -89,7 +72,7 @@
     let vault = getAccountsVault();
     vault = vault.filter(acc => acc.email.toLowerCase() !== email.toLowerCase());
     vault.unshift(currentAcc);
-    vault = vault.slice(0, 2); // Enforce maximum of 2 accounts
+    vault = vault.slice(0, 2);
     localStorage.setItem('luvon_accounts_vault', JSON.stringify(vault));
   }
 
@@ -98,13 +81,11 @@
     const vault = getAccountsVault();
     const currentEmail = (localStorage.getItem('luvon_user_email') || '').toLowerCase();
     
-    // Locate the other paired account
     const target = targetEmail 
       ? vault.find(acc => acc.email.toLowerCase() === targetEmail.toLowerCase())
       : vault.find(acc => acc.email.toLowerCase() !== currentEmail);
 
     if (target && target.accessToken) {
-      // Instant seamless switch
       localStorage.setItem('luvon_user', JSON.stringify(target.user));
       localStorage.setItem('luvon_active_tenant_id', target.tenantId);
       localStorage.setItem('luvon_business_name', target.businessName);
@@ -122,7 +103,6 @@
       showToast(`Switched account to ${target.businessName || target.email}`, 'success');
       setTimeout(() => window.location.reload(), 200);
     } else {
-      // Second account not paired yet -> launch connection flow for 2nd account
       if (vault.length >= 2) {
         showToast('Maximum 2 accounts connected. Please remove an account in Settings first.', 'warning');
         return;
@@ -357,20 +337,11 @@
   }
 
   // ==========================================
-  // OAUTH INITIALIZATION (Google / GitHub)
+  // OAUTH INITIALIZATION (ROUTED VIA SERVER)
   // ==========================================
-  async function initiateOAuth(provider) {
+  function initiateOAuth(provider) {
     if (!['google', 'github'].includes(provider)) {
       showToast(`Unsupported login provider: ${provider}`, 'error');
-      return;
-    }
-
-    if (!SUPABASE_URL) {
-      await loadPublicConfig();
-    }
-
-    if (!SUPABASE_URL) {
-      showToast("Authentication server unavailable. Check server connection.", "error");
       return;
     }
 
@@ -384,8 +355,8 @@
     const currentOrigin = window.location.origin;
     const redirectUrl = `${currentOrigin}/index.html`;
 
-    const oauthUrl = `${SUPABASE_URL}/auth/v1/authorize?provider=${provider}&redirect_to=${encodeURIComponent(redirectUrl)}&prompt=select_account`;
-    window.location.href = oauthUrl;
+    // Proxied securely through Express server
+    window.location.href = `${BASE_URL}/api/auth/oauth/${provider}?redirect_to=${encodeURIComponent(redirectUrl)}`;
   }
 
   // ==========================================
@@ -404,24 +375,20 @@
 
       window.history.replaceState({}, document.title, window.location.pathname);
 
-      if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
-        await loadPublicConfig();
-      }
-
-      const userRes = await fetch(`${SUPABASE_URL}/auth/v1/user`, {
-        headers: {
-          'apikey': SUPABASE_ANON_KEY,
-          'Authorization': `Bearer ${accessToken}`
-        }
+      // Verify token on server without exposing any credentials in client JS
+      const verifyRes = await fetch(`${BASE_URL}/api/auth/verify-token`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ accessToken })
       });
 
-      if (!userRes.ok) throw new Error('Could not verify credentials with authentication server.');
-      const user = await userRes.json();
-      const meta = user.user_metadata || {};
+      if (!verifyRes.ok) {
+        const errData = await verifyRes.json().catch(() => ({}));
+        throw new Error(errData.error || 'Authentication server verification failed.');
+      }
 
-      const businessName = meta.tenant_name || meta.full_name || meta.name || meta.user_name || (user.email ? user.email.split('@')[0] : 'My Store');
-      const tenantId = meta.tenant_id || `tenant_${user.id.replace(/-/g, '').slice(0, 10)}`;
-      const avatarUrl = meta.avatar_url || meta.picture || null;
+      const data = await verifyRes.json();
+      const { user, tenantId, businessName, avatarUrl } = data;
 
       localStorage.setItem('luvon_user', JSON.stringify(user));
       localStorage.setItem('luvon_active_tenant_id', tenantId);
@@ -440,20 +407,6 @@
 
       saveCurrentAccountToVault();
       sessionStorage.removeItem('luvon_adding_secondary_account');
-
-      await fetch(`${BASE_URL}/api/tenant/sync-profile`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-tenant-id': tenantId
-        },
-        body: JSON.stringify({
-          userId: user.id,
-          email: user.email,
-          businessName: businessName,
-          avatarUrl: avatarUrl
-        })
-      }).catch(() => {});
 
       updateAuthUI(user, businessName);
       showToast(`Welcome, ${businessName}! Successfully authenticated.`, 'success');
@@ -654,8 +607,6 @@
   window.initiateOAuth = initiateOAuth;
 
   document.addEventListener('DOMContentLoaded', async () => {
-    await loadPublicConfig();
-
     const redirected = await handleAuthHashRedirect();
     if (!redirected) {
       checkAuthSession();
