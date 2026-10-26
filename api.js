@@ -2,10 +2,24 @@
 (function () {
   const BASE_URL = (typeof window !== 'undefined' && window.location.origin && window.location.origin.includes('http') && !window.location.origin.includes('localhost'))
     ? window.location.origin
-    : 'https://luvon-engine.onrender.com';
+    : '';
 
-  const SUPABASE_URL = 'https://kmwwgmzypjnjfkpoyims.supabase.co';
-  const SUPABASE_ANON_KEY = 'sb_publishable_DhTvZ4K5YCYLXErehDkBFQ_noylBgEH';
+  let SUPABASE_URL = '';
+  let SUPABASE_ANON_KEY = '';
+
+  // Asynchronously fetch public connection parameters from server environment (Zero Hardcoded Keys)
+  async function loadPublicConfig() {
+    try {
+      const res = await fetch(`${BASE_URL}/api/config/public`);
+      if (res.ok) {
+        const data = await res.json();
+        SUPABASE_URL = data.supabaseUrl || '';
+        SUPABASE_ANON_KEY = data.supabaseAnonKey || '';
+      }
+    } catch (e) {
+      console.warn('Could not retrieve public authentication config');
+    }
+  }
 
   function isAuthenticated() {
     const user = localStorage.getItem('luvon_user');
@@ -75,7 +89,7 @@
     let vault = getAccountsVault();
     vault = vault.filter(acc => acc.email.toLowerCase() !== email.toLowerCase());
     vault.unshift(currentAcc);
-    vault = vault.slice(0, 2); // Strictly max 2 accounts
+    vault = vault.slice(0, 2); // Enforce maximum of 2 accounts
     localStorage.setItem('luvon_accounts_vault', JSON.stringify(vault));
   }
 
@@ -345,9 +359,18 @@
   // ==========================================
   // OAUTH INITIALIZATION (Google / GitHub)
   // ==========================================
-  function initiateOAuth(provider) {
+  async function initiateOAuth(provider) {
     if (!['google', 'github'].includes(provider)) {
       showToast(`Unsupported login provider: ${provider}`, 'error');
+      return;
+    }
+
+    if (!SUPABASE_URL) {
+      await loadPublicConfig();
+    }
+
+    if (!SUPABASE_URL) {
+      showToast("Authentication server unavailable. Check server connection.", "error");
       return;
     }
 
@@ -361,7 +384,6 @@
     const currentOrigin = window.location.origin;
     const redirectUrl = `${currentOrigin}/index.html`;
 
-    // Added prompt=select_account so Google allows selecting a 2nd account
     const oauthUrl = `${SUPABASE_URL}/auth/v1/authorize?provider=${provider}&redirect_to=${encodeURIComponent(redirectUrl)}&prompt=select_account`;
     window.location.href = oauthUrl;
   }
@@ -381,6 +403,10 @@
       if (!accessToken) return false;
 
       window.history.replaceState({}, document.title, window.location.pathname);
+
+      if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
+        await loadPublicConfig();
+      }
 
       const userRes = await fetch(`${SUPABASE_URL}/auth/v1/user`, {
         headers: {
@@ -583,7 +609,6 @@
         const initial = name.trim().charAt(0).toUpperCase() || 'M';
 
         if (avatarUrl) {
-          // Clean borderless profile circle
           userAvatarCircle.className = "w-11 h-11 rounded-full overflow-hidden flex items-center justify-center cursor-pointer transition-transform hover:scale-105 shadow-md bg-stone-900";
           userAvatarCircle.innerHTML = `
             <img src="${avatarUrl}" alt="${name}" class="w-full h-full object-cover rounded-full" />
@@ -600,46 +625,6 @@
 
     if (window.lucide && typeof window.lucide.createIcons === 'function') {
       lucide.createIcons();
-    }
-  }
-
-  function openOnboardingModal() {
-    const modal = document.getElementById('aiOnboardingModal');
-    if (modal) {
-      modal.classList.remove('hidden');
-      if (window.lucide && typeof window.lucide.createIcons === 'function') lucide.createIcons();
-    }
-  }
-
-  function closeOnboardingModal() {
-    const modal = document.getElementById('aiOnboardingModal');
-    if (modal) modal.classList.add('hidden');
-  }
-
-  async function runAIBusinessSetup(promptText) {
-    if (!promptText || !promptText.trim()) return;
-
-    try {
-      const res = await fetch(`${BASE_URL}/api/tenant/ai-onboard`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-tenant-id': getActiveTenantId()
-        },
-        body: JSON.stringify({ prompt: promptText })
-      });
-
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'AI store configuration failed');
-
-      localStorage.setItem('luvon_business_name', data.businessName);
-      showToast(`Store Generated! Business: ${data.businessName} with ${data.catalog?.length || 0} catalog items.`, 'success');
-      
-      closeOnboardingModal();
-      setTimeout(() => window.location.reload(), 1200);
-    } catch (err) {
-      showToast(`AI Setup Notice: ${err.message}`, 'error');
-      throw err;
     }
   }
 
@@ -669,6 +654,8 @@
   window.initiateOAuth = initiateOAuth;
 
   document.addEventListener('DOMContentLoaded', async () => {
+    await loadPublicConfig();
+
     const redirected = await handleAuthHashRedirect();
     if (!redirected) {
       checkAuthSession();
