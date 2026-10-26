@@ -52,7 +52,13 @@
     const tenantId = localStorage.getItem('luvon_active_tenant_id');
     if (!userStr || !tenantId || tenantId === 'anonymous') return;
 
-    const user = JSON.parse(userStr);
+    let user = {};
+    try {
+      user = JSON.parse(userStr);
+    } catch (e) {
+      user = { id: tenantId };
+    }
+
     const email = localStorage.getItem('luvon_user_email') || user.email || '';
     const businessName = localStorage.getItem('luvon_business_name') || 'Merchant Store';
     const avatarUrl = localStorage.getItem('luvon_user_avatar') || null;
@@ -72,7 +78,7 @@
     let vault = getAccountsVault();
     vault = vault.filter(acc => acc.email.toLowerCase() !== email.toLowerCase());
     vault.unshift(currentAcc);
-    vault = vault.slice(0, 2);
+    vault = vault.slice(0, 2); // Strictly max 2 accounts
     localStorage.setItem('luvon_accounts_vault', JSON.stringify(vault));
   }
 
@@ -80,11 +86,13 @@
     saveCurrentAccountToVault();
     const vault = getAccountsVault();
     const currentEmail = (localStorage.getItem('luvon_user_email') || '').toLowerCase();
-    
-    const target = targetEmail 
+
+    // Locate the target or alternate account
+    let target = targetEmail 
       ? vault.find(acc => acc.email.toLowerCase() === targetEmail.toLowerCase())
       : vault.find(acc => acc.email.toLowerCase() !== currentEmail);
 
+    // If target exists and has a valid token, instant 1-click switch
     if (target && target.accessToken) {
       localStorage.setItem('luvon_user', JSON.stringify(target.user));
       localStorage.setItem('luvon_active_tenant_id', target.tenantId);
@@ -102,15 +110,38 @@
 
       showToast(`Switched account to ${target.businessName || target.email}`, 'success');
       setTimeout(() => window.location.reload(), 200);
-    } else {
-      if (vault.length >= 2) {
-        showToast('Maximum 2 accounts connected. Please remove an account in Settings first.', 'warning');
-        return;
-      }
-      sessionStorage.setItem('luvon_adding_secondary_account', 'true');
-      showToast('Connect your second account (Max 2 accounts).', 'info');
-      openSignInModal();
+      return;
     }
+
+    // Self-healing: Target exists in vault but lacks a token -> prompt login for that target
+    if (target && !target.accessToken) {
+      sessionStorage.setItem('luvon_adding_secondary_account', 'true');
+      sessionStorage.setItem('luvon_target_switch_email', target.email);
+      showToast(`Authenticate ${target.email} to complete linking.`, 'info');
+      openSignInModal();
+      return;
+    }
+
+    // Connecting a new second account if under the 2-account limit
+    if (vault.length >= 2) {
+      showToast('Maximum 2 accounts connected. Please unlink an account in Settings first.', 'warning');
+      return;
+    }
+
+    sessionStorage.setItem('luvon_adding_secondary_account', 'true');
+    showToast('Connect your 2nd account (Max 2 accounts).', 'info');
+    openSignInModal();
+  }
+
+  function connectSecondaryAccount() {
+    const vault = getAccountsVault();
+    if (vault.length >= 2) {
+      showToast('Maximum 2 accounts connected. Please remove an account in Settings first.', 'warning');
+      return;
+    }
+    saveCurrentAccountToVault();
+    sessionStorage.setItem('luvon_adding_secondary_account', 'true');
+    openSignInModal();
   }
 
   function unlinkAccount(targetEmail) {
@@ -407,6 +438,7 @@
 
       saveCurrentAccountToVault();
       sessionStorage.removeItem('luvon_adding_secondary_account');
+      sessionStorage.removeItem('luvon_target_switch_email');
 
       updateAuthUI(user, businessName);
       showToast(`Welcome, ${businessName}! Successfully authenticated.`, 'success');
@@ -512,6 +544,7 @@
 
       saveCurrentAccountToVault();
       sessionStorage.removeItem('luvon_adding_secondary_account');
+      sessionStorage.removeItem('luvon_target_switch_email');
 
       closeSignInModal();
       updateAuthUI(data.user, data.businessName);
@@ -587,6 +620,7 @@
     setTenantId,
     getAccountsVault,
     switchAccount,
+    connectSecondaryAccount,
     unlinkAccount,
     showToast,
     showConfirmModal,
@@ -603,6 +637,7 @@
   window.handleCustomerAuth = handleCustomerAuth;
   window.toggleSignOut = toggleSignOut;
   window.switchAccount = switchAccount;
+  window.connectSecondaryAccount = connectSecondaryAccount;
   window.unlinkAccount = unlinkAccount;
   window.initiateOAuth = initiateOAuth;
 

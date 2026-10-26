@@ -172,7 +172,7 @@
           </div>
           <div>
             <h2 class="text-base font-serif font-bold text-brand-900">Connected Accounts</h2>
-            <p class="text-xs text-slate-500">Fast 1-click switching between paired merchant accounts (2 accounts maximum)</p>
+            <p class="text-xs text-slate-500">Pair up to 2 merchant accounts with 1-click switching from anywhere</p>
           </div>
         </div>
       </div>
@@ -420,7 +420,7 @@
         const isCurrent = acc.email.toLowerCase() === currentEmail;
         const initial = (acc.businessName || acc.email || 'M').trim().charAt(0).toUpperCase();
         
-        // Clean borderless avatar for list view
+        // Borderless circular avatar
         const avatarImg = acc.avatarUrl 
           ? `<img src="${acc.avatarUrl}" class="w-12 h-12 rounded-full object-cover shadow-sm flex-shrink-0" />`
           : `<div class="w-12 h-12 rounded-full bg-slate-900 text-[#bf862d] font-bold text-lg flex items-center justify-center flex-shrink-0 shadow-sm">${initial}</div>`;
@@ -437,14 +437,14 @@
 
             <div class="flex items-center gap-2 flex-shrink-0">
               ${!isCurrent ? `
-                <button onclick="window.API.switchAccount('${acc.email}')" class="px-3 py-1.5 bg-brand-600 hover:bg-brand-700 text-white rounded-lg text-xs font-semibold transition-all cursor-pointer">
-                  Switch
+                <button type="button" onclick="window.API.switchAccount('${acc.email}')" class="px-3.5 py-1.5 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-xs font-semibold shadow-sm transition-all cursor-pointer">
+                  Activate
                 </button>
-                <button onclick="window.API.unlinkAccount('${acc.email}')" class="p-1.5 text-slate-400 hover:text-rose-600 rounded-lg transition-colors cursor-pointer" title="Unlink Account">
+                <button type="button" onclick="window.API.unlinkAccount('${acc.email}')" class="p-1.5 text-slate-400 hover:text-rose-600 rounded-lg transition-colors cursor-pointer" title="Unlink Account">
                   <i data-lucide="trash-2" class="w-4 h-4"></i>
                 </button>
               ` : `
-                <button onclick="editCurrentAccountName()" class="px-2.5 py-1 text-slate-500 hover:text-brand-900 text-xs font-medium cursor-pointer">
+                <button type="button" onclick="editCurrentAccountName()" class="px-2.5 py-1 text-slate-500 hover:text-brand-900 text-xs font-medium cursor-pointer">
                   Edit Name
                 </button>
               `}
@@ -453,12 +453,12 @@
         `;
       });
 
-      // Show option to connect second account if under the 2-account maximum
+      // Explicit "Add / Connect Account" card for slot 2 when under 2 accounts
       if (vault.length < 2) {
         html += `
-          <div onclick="window.API.switchAccount()" class="p-4 rounded-xl border-2 border-dashed border-brand-200 hover:border-brand-500 bg-brand-50/20 hover:bg-brand-50/50 flex items-center justify-center gap-2 cursor-pointer transition-all text-brand-800">
+          <div onclick="window.API.connectSecondaryAccount()" class="p-4 rounded-xl border-2 border-dashed border-brand-200 hover:border-brand-500 bg-brand-50/20 hover:bg-brand-50/50 flex items-center justify-center gap-2.5 cursor-pointer transition-all text-brand-800">
             <i data-lucide="plus-circle" class="w-5 h-5 text-brand-600"></i>
-            <span class="text-xs font-bold">Connect 2nd Account (1-Click Switch)</span>
+            <span class="text-xs font-bold">Add / Connect Account</span>
           </div>
         `;
       }
