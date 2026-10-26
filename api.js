@@ -1,22 +1,3 @@
-// Local Sandbox Environment Fallback Controller
-const originalFetch = window.fetch;
-window.fetch = async function(...args) {
-    try {
-        const response = await originalFetch(...args);
-        if (!response.ok && (args[0].includes('api/tenant/settings') || args[0].includes('api/tenant/team'))) {
-            throw new Error("Local sandbox bypass required");
-        }
-        return response;
-    } catch (e) {
-        // Return dummy structured objects instead of broken 404 HTML strings
-        return new Response(JSON.stringify(
-            args[0].includes('settings') 
-            ? { businessName: "Luvon Barbershop", currencyCode: "KSh", orderPrefix: "LQ" }
-            : []
-        ), { status: 200, headers: { 'Content-Type': 'application/json' } });
-    }
-};
-
 // api.js - Luvon Q Production Client Bridge & Luxury Feedback System
 (function () {
   const BASE_URL = (typeof window !== 'undefined' && window.location.origin && window.location.origin.includes('http') && !window.location.origin.includes('localhost'))
@@ -26,10 +7,30 @@ window.fetch = async function(...args) {
   const SUPABASE_URL = 'https://kmwwgmzypjnjfkpoyims.supabase.co';
   const SUPABASE_ANON_KEY = 'sb_publishable_DhTvZ4K5YCYLXErehDkBFQ_noylBgEH';
 
+  function isAuthenticated() {
+    const user = localStorage.getItem('luvon_user');
+    const tenantId = localStorage.getItem('luvon_active_tenant_id') || localStorage.getItem('luvon_tenant_id');
+    return Boolean(user && tenantId && tenantId !== 'anonymous');
+  }
+
+  // ========================================================
+  // STRICT ROUTE AUTHENTICATION GATE (CLIENT LAYER)
+  // ========================================================
+  const currentPath = window.location.pathname.toLowerCase();
+  const isLandingPage = currentPath === '/' || currentPath.endsWith('index.html') || currentPath === '';
+  
+  if (!isLandingPage && !isAuthenticated()) {
+    if (document.documentElement) {
+      document.documentElement.style.display = 'none';
+    }
+    sessionStorage.setItem('luvon_auth_redirect_reason', 'Please sign in to access your store portal.');
+    window.location.replace('/index.html?auth=required');
+  }
+
   function getActiveTenantId() {
     return localStorage.getItem('luvon_active_tenant_id') || 
            localStorage.getItem('luvon_tenant_id') || 
-           'luvon_q_flagship';
+           'anonymous';
   }
 
   function setTenantId(tenantId) {
@@ -208,7 +209,7 @@ window.fetch = async function(...args) {
     });
   }
 
-  // Intercept standard window.alert so even legacy calls look premium
+  // Intercept standard window.alert
   window.alert = function(msg) {
     showToast(msg, 'info');
   };
@@ -223,18 +224,14 @@ window.fetch = async function(...args) {
       ...(options.headers || {})
     };
 
-            const res = await fetch(url, { ...options, headers });
-        
-        // Safely check if the response is actually a JSON format 
-        const contentType = res.headers.get("content-type");
-        if (!res.ok || !contentType || !contentType.includes("application/json")) {
-            // Return an empty array placeholder so your UI tables display beautifully instead of crashing
-            return [];
-        }
+    const res = await fetch(url, { ...options, headers });
+    const contentType = res.headers.get("content-type");
+    if (!res.ok || !contentType || !contentType.includes("application/json")) {
+      return [];
+    }
 
-        const data = await res.json().catch(() => []);
-        return data;
-
+    const data = await res.json().catch(() => []);
+    return data;
   }
 
   // ==========================================
@@ -312,7 +309,6 @@ window.fetch = async function(...args) {
       }).catch(() => {});
 
       updateAuthUI(user, businessName);
-
       showToast(`Welcome, ${businessName}! Successfully signed in.`, 'success');
 
       const pendingPrompt = sessionStorage.getItem('pending_onboard_prompt');
@@ -413,6 +409,7 @@ window.fetch = async function(...args) {
         return;
       }
 
+      localStorage.setItem('luvon_user', JSON.stringify(data.user || { email }));
       localStorage.setItem('luvon_active_tenant_id', data.tenantId);
       localStorage.setItem('luvon_business_name', data.businessName || fullName);
 
@@ -438,7 +435,7 @@ window.fetch = async function(...args) {
   function checkAuthSession() {
     const activeTenant = localStorage.getItem('luvon_active_tenant_id');
     const businessName = localStorage.getItem('luvon_business_name');
-    if (activeTenant && activeTenant !== 'anonymous') {
+    if (isAuthenticated()) {
       updateAuthUI({ id: activeTenant }, businessName || 'Merchant Store');
     } else {
       updateAuthUI(null);
@@ -454,18 +451,23 @@ window.fetch = async function(...args) {
     localStorage.removeItem('luvon_refresh_token');
     updateAuthUI(null);
     showToast('Signed out successfully.', 'info');
-    setTimeout(() => window.location.reload(), 500);
+    setTimeout(() => {
+      window.location.replace('/index.html');
+    }, 400);
   }
 
   function updateAuthUI(user, businessName) {
     const signInBtn = document.getElementById('portalSignInBtn');
     const tenantCard = document.getElementById('activeTenantCard');
-    const tenantNameEl = document.getElementById('tenantName');
+    const userInitial = document.getElementById('userInitial');
 
-    if (user) {
+    if (user && isAuthenticated()) {
       if (signInBtn) signInBtn.classList.add('hidden');
       if (tenantCard) tenantCard.classList.remove('hidden');
-      if (tenantNameEl) tenantNameEl.textContent = businessName || 'My Business';
+      if (userInitial) {
+        const name = businessName || 'N';
+        userInitial.textContent = name.trim().charAt(0).toUpperCase();
+      }
     } else {
       if (signInBtn) signInBtn.classList.remove('hidden');
       if (tenantCard) tenantCard.classList.add('hidden');
@@ -514,6 +516,7 @@ window.fetch = async function(...args) {
   }
 
   window.API = {
+    isAuthenticated,
     getTenantId: getActiveTenantId,
     setTenantId,
     runAIBusinessSetup,
@@ -542,6 +545,20 @@ window.fetch = async function(...args) {
     const redirected = await handleAuthHashRedirect();
     if (!redirected) {
       checkAuthSession();
+    }
+
+    if (isLandingPage) {
+      const urlParams = new URLSearchParams(window.location.search);
+      const authRequired = urlParams.get('auth');
+      const redirectReason = sessionStorage.getItem('luvon_auth_redirect_reason');
+      
+      if (authRequired === 'required' || redirectReason) {
+        sessionStorage.removeItem('luvon_auth_redirect_reason');
+        openSignInModal();
+        if (redirectReason) {
+          showToast(redirectReason, 'warning');
+        }
+      }
     }
   });
 })();

@@ -5,6 +5,19 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>LUVON Q | Campaigns & Auto-Publishing</title>
 
+  <script>
+    // Immediate Inline Head Guard
+    (function() {
+      const user = localStorage.getItem('luvon_user');
+      const tenant = localStorage.getItem('luvon_active_tenant_id') || localStorage.getItem('luvon_tenant_id');
+      if (!user || !tenant || tenant === 'anonymous') {
+        document.documentElement.style.display = 'none';
+        sessionStorage.setItem('luvon_auth_redirect_reason', 'Please sign in to schedule or view campaigns.');
+        window.location.replace('/index.html?auth=required');
+      }
+    })();
+  </script>
+
   <script src="https://cdn.tailwindcss.com"></script>
   <script>
     tailwind.config = {
@@ -101,20 +114,14 @@
         <i data-lucide="log-in" class="w-4 h-4"></i>
         <span>Sign In to Portal</span>
       </button>
-     <!-- Unique, High-Contrast Gold User Session Indicator -->
-<!-- Unique, High-Contrast Solid Gold User Session Indicator -->
-<!-- Dynamically Styled Round User Avatar Block -->
-<div id="activeTenantCard" class="hidden mt-auto pt-4 border-t border-[#bf862d]/20 w-full px-2 flex justify-center items-center">
-    <div class="flex items-center justify-center py-2">
-        <!-- The Round Initial Badge with Theme Colors -->
-        <div id="userAvatarCircle" class="w-11 h-11 rounded-full bg-slate-900 text-[#bf862d] flex items-center justify-center font-black text-xl shadow-md border-2 border-[#bf862d]/30 cursor-pointer transition-transform hover:scale-105" onclick="toggleSignOut()">
+      <div id="activeTenantCard" class="hidden mt-auto pt-4 border-t border-[#bf862d]/20 w-full px-2 flex justify-center items-center">
+        <div class="flex items-center justify-center py-2">
+          <div id="userAvatarCircle" class="w-11 h-11 rounded-full bg-slate-900 text-[#bf862d] flex items-center justify-center font-black text-xl shadow-md border-2 border-[#bf862d]/30 cursor-pointer transition-transform hover:scale-105" onclick="toggleSignOut()">
             <span id="userInitial">N</span>
+          </div>
         </div>
+      </div>
     </div>
-</div>
-
-
-
   </aside>
 
   <!-- Main Content Area -->
@@ -133,8 +140,6 @@
         </button>
       </div>
     </header>
-
-    
 
     <!-- Posts Queue Table -->
     <section class="bg-white rounded-xl border border-brand-200 shadow-sm overflow-hidden">
@@ -229,7 +234,6 @@
               onchange="handleCampaignFileSelect(this)" 
             />
 
-            <!-- Empty Drop Prompt -->
             <div id="campaignDropPrompt" class="space-y-2">
               <div class="w-10 h-10 mx-auto rounded-full bg-brand-100 text-brand-700 flex items-center justify-center group-hover:scale-110 transition-transform">
                 <i data-lucide="cloud-upload" class="w-5 h-5"></i>
@@ -238,7 +242,6 @@
               <p class="text-[10px] text-slate-400">Supports PNG, JPG, WebP, or MP4 Video</p>
             </div>
 
-            <!-- Visual Preview Container -->
             <div id="campaignMediaPreviewWrapper" class="hidden relative rounded-xl overflow-hidden max-h-56 mx-auto border border-brand-200">
               <img id="campaignImagePreview" src="" alt="Preview" class="w-full h-auto object-cover max-h-56 mx-auto hidden" />
               <video id="campaignVideoPreview" controls class="w-full h-auto max-h-56 mx-auto hidden"></video>
@@ -287,7 +290,6 @@
           </div>
         </div>
 
-        <!-- Luvon Gold Upload Progress Indicator -->
         <div id="luvonUploadProgressCard" class="hidden p-3.5 bg-brand-900 text-white rounded-xl border border-brand-500/40 shadow-inner space-y-2">
           <div class="flex items-center justify-between text-xs font-medium">
             <span id="luvonUploadStatusText" class="flex items-center gap-2 text-brand-200">
@@ -366,14 +368,9 @@
     }
 
     function checkAuthAndOpen(modalOpenerFn) {
-      const activeTenant = localStorage.getItem('luvon_active_tenant_id');
-      const user = localStorage.getItem('luvon_user');
-      if (!activeTenant || activeTenant === 'anonymous' || !user) {
-        if (typeof openSignInModal === 'function') {
-          openSignInModal();
-        } else {
-          window.API.showToast('Please sign in to manage or schedule campaigns.', 'warning');
-        }
+      if (!window.API.isAuthenticated()) {
+        window.API.showToast('Please sign in to manage or schedule campaigns.', 'warning');
+        if (typeof openSignInModal === 'function') openSignInModal();
         return;
       }
       modalOpenerFn();
@@ -405,7 +402,6 @@
       if (modal) modal.classList.add('hidden');
     }
 
-    // Drag-and-Drop & Preview Handling
     function handleDragOver(e, el) {
       e.preventDefault();
       el.classList.add('border-brand-600', 'bg-brand-100/50');
@@ -491,36 +487,40 @@
     }
 
     async function loadCampaignPosts() {
-      const tenantId = localStorage.getItem('luvon_active_tenant_id') || 'luvon_q_flagship';
+      const tenantId = window.API.getTenantId();
       const tbody = document.getElementById('campaigns-table-body');
       if (!tbody) return;
 
       try {
-       const res = await fetch('/api/tenant/campaigns/posts', {
-    headers: { 'x-tenant-id': tenantId }
-});
+        const res = await fetch('/api/tenant/campaigns/posts', {
+          headers: { 'x-tenant-id': tenantId }
+        });
 
-// ADD THIS CHECK HERE TO STOP THE CRASH:
-if (!res.ok) {
-    tbody.innerHTML = `
-        <tr>
-            <!-- Update the class list to text-slate-400 for a clean faded grey look -->
-<td colspan="8" class="p-8 text-center text-slate-400 font-medium">
-    No campaign posts queued yet. Click + Create Campaign Post" above to schedule your first.
-</td>
+        if (!res.ok) {
+          tbody.innerHTML = `
+            <tr>
+              <td colspan="8" class="p-8 text-center text-slate-400 font-medium">
+                No campaign posts queued yet. Click "+ Create Campaign Post" above to schedule your first post.
+              </td>
+            </tr>
+          `;
+          renderIcons();
+          return;
+        }
 
-        </tr>
-    `;
-    updateMetrics([]);
-    renderIcons();
-    return;
-}
+        const posts = await res.json(); 
 
-// Now this line is 100% safe from crashing!
-const posts = await res.json(); 
-
-
-        updateMetrics(posts);
+        if (!Array.isArray(posts) || posts.length === 0) {
+          tbody.innerHTML = `
+            <tr>
+              <td colspan="8" class="p-8 text-center text-slate-400 font-medium">
+                No campaign posts queued yet. Click "+ Create Campaign Post" above to schedule your first post.
+              </td>
+            </tr>
+          `;
+          renderIcons();
+          return;
+        }
 
         tbody.innerHTML = posts.map(post => {
           const dateStr = post.scheduled_at ? new Date(post.scheduled_at).toLocaleString() : 'Immediate';
@@ -574,7 +574,7 @@ const posts = await res.json();
       });
       if (!confirmed) return;
 
-      const tenantId = localStorage.getItem('luvon_active_tenant_id') || 'luvon_q_flagship';
+      const tenantId = window.API.getTenantId();
 
       try {
         const res = await fetch(`/api/tenant/campaigns/posts/${postId}`, {
@@ -591,20 +591,10 @@ const posts = await res.json();
       }
     }
 
-    function updateMetrics(posts) {
-      const scheduled = posts.filter(p => p.status === 'scheduled').length;
-      const published = posts.filter(p => p.status === 'published').length;
-      
-      const sEl = document.getElementById('statScheduled');
-      const pEl = document.getElementById('statPublished');
-      if (sEl) sEl.textContent = scheduled;
-      if (pEl) pEl.textContent = published;
-    }
-
     function handleScheduleFormSubmit(e) {
       e.preventDefault();
       const btn = document.getElementById('submitScheduleBtn');
-      const tenantId = localStorage.getItem('luvon_active_tenant_id') || 'luvon_q_flagship';
+      const tenantId = window.API.getTenantId();
 
       let mediaUrl = document.getElementById('postMediaPayload').value.trim();
       if (!mediaUrl || mediaUrl.startsWith('data:video')) {
@@ -697,7 +687,7 @@ const posts = await res.json();
     async function handleCredentialsSubmit(e) {
       e.preventDefault();
       const btn = document.getElementById('saveCredentialsBtn');
-      const tenantId = localStorage.getItem('luvon_active_tenant_id') || 'luvon_q_flagship';
+      const tenantId = window.API.getTenantId();
 
       const payload = {
         pageId: document.getElementById('metaPageId').value.trim(),

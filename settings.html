@@ -5,6 +5,19 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>LUVON Q | Store & Workspace Settings</title>
   
+  <script>
+    // Immediate Inline Head Guard
+    (function() {
+      const user = localStorage.getItem('luvon_user');
+      const tenant = localStorage.getItem('luvon_active_tenant_id') || localStorage.getItem('luvon_tenant_id');
+      if (!user || !tenant || tenant === 'anonymous') {
+        document.documentElement.style.display = 'none';
+        sessionStorage.setItem('luvon_auth_redirect_reason', 'Please sign in to access workspace settings.');
+        window.location.replace('/index.html?auth=required');
+      }
+    })();
+  </script>
+
   <script src="https://cdn.tailwindcss.com"></script>
   <script>
     tailwind.config = {
@@ -102,20 +115,14 @@
         <i data-lucide="log-in" class="w-4 h-4"></i>
         <span>Sign In to Portal</span>
       </button>
-     <!-- Unique, High-Contrast Gold User Session Indicator -->
-<!-- Unique, High-Contrast Solid Gold User Session Indicator -->
-<!-- Dynamically Styled Round User Avatar Block -->
-<div id="activeTenantCard" class="hidden mt-auto pt-4 border-t border-[#bf862d]/20 w-full px-2 flex justify-center items-center">
-    <div class="flex items-center justify-center py-2">
-        <!-- The Round Initial Badge with Theme Colors -->
-        <div id="userAvatarCircle" class="w-11 h-11 rounded-full bg-slate-900 text-[#bf862d] flex items-center justify-center font-black text-xl shadow-md border-2 border-[#bf862d]/30 cursor-pointer transition-transform hover:scale-105" onclick="toggleSignOut()">
+      <div id="activeTenantCard" class="hidden mt-auto pt-4 border-t border-[#bf862d]/20 w-full px-2 flex justify-center items-center">
+        <div class="flex items-center justify-center py-2">
+          <div id="userAvatarCircle" class="w-11 h-11 rounded-full bg-slate-900 text-[#bf862d] flex items-center justify-center font-black text-xl shadow-md border-2 border-[#bf862d]/30 cursor-pointer transition-transform hover:scale-105" onclick="toggleSignOut()">
             <span id="userInitial">N</span>
+          </div>
         </div>
+      </div>
     </div>
-</div>
-
-
-
   </aside>
 
   <!-- Main Content Area -->
@@ -158,7 +165,7 @@
 
           <div>
             <label class="block font-semibold text-slate-700 mb-1">Human Agent Escalation Phone (WhatsApp & Voice Hand-off)</label>
-            <input type="text" id="escalationPhoneInput" placeholder="254768820142" class="w-full px-3.5 py-2.5 bg-brand-50 border border-brand-200 rounded-xl focus:outline-none focus:border-brand-600 font-mono text-slate-800" />
+            <input type="text" id="escalationPhoneInput" placeholder="254700000000" class="w-full px-3.5 py-2.5 bg-brand-50 border border-brand-200 rounded-xl focus:outline-none focus:border-brand-600 font-mono text-slate-800" />
             <p class="text-[10px] text-slate-400 mt-1">When buyers request an owner or custom quote, conversation context routes here.</p>
           </div>
 
@@ -175,7 +182,7 @@
         </div>
       </section>
 
-      <!-- 2. Meta Publishing & Instagram Auto-Scheduler Credentials -->
+      <!-- 2. Meta Publishing Credentials -->
       <section class="bg-white rounded-2xl border border-brand-200 p-6 shadow-sm space-y-4">
         <div class="flex items-center gap-2.5 border-b border-brand-200 pb-3">
           <div class="w-7 h-7 rounded-lg bg-blue-100 text-blue-700 flex items-center justify-center font-bold">
@@ -213,7 +220,7 @@
       </section>
     </div>
 
-    <!-- 3. Team Member Access & Role Management -->
+    <!-- 3. Team Member Access -->
     <section class="bg-white rounded-2xl border border-brand-200 shadow-sm overflow-hidden">
       <div class="p-6 border-b border-brand-200 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
@@ -251,7 +258,7 @@
       </div>
     </section>
 
-    <!-- 4. Security, Row-Level Isolation & Danger Zone -->
+    <!-- 4. Multi-Tenant Isolation & Danger Zone -->
     <section class="bg-white rounded-2xl border border-brand-200 p-6 shadow-sm space-y-6">
       <div class="flex items-center gap-2.5 border-b border-brand-200 pb-3">
         <div class="w-7 h-7 rounded-lg bg-amber-100 text-amber-800 flex items-center justify-center font-bold">
@@ -359,7 +366,7 @@
     }
 
     async function loadWorkspaceData() {
-      const tenantId = window.API?.getTenantId() || localStorage.getItem('luvon_active_tenant_id') || 'luvon_q_flagship';
+      const tenantId = window.API.getTenantId();
       const tenantDisplay = document.getElementById('tenantIdDisplay');
       if (tenantDisplay) tenantDisplay.textContent = tenantId;
 
@@ -390,7 +397,7 @@
     }
 
     async function loadTeamMembers() {
-      const tenantId = window.API?.getTenantId() || localStorage.getItem('luvon_active_tenant_id') || 'luvon_q_flagship';
+      const tenantId = window.API.getTenantId();
       const tbody = document.getElementById('team-table-body');
       if (!tbody) return;
 
@@ -437,7 +444,7 @@
       const email = document.getElementById('inviteEmail').value.trim();
       const role = document.getElementById('inviteRole').value;
       const btn = document.getElementById('submitInviteBtn');
-      const tenantId = window.API?.getTenantId() || localStorage.getItem('luvon_active_tenant_id') || 'luvon_q_flagship';
+      const tenantId = window.API.getTenantId();
 
       btn.disabled = true;
       btn.innerHTML = `<i data-lucide="loader-2" class="w-3.5 h-3.5 animate-spin"></i> Sending...`;
@@ -477,7 +484,7 @@
       });
       if (!confirmed) return;
 
-      const tenantId = window.API?.getTenantId() || localStorage.getItem('luvon_active_tenant_id') || 'luvon_q_flagship';
+      const tenantId = window.API.getTenantId();
 
       try {
         const res = await fetch(`/api/tenant/team/${memberId}`, {
@@ -494,7 +501,7 @@
 
     async function saveStoreProfile() {
       const btn = document.getElementById('saveProfileBtn');
-      const tenantId = window.API?.getTenantId() || localStorage.getItem('luvon_active_tenant_id') || 'luvon_q_flagship';
+      const tenantId = window.API.getTenantId();
 
       const payload = {
         businessName: document.getElementById('businessNameInput').value.trim(),
@@ -532,7 +539,7 @@
 
     async function saveMetaCredentials() {
       const btn = document.getElementById('saveMetaBtn');
-      const tenantId = window.API?.getTenantId() || localStorage.getItem('luvon_active_tenant_id') || 'luvon_q_flagship';
+      const tenantId = window.API.getTenantId();
 
       const payload = {
         pageId: document.getElementById('metaPageIdInput').value.trim(),
@@ -577,7 +584,7 @@
         return;
       }
 
-      const tenantId = window.API?.getTenantId() || localStorage.getItem('luvon_active_tenant_id');
+      const tenantId = window.API.getTenantId();
       try {
         const res = await fetch('/api/tenant/account', {
           method: 'DELETE',

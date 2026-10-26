@@ -5,6 +5,19 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>LUVON Q | Omnichannel Inbox</title>
   
+  <script>
+    // Immediate Inline Head Guard
+    (function() {
+      const user = localStorage.getItem('luvon_user');
+      const tenant = localStorage.getItem('luvon_active_tenant_id') || localStorage.getItem('luvon_tenant_id');
+      if (!user || !tenant || tenant === 'anonymous') {
+        document.documentElement.style.display = 'none';
+        sessionStorage.setItem('luvon_auth_redirect_reason', 'Please sign in to view customer conversations.');
+        window.location.replace('/index.html?auth=required');
+      }
+    })();
+  </script>
+
   <script src="https://cdn.tailwindcss.com"></script>
   <script>
     tailwind.config = {
@@ -108,20 +121,14 @@
         <i data-lucide="log-in" class="w-4 h-4"></i>
         <span>Sign In to Portal</span>
       </button>
-      <!-- Unique, High-Contrast Gold User Session Indicator -->
-<!-- Unique, High-Contrast Solid Gold User Session Indicator -->
-<!-- Dynamically Styled Round User Avatar Block -->
-<div id="activeTenantCard" class="hidden mt-auto pt-4 border-t border-[#bf862d]/20 w-full px-2 flex justify-center items-center">
-    <div class="flex items-center justify-center py-2">
-        <!-- The Round Initial Badge with Theme Colors -->
-        <div id="userAvatarCircle" class="w-11 h-11 rounded-full bg-slate-900 text-[#bf862d] flex items-center justify-center font-black text-xl shadow-md border-2 border-[#bf862d]/30 cursor-pointer transition-transform hover:scale-105" onclick="toggleSignOut()">
+      <div id="activeTenantCard" class="hidden mt-auto pt-4 border-t border-[#bf862d]/20 w-full px-2 flex justify-center items-center">
+        <div class="flex items-center justify-center py-2">
+          <div id="userAvatarCircle" class="w-11 h-11 rounded-full bg-slate-900 text-[#bf862d] flex items-center justify-center font-black text-xl shadow-md border-2 border-[#bf862d]/30 cursor-pointer transition-transform hover:scale-105" onclick="toggleSignOut()">
             <span id="userInitial">N</span>
+          </div>
         </div>
+      </div>
     </div>
-</div>
-
-
-
   </aside>
 
   <!-- Main Inbox Layout -->
@@ -360,12 +367,6 @@
           <span>Dispatch Prompt</span>
         </button>
       </div>
-    </div>
-  </div>
-
-  <div id="toast" class="fixed bottom-5 right-5 z-50 hidden transition-all duration-300">
-    <div id="toast-inner" class="px-4 py-3 rounded-xl shadow-xl flex items-center gap-2.5 text-xs font-semibold border">
-      <span id="toast-msg">Notification</span>
     </div>
   </div>
 

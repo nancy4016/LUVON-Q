@@ -5,6 +5,19 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>LUVON Q | Catalog & Stock Manager</title>
   
+  <script>
+    // Immediate Inline Head Guard: Prevents rendering if not authenticated
+    (function() {
+      const user = localStorage.getItem('luvon_user');
+      const tenant = localStorage.getItem('luvon_active_tenant_id') || localStorage.getItem('luvon_tenant_id');
+      if (!user || !tenant || tenant === 'anonymous') {
+        document.documentElement.style.display = 'none';
+        sessionStorage.setItem('luvon_auth_redirect_reason', 'Please sign in to access your store catalog.');
+        window.location.replace('/index.html?auth=required');
+      }
+    })();
+  </script>
+
   <script src="https://cdn.tailwindcss.com"></script>
   <script>
     tailwind.config = {
@@ -106,20 +119,14 @@
         <i data-lucide="log-in" class="w-4 h-4"></i>
         <span>Sign In to Portal</span>
       </button>
-      <!-- Unique, High-Contrast Gold User Session Indicator -->
-<!-- Unique, High-Contrast Solid Gold User Session Indicator -->
-<!-- Dynamically Styled Round User Avatar Block -->
-<div id="activeTenantCard" class="hidden mt-auto pt-4 border-t border-[#bf862d]/20 w-full px-2 flex justify-center items-center">
-    <div class="flex items-center justify-center py-2">
-        <!-- The Round Initial Badge with Theme Colors -->
-        <div id="userAvatarCircle" class="w-11 h-11 rounded-full bg-slate-900 text-[#bf862d] flex items-center justify-center font-black text-xl shadow-md border-2 border-[#bf862d]/30 cursor-pointer transition-transform hover:scale-105" onclick="toggleSignOut()">
+      <div id="activeTenantCard" class="hidden mt-auto pt-4 border-t border-[#bf862d]/20 w-full px-2 flex justify-center items-center">
+        <div class="flex items-center justify-center py-2">
+          <div id="userAvatarCircle" class="w-11 h-11 rounded-full bg-slate-900 text-[#bf862d] flex items-center justify-center font-black text-xl shadow-md border-2 border-[#bf862d]/30 cursor-pointer transition-transform hover:scale-105" onclick="toggleSignOut()">
             <span id="userInitial">N</span>
+          </div>
         </div>
+      </div>
     </div>
-</div>
-
-
-
   </aside>
 
   <!-- Main Content Area -->
@@ -233,7 +240,6 @@
               onchange="handleCatalogFileSelect(this)" 
             />
 
-            <!-- Empty Drop Prompt -->
             <div id="productDropPrompt" class="space-y-1.5">
               <div class="w-9 h-9 mx-auto rounded-full bg-brand-100 text-brand-700 flex items-center justify-center group-hover:scale-110 transition-transform">
                 <i data-lucide="image-plus" class="w-4 h-4"></i>
@@ -242,7 +248,6 @@
               <p class="text-[10px] text-slate-400">PNG, JPG, or WebP</p>
             </div>
 
-            <!-- Preview Container -->
             <div id="productMediaPreviewWrapper" class="hidden relative rounded-xl overflow-hidden max-h-44 mx-auto border border-brand-200">
               <img id="productImagePreview" src="" alt="Preview" class="w-full h-auto object-cover max-h-44 mx-auto" />
               <button 
@@ -284,14 +289,9 @@
     }
 
     function checkAuthAndOpenProductModal() {
-      const activeTenant = localStorage.getItem('luvon_active_tenant_id');
-      const user = localStorage.getItem('luvon_user');
-      if (!activeTenant || activeTenant === 'anonymous' || !user) {
-        if (typeof openSignInModal === 'function') {
-          openSignInModal();
-        } else {
-          window.API.showToast('Please sign in to access and manage your private store catalog.', 'warning');
-        }
+      if (!window.API.isAuthenticated()) {
+        window.API.showToast('Please sign in to access and manage your private store catalog.', 'warning');
+        if (typeof openSignInModal === 'function') openSignInModal();
         return;
       }
       const modal = document.getElementById('product-modal');
@@ -299,9 +299,6 @@
       renderIcons();
     }
 
-    // ==========================================
-    // CATALOG IMAGE DRAG-AND-DROP & PREVIEW
-    // ==========================================
     function handleCatalogDragOver(e, el) {
       e.preventDefault();
       el.classList.add('border-brand-600', 'bg-brand-100/50');

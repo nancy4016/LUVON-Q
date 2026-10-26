@@ -75,7 +75,7 @@ function initializeStore() {
           tone: "luxury_chic",
           languagePreference: "mirror_user",
           elevenLabsVoiceId: process.env.ELEVENLABS_VOICE_ID || DEFAULT_FEMALE_VOICE_ID,
-          escalationPhone: process.env.AGENT_PHONE_NUMBER || "254768820142",
+          escalationPhone: process.env.AGENT_PHONE_NUMBER || "254700000000",
           whatsappPhoneId: process.env.WHATSAPP_PHONE_NUMBER_ID || "1350863544770006",
           currency: "KSh",
           orderPrefix: "LQ",
@@ -118,10 +118,13 @@ function resolveTenant(channelId) {
   return db.tenants["luvon_q_flagship"];
 }
 
+// ==========================================
+// STRICT SERVER-SIDE ROUTE GUARD
+// ==========================================
 function tenantMiddleware(req, res, next) {
   let tenantId = req.headers['x-tenant-id'];
   if (!tenantId || tenantId === 'anonymous') {
-    tenantId = 'luvon_q_flagship';
+    return res.status(401).json({ error: "Unauthorized. Please sign in to access store operations." });
   }
 
   if (!db.tenants[tenantId]) {
@@ -150,8 +153,6 @@ function tenantMiddleware(req, res, next) {
 // ==========================================
 async function callGeminiAPI(systemPrompt, userText) {
   const models = [
-    'gemini-3.8-flash',
-    'gemini-3.1-pro-preview',
     'gemini-2.5-flash',
     'gemini-2.0-flash'
   ];
@@ -187,7 +188,7 @@ async function callGeminiAPI(systemPrompt, userText) {
     }
   }
 
-  return "Niaje! Tuko hapa kukusaidia. System yetu inafanya update kidogo—unatafuta sneakers gani specifically nikusaidie right now?";
+  return "Niaje! Tuko hapa kukusaidia. System yetu inafanya update kidogo—unatafuta nini specifically nikusaidie right now?";
 }
 
 async function handleAIOnboarding(req, res) {
@@ -713,7 +714,7 @@ app.post('/api/tenant/conversations/simulate-inquiry', tenantMiddleware, async (
   const { customerId, text } = req.body;
   if (!text) return res.status(400).json({ error: "Text inquiry is required" });
 
-  const phone = customerId ? customerId.toString().replace(/\+/g, '').trim() : "254708374149";
+  const phone = customerId ? customerId.toString().replace(/\+/g, '').trim() : "254700000000";
   const { profile } = getOrCreateCustomerSession(req.tenant, phone, 'whatsapp');
 
   try {
@@ -769,7 +770,7 @@ app.post('/api/tenant/payments/daraja', tenantMiddleware, (req, res) => {
 
 app.post('/api/tenant/payments/test-stk', tenantMiddleware, async (req, res) => {
   const { testPhone } = req.body;
-  let cleanPhone = String(testPhone || "254708374149").replace(/\D/g, '').trim();
+  let cleanPhone = String(testPhone || "254700000000").replace(/\D/g, '').trim();
   if (cleanPhone.startsWith('0')) cleanPhone = '254' + cleanPhone.slice(1);
   if (!cleanPhone.startsWith('254')) cleanPhone = '254' + cleanPhone;
 
@@ -825,7 +826,6 @@ async function publishToInstagram({ igUserId, pageAccessToken, mediaUrl, caption
   const containerId = containerRes.data?.id;
   if (!containerId) throw new Error('Failed to create Instagram media container');
 
-  // Video and Reels must be encoded by Meta before publishing
   if (mediaType === 'REELS' || mediaType === 'VIDEO') {
     let isReady = false;
     let attempts = 0;
@@ -912,9 +912,8 @@ app.post('/api/tenant/campaigns/schedule', tenantMiddleware, async (req, res) =>
     return res.status(400).json({ error: "Caption and scheduled date/time are required." });
   }
 
-  // Auto-attach Click-to-WhatsApp attribution link to direct leads to Luvon Q
   let processedCaption = caption;
-  const escalationPhone = req.tenant.escalationPhone || "254768820142";
+  const escalationPhone = req.tenant.escalationPhone || process.env.AGENT_PHONE_NUMBER || "254700000000";
   const tag = (campaignTag || "PROMO").toUpperCase().replace(/\s+/g, '_');
   const whatsappUrl = `https://wa.me/${escalationPhone}?text=Hello%2C%20I%20saw%20your%20post%20regarding%20${encodeURIComponent(tag)}`;
 
@@ -922,7 +921,6 @@ app.post('/api/tenant/campaigns/schedule', tenantMiddleware, async (req, res) =>
     processedCaption += `\n\n💬 Order / Inquire via WhatsApp: ${whatsappUrl}`;
   }
 
-  // Canonical hosted route resolution for local video demo
   let cleanMediaUrl = mediaUrl || null;
   const serverBaseUrl = (process.env.SERVER_URL || "https://luvonq.changelens.africa").replace(/\/$/, "");
   if (!cleanMediaUrl && (mediaType === 'REELS' || mediaType === 'VIDEO')) {
@@ -1085,7 +1083,7 @@ async function executeDarajaSTK(tenant, phoneNumber, amount, itemRef, isRetry = 
     let cleanPhone = String(phoneNumber || '').replace(/\D/g, '').trim();
     if (cleanPhone.startsWith('0')) cleanPhone = '254' + cleanPhone.slice(1);
     if (!cleanPhone.startsWith('254')) cleanPhone = '254' + cleanPhone;
-    if (cleanPhone.length !== 12) cleanPhone = "254708374149";
+    if (cleanPhone.length !== 12) cleanPhone = "254700000000";
 
     const serverBaseUrl = (process.env.SERVER_URL || "https://luvonq.changelens.africa").replace(/\/$/, "");
     const res = await axios.post(
