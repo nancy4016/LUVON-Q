@@ -308,7 +308,7 @@ app.post('/api/auth/signin', async (req, res) => {
 // 3. AI CONVERSATIONAL ENGINE (GEMINI CASCADE)
 // ==========================================
 async function callGeminiAPI(systemPrompt, userText) {
-  const models = ['gemini-2.5-flash', 'gemini-2.0-flash'];
+  const models = ['gemini-3.8-flash', 'gemini-3.5-flash-lite'];
 
   for (const model of models) {
     for (let attempt = 0; attempt < 2; attempt++) {
