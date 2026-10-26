@@ -284,12 +284,19 @@
 
       const businessName = meta.tenant_name || meta.full_name || meta.name || meta.user_name || (user.email ? user.email.split('@')[0] : 'My Store');
       const tenantId = meta.tenant_id || `tenant_${user.id.replace(/-/g, '').slice(0, 10)}`;
+      const avatarUrl = meta.avatar_url || meta.picture || null;
 
       localStorage.setItem('luvon_user', JSON.stringify(user));
       localStorage.setItem('luvon_active_tenant_id', tenantId);
       localStorage.setItem('luvon_business_name', businessName);
       localStorage.setItem('luvon_user_email', user.email || '');
       localStorage.setItem('luvon_access_token', accessToken);
+      if (avatarUrl) {
+        localStorage.setItem('luvon_user_avatar', avatarUrl);
+      } else {
+        localStorage.removeItem('luvon_user_avatar');
+      }
+
       if (refreshToken) {
         localStorage.setItem('luvon_refresh_token', refreshToken);
       }
@@ -304,7 +311,7 @@
           userId: user.id,
           email: user.email,
           businessName: businessName,
-          avatarUrl: meta.avatar_url || meta.picture || null
+          avatarUrl: avatarUrl
         })
       }).catch(() => {});
 
@@ -413,6 +420,13 @@
       localStorage.setItem('luvon_active_tenant_id', data.tenantId);
       localStorage.setItem('luvon_business_name', data.businessName || fullName);
 
+      const avatar = data.user?.user_metadata?.avatar_url || data.user?.user_metadata?.picture;
+      if (avatar) {
+        localStorage.setItem('luvon_user_avatar', avatar);
+      } else {
+        localStorage.removeItem('luvon_user_avatar');
+      }
+
       closeSignInModal();
       updateAuthUI(data.user, data.businessName);
       showToast(`Welcome, ${data.businessName || 'Merchant'}!`, 'success');
@@ -447,6 +461,7 @@
     localStorage.removeItem('luvon_active_tenant_id');
     localStorage.removeItem('luvon_business_name');
     localStorage.removeItem('luvon_user_email');
+    localStorage.removeItem('luvon_user_avatar');
     localStorage.removeItem('luvon_access_token');
     localStorage.removeItem('luvon_refresh_token');
     updateAuthUI(null);
@@ -456,23 +471,57 @@
     }, 400);
   }
 
+  function switchAccount() {
+    localStorage.removeItem('luvon_user');
+    localStorage.removeItem('luvon_active_tenant_id');
+    localStorage.removeItem('luvon_business_name');
+    localStorage.removeItem('luvon_user_email');
+    localStorage.removeItem('luvon_user_avatar');
+    localStorage.removeItem('luvon_access_token');
+    localStorage.removeItem('luvon_refresh_token');
+    updateAuthUI(null);
+    window.location.replace('/index.html?auth=required');
+  }
+
+  // ==========================================
+  // DYNAMIC AVATAR & SIDEBAR HYDRATION
+  // ==========================================
   function updateAuthUI(user, businessName) {
     const signInBtn = document.getElementById('portalSignInBtn');
     const tenantCard = document.getElementById('activeTenantCard');
-    const userInitial = document.getElementById('userInitial');
+    const userAvatarCircle = document.getElementById('userAvatarCircle');
 
     if (user && isAuthenticated()) {
       if (signInBtn) signInBtn.classList.add('hidden');
       if (tenantCard) tenantCard.classList.remove('hidden');
-      if (userInitial) {
-        const name = businessName || 'N';
-        userInitial.textContent = name.trim().charAt(0).toUpperCase();
+
+      if (userAvatarCircle) {
+        // Redirection on click to profile section in Settings
+        userAvatarCircle.onclick = function() {
+          window.location.href = 'settings.html#profile';
+        };
+        userAvatarCircle.title = "View Account & Workspace Profile";
+
+        const avatarUrl = localStorage.getItem('luvon_user_avatar');
+        const name = businessName || localStorage.getItem('luvon_business_name') || 'Merchant';
+        const initial = name.trim().charAt(0).toUpperCase() || 'M';
+
+        if (avatarUrl) {
+          userAvatarCircle.innerHTML = `
+            <img src="${avatarUrl}" alt="${name}" class="w-full h-full rounded-full object-cover border border-brand-500/30" />
+          `;
+        } else {
+          userAvatarCircle.innerHTML = `<span id="userInitial">${initial}</span>`;
+        }
       }
     } else {
       if (signInBtn) signInBtn.classList.remove('hidden');
       if (tenantCard) tenantCard.classList.add('hidden');
     }
-    if (window.lucide && typeof window.lucide.createIcons === 'function') lucide.createIcons();
+
+    if (window.lucide && typeof window.lucide.createIcons === 'function') {
+      lucide.createIcons();
+    }
   }
 
   function openOnboardingModal() {
@@ -536,6 +585,7 @@
   window.switchAuthTab = switchAuthTab;
   window.handleCustomerAuth = handleCustomerAuth;
   window.toggleSignOut = toggleSignOut;
+  window.switchAccount = switchAccount;
   window.runAIBusinessSetup = runAIBusinessSetup;
   window.openOnboardingModal = openOnboardingModal;
   window.closeOnboardingModal = closeOnboardingModal;
